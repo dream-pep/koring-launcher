@@ -7,26 +7,45 @@ interface DebugProps {
 
 export function Debug({ onNavigate }: DebugProps) {
   const openSplash = async () => {
-    const existing = await WebviewWindow.getByLabel("splashscreen");
-    if (existing) {
-      existing.show();
-      return;
-    }
+    try {
+      const existing = await WebviewWindow.getByLabel("splashscreen");
+      if (existing) {
+        await existing.show();
+        await existing.setFocus();
+        return;
+      }
 
-    new WebviewWindow("splashscreen", {
-      url: "/splash.html",
-      width: 480,
-      height: 320,
-      decorations: false,
-      transparent: true,
-      center: true,
-    });
+      const splash = new WebviewWindow("splashscreen", {
+        url: "/splash.html",
+        width: 480,
+        height: 320,
+        decorations: false,
+        transparent: true,
+        center: true,
+        visible: true,
+        resizable: false,
+        minWidth: 480,
+        maxWidth: 480,
+        minHeight: 320,
+        maxHeight: 320,
+      } as any);
+
+      splash.once("tauri://error", (e) => {
+        console.error("Splash window error:", e);
+      });
+    } catch (err) {
+      console.error("Failed to open splash:", err);
+    }
   };
 
   const closeSplash = async () => {
-    const splash = await WebviewWindow.getByLabel("splashscreen");
-    if (splash) {
-      splash.close();
+    try {
+      const splash = await WebviewWindow.getByLabel("splashscreen");
+      if (splash) {
+        await splash.close();
+      }
+    } catch (err) {
+      console.error("Failed to close splash:", err);
     }
   };
 

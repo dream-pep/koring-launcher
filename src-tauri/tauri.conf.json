@@ -20,7 +20,12 @@
         "decorations": false,
         "transparent": true,
         "center": true,
-        "visible": true
+        "visible": true,
+        "resizable": false,
+        "minWidth": 480,
+        "maxWidth": 480,
+        "minHeight": 320,
+        "maxHeight": 320
       },
       {
         "label": "main",

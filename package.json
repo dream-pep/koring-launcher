@@ -4,11 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "icon:dev": "node scripts/switch-icon.js dev",
+    "icon:beta": "node scripts/switch-icon.js beta",
+    "icon:run": "node scripts/switch-icon.js run",
+    "dev": "node scripts/switch-icon.js dev && vite --mode development",
+    "build": "node scripts/switch-icon.js run && tsc && vite build --mode production",
+    "build:beta": "node scripts/switch-icon.js beta && tsc && vite build --mode beta",
     "preview": "vite preview",
     "tauri": "tauri",
-    "dev:t": "tauri dev"
+    "dev:t": "node scripts/switch-icon.js dev && tauri dev"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
