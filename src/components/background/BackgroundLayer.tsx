@@ -77,6 +77,7 @@ export function BackgroundLayer() {
         }
       `}</style>
       <div style={getBackgroundStyle()} />
+      <div className="dark:block hidden fixed inset-0 z-0 pointer-events-none bg-black/35" />
     </>
   );
 }

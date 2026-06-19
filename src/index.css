@@ -90,6 +90,12 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+
+    /* 标题栏 & 导航 - 亮色 */
+    --titlebar-bg: rgba(255, 255, 255, 0.5);
+    --titlebar-border: rgba(0, 0, 0, 0.08);
+    --indicator-bg: rgba(0, 0, 0, 0.1);
+    --indicator-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .dark {
@@ -124,6 +130,12 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+
+    /* 标题栏 & 导航 - 暗色 */
+    --titlebar-bg: rgba(0, 0, 0, 0.2);
+    --titlebar-border: rgba(255, 255, 255, 0.08);
+    --indicator-bg: rgba(255, 255, 255, 0.15);
+    --indicator-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 @layer base {
@@ -136,4 +148,48 @@
   html {
     @apply font-sans;
     }
+}
+
+/* ============================================
+   View Transitions — 页面切换动效
+   ============================================ */
+
+/* root 转场：禁用，只让内容区参与动画 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* 内容区转场：前进方向 */
+::view-transition-old(content) {
+  animation: 0.3s cubic-bezier(0.4, 0, 0.2, 1) both page-out-forward;
+}
+::view-transition-new(content) {
+  animation: 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s both page-in-forward;
+}
+
+/* 内容区转场：后退方向 */
+:root[data-transition-dir="backward"] ::view-transition-old(content) {
+  animation-name: page-out-backward;
+}
+:root[data-transition-dir="backward"] ::view-transition-new(content) {
+  animation-name: page-in-backward;
+  animation-delay: 0.05s;
+}
+
+@keyframes page-out-forward {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.97); }
+}
+@keyframes page-in-forward {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes page-out-backward {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.97); }
+}
+@keyframes page-in-backward {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
 }

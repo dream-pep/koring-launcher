@@ -25,10 +25,9 @@ if (!existsSync(ico)) {
   process.exit(1);
 }
 
+// Tauri 2 only needs icon.png (source) + icon.ico
+// It auto-generates 32x32, 128x128, 128x128@2x, icns from icon.png during build
 cpSync(png, join(iconsDir, "icon.png"), { overwrite: true });
 cpSync(ico, join(iconsDir, "icon.ico"), { overwrite: true });
-cpSync(png, join(iconsDir, "32x32.png"), { overwrite: true });
-cpSync(png, join(iconsDir, "128x128.png"), { overwrite: true });
-cpSync(png, join(iconsDir, "128x128@2x.png"), { overwrite: true });
 
-console.log(`[switch-icon] Mode: ${mode} → icons updated`);
+console.log(`[switch-icon] Mode: ${mode} → icon.png + icon.ico updated`);

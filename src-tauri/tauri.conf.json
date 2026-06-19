@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "splashscreen",
-        "title": "splashscreen",
+        "title": "正在启动",
         "url": "/splash.html",
         "width": 480,
         "height": 320,
@@ -29,7 +29,7 @@
       },
       {
         "label": "main",
-        "title": "koring-launcher",
+        "title": "Koring Launcher",
         "width": 800,
         "height": 600,
         "decorations": false,
@@ -45,10 +45,7 @@
     "active": true,
     "targets": "all",
     "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
+      "icons/icon.png",
       "icons/icon.ico"
     ],
     "externalBin": [

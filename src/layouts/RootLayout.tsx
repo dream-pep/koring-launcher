@@ -21,7 +21,10 @@ export function RootLayout({
       <BackgroundLayer />
 
       {/* Layer 1: Content */}
-      <div className="absolute z-[1] left-0 right-0 bottom-0 top-[40px] overflow-auto">
+      <div
+        className="absolute z-[1] left-0 right-0 bottom-0 top-[40px] overflow-auto"
+        style={{ viewTransitionName: "content" } as React.CSSProperties}
+      >
         {children}
       </div>
 
