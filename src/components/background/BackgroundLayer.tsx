@@ -1,10 +1,15 @@
 import { useEffect } from "react";
 import { useBackgroundStore } from "@/stores/backgroundStore";
+import { useRouteStore } from "@/stores/routeStore";
+import { useDevStore } from "@/stores/devStore";
 
 const DEFAULT_BG = "/background.png";
 
 export function BackgroundLayer() {
   const { type, image, color, blur, opacity, animationSpeed, fetchConfig } = useBackgroundStore();
+  const route = useRouteStore((s) => s.current);
+  const forceDisableContentBlur = useDevStore((s) => s.forceDisableContentBlur);
+  const inSetting = route === "setting" || route === "debug";
 
   useEffect(() => {
     fetchConfig();
@@ -77,6 +82,7 @@ export function BackgroundLayer() {
         }
       `}</style>
       <div style={getBackgroundStyle()} />
+      {inSetting && !forceDisableContentBlur && <div className="content-blur-overlay" />}
       <div className="dark:block hidden fixed inset-0 z-0 pointer-events-none bg-black/35" />
     </>
   );

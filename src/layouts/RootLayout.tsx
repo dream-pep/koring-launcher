@@ -1,6 +1,8 @@
 import { type ReactNode } from "react";
 import { BackgroundLayer } from "@/components/background/BackgroundLayer";
 import { SystemLayer } from "@/components/system/SystemLayer";
+import { useA11yStore } from "@/stores/a11yStore";
+import clsx from "clsx";
 
 interface RootLayoutProps {
   children: ReactNode;
@@ -15,8 +17,17 @@ export function RootLayout({
   showMaximize = true,
   showClose = true,
 }: RootLayoutProps) {
+  const { reduceMotion, reduceTransparency, highContrast } = useA11yStore();
+
   return (
-    <div className="relative w-screen h-screen overflow-hidden">
+    <div
+      className={clsx(
+        "relative w-screen h-screen overflow-hidden",
+        reduceMotion && "reduce-motion",
+        reduceTransparency && "reduce-transparency",
+        highContrast && "high-contrast",
+      )}
+    >
       {/* Layer 0: Background */}
       <BackgroundLayer />
 

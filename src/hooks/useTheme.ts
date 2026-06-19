@@ -1,19 +1,22 @@
 import { useEffect } from "react";
+import { useThemeStore } from "@/stores/themeStore";
 
 export function useTheme() {
+  const darkMode = useThemeStore((s) => s.darkMode);
+
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
 
-    const apply = (dark: boolean) => {
+    const apply = () => {
+      const mode = useThemeStore.getState().darkMode;
+      let dark = false;
+      if (mode === "auto") dark = mq.matches;
+      else if (mode === "dark") dark = true;
       document.documentElement.classList.toggle("dark", dark);
     };
 
-    // 初始应用
-    apply(mq.matches);
-
-    // 监听系统切换
-    const handler = (e: MediaQueryListEvent) => apply(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [darkMode]);
 }

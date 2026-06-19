@@ -32,7 +32,7 @@ pub fn run() {
             // After splash animation, close splash and show main
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(4)).await;
 
                 // Close splash screen
                 if let Some(splash) = handle.get_webview_window("splashscreen") {

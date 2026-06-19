@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "splashscreen",
-        "title": "正在启动",
+        "title": "Koring Launcher",
         "url": "/splash.html",
         "width": 480,
         "height": 320,
@@ -30,10 +30,13 @@
       {
         "label": "main",
         "title": "Koring Launcher",
-        "width": 800,
+        "width": 900,
         "height": 600,
+        "minWidth": 800,
+        "minHeight": 600,
         "decorations": false,
         "transparent": true,
+        "center": true,
         "visible": false
       }
     ],
@@ -45,8 +48,7 @@
     "active": true,
     "targets": "all",
     "icon": [
-      "icons/icon.png",
-      "icons/icon.ico"
+      "icons/icon.png"
     ],
     "externalBin": [
       "binaries/koring-sidecar"

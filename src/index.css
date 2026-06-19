@@ -92,7 +92,7 @@
     --sidebar-ring: oklch(0.708 0 0);
 
     /* 标题栏 & 导航 - 亮色 */
-    --titlebar-bg: rgba(255, 255, 255, 0.5);
+    --titlebar-bg: rgba(255, 255, 255, 0.1);
     --titlebar-border: rgba(0, 0, 0, 0.08);
     --indicator-bg: rgba(0, 0, 0, 0.1);
     --indicator-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -132,7 +132,7 @@
     --sidebar-ring: oklch(0.556 0 0);
 
     /* 标题栏 & 导航 - 暗色 */
-    --titlebar-bg: rgba(0, 0, 0, 0.2);
+    --titlebar-bg: rgba(0, 0, 0, 0.1);
     --titlebar-border: rgba(255, 255, 255, 0.08);
     --indicator-bg: rgba(255, 255, 255, 0.15);
     --indicator-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -148,6 +148,38 @@
   html {
     @apply font-sans;
     }
+}
+
+/* ============================================
+   自定义滚动条 — 默认隐藏，滚动时显示
+   ============================================ */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.4);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 悬停/滚动时显示滑块 */
+.scroll-area:hover::-webkit-scrollbar-thumb,
+.scroll-area::-webkit-scrollbar-thumb:active {
+  background: rgba(128, 128, 128, 0.25);
+}
+.dark .scroll-area:hover::-webkit-scrollbar-thumb,
+.dark .scroll-area::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* ============================================
@@ -192,4 +224,65 @@
 @keyframes page-in-backward {
   from { opacity: 0; transform: scale(0.97); }
   to   { opacity: 1; transform: scale(1); }
+}
+
+/* ============================================
+   磨砂卡片 — 复用 --titlebar-bg / --titlebar-border
+   ============================================ */
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--titlebar-border);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+:root.dark .glass-card {
+  background: rgba(0, 0, 0, 0.48);
+}
+
+/* ============================================
+   强内容模式 — 设置页面内容区模糊遮罩
+   ============================================ */
+.content-blur-overlay {
+  position: fixed;
+  inset: 0;
+  backdrop-filter: blur(80px) saturate(120%);
+  -webkit-backdrop-filter: blur(80px) saturate(120%);
+  z-index: 0;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.5);
+}
+:root.dark .content-blur-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   辅助功能
+   ============================================ */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+.reduce-motion ::view-transition-old(root),
+.reduce-motion ::view-transition-new(root) {
+  animation: none !important;
+}
+
+.reduce-transparency {
+  --titlebar-bg: var(--background);
+}
+.reduce-transparency .glass-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.high-contrast {
+  --foreground: oklch(0 0 0);
+}
+:root.dark .high-contrast {
+  --foreground: oklch(1 0 0);
 }
