@@ -22,10 +22,10 @@ export function A11ySetting() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-foreground mb-6">辅助功能</h2>
+      <h2 className="text-xl font-bold text-foreground mb-1">辅助功能</h2>
+      <p className="text-sm text-muted-foreground mb-6">调整动画、透明度与对比度以改善使用体验</p>
 
       <div className="space-y-6">
-        {/* ===== 显示 ===== */}
         <div>
           <h3 className="text-lg font-bold text-foreground mb-3">显示</h3>
           <div className="space-y-3">

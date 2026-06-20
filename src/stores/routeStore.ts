@@ -1,6 +1,15 @@
 import { create } from "zustand";
 
-export type RouteKey = "home" | "store" | "today" | "play-link" | "setting" | "debug";
+export type RouteKey =
+  | "home"
+  | "store"
+  | "today"
+  | "play-link"
+  | "setting"
+  | "debug"
+  | "debug-splash"
+  | "debug-display"
+  | "debug-version-card";
 
 export type TitleBarMode = "default" | "sub" | "window";
 
@@ -24,11 +33,19 @@ export const routes: RouteItem[] = [
 export const allRoutes: RouteItem[] = [
   ...routes,
   { key: "debug", label: "调试", path: "/debug", hidden: true },
+  { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
+  { key: "debug-display", label: "显示效果调试", path: "/debug/display", hidden: true },
+  { key: "debug-version-card", label: "版本卡片调试", path: "/debug/version-card", hidden: true },
 ];
 
 const parentMap: Partial<Record<RouteKey, RouteKey>> = {
   debug: "setting",
+  "debug-splash": "debug",
+  "debug-display": "debug",
+  "debug-version-card": "debug",
 };
+
+const topLevelKeys = new Set(routes.map((r) => r.key));
 
 function startTransition(dir: TransitionDirection, callback: () => void) {
   document.documentElement.dataset.transitionDir = dir;
@@ -54,11 +71,10 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   direction: "forward",
   navigate: (key) => {
     const parent = parentMap[key];
-    const isForward = parent !== undefined;
     startTransition("forward", () => {
       set({
         current: key,
-        titleBarMode: isForward ? "sub" : "default",
+        titleBarMode: parent && !topLevelKeys.has(key) ? "sub" : "default",
         direction: "forward",
       });
     });
@@ -71,7 +87,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
       startTransition("backward", () => {
         set({
           current: parent,
-          titleBarMode: "default",
+          titleBarMode: topLevelKeys.has(parent) ? "default" : "sub",
           direction: "backward",
         });
       });

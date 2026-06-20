@@ -9,7 +9,7 @@ export function BackgroundLayer() {
   const { type, image, color, blur, opacity, animationSpeed, fetchConfig } = useBackgroundStore();
   const route = useRouteStore((s) => s.current);
   const forceDisableContentBlur = useDevStore((s) => s.forceDisableContentBlur);
-  const inSetting = route === "setting" || route === "debug";
+  const showContentBlur = route !== "home";
 
   useEffect(() => {
     fetchConfig();
@@ -82,7 +82,10 @@ export function BackgroundLayer() {
         }
       `}</style>
       <div style={getBackgroundStyle()} />
-      {inSetting && !forceDisableContentBlur && <div className="content-blur-overlay" />}
+      <div
+        className="content-blur-overlay"
+        style={{ opacity: showContentBlur && !forceDisableContentBlur ? 1 : 0 }}
+      />
       <div className="dark:block hidden fixed inset-0 z-0 pointer-events-none bg-black/35" />
     </>
   );

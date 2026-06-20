@@ -17,7 +17,9 @@ export function RootLayout({
   showMaximize = true,
   showClose = true,
 }: RootLayoutProps) {
-  const { reduceMotion, reduceTransparency, highContrast } = useA11yStore();
+  const { reduceMotion, reduceTransparency, highContrast, contentBlurOpacity } = useA11yStore();
+
+  const blurOpacity = reduceTransparency ? 0 : contentBlurOpacity;
 
   return (
     <div
@@ -27,6 +29,7 @@ export function RootLayout({
         reduceTransparency && "reduce-transparency",
         highContrast && "high-contrast",
       )}
+      style={{ "--content-blur-opacity": `${blurOpacity / 100}` } as React.CSSProperties}
     >
       {/* Layer 0: Background */}
       <BackgroundLayer />

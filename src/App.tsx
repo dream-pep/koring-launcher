@@ -6,7 +6,10 @@ import { Store } from "./pages/store";
 import { Today } from "./pages/today";
 import { PlayLink } from "./pages/play-link";
 import { Setting } from "./pages/setting";
-import { Debug } from "./pages/setting/debug";
+import { Debug } from "./pages/debug";
+import { SplashDebug } from "./pages/debug/splash-debug";
+import { DisplayDebug } from "./pages/debug/display-debug";
+import { VersionCardDebug } from "./pages/debug/version-card-debug";
 
 const pageMap = {
   home: Home,
@@ -15,6 +18,9 @@ const pageMap = {
   "play-link": PlayLink,
   setting: Setting,
   debug: Debug,
+  "debug-splash": SplashDebug,
+  "debug-display": DisplayDebug,
+  "debug-version-card": VersionCardDebug,
 } as const;
 
 function App() {

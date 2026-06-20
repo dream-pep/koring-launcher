@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { BUILD_MODE } from "@/lib/mode";
+import clsx from "clsx";
 
 interface WindowControlsProps {
   showMinimize?: boolean;
@@ -30,8 +32,23 @@ export function WindowControls({
   const btnClass = "flex items-center justify-center w-[25px] h-[25px] rounded transition-colors cursor-default hover:bg-black/10 dark:hover:bg-white/15 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white";
   const closeBtnClass = "flex items-center justify-center w-[25px] h-[25px] rounded transition-colors cursor-default hover:bg-red-500 text-black/70 dark:text-white/70 hover:text-white";
 
+  const showBadge = BUILD_MODE !== "run";
+  const badgeLabel = BUILD_MODE === "dev" ? "DEV" : "BETA";
+
   return (
     <div className="flex items-center gap-0.5 pr-2" data-no-drag>
+      {showBadge && (
+        <span
+          className={clsx(
+            "inline-flex items-center justify-center h-[18px] px-1.5 rounded text-[10px] font-bold tracking-wider mr-1",
+            BUILD_MODE === "dev"
+              ? "bg-amber-500/65 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+              : "bg-emerald-500/65 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20",
+          )}
+        >
+          {badgeLabel}
+        </span>
+      )}
       {showMinimize && (
         <div onClick={handleMinimize} className={btnClass}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">

@@ -12,15 +12,20 @@
     "build:beta": "node scripts/switch-icon.js beta && tsc && vite build --mode beta",
     "preview": "vite preview",
     "tauri": "tauri",
-    "dev:t": "node scripts/switch-icon.js dev && tauri dev"
+    "dev:t": "node scripts/switch-icon.js dev && tauri dev",
+    "dev:vs": "./dev-vs.cmd"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/inter": "^5.2.8",
+    "@react-three/fiber": "^9.6.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "@types/three": "^0.184.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.21.0",
@@ -28,6 +33,7 @@
     "react-dom": "^19.1.0",
     "shadcn": "^4.11.0",
     "tailwind-merge": "^3.6.0",
+    "three": "^0.184.0",
     "tw-animate-css": "^1.4.0",
     "zustand": "^5.0.14"
   },

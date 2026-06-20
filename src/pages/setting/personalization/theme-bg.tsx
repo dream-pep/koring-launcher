@@ -1,5 +1,6 @@
 import { useThemeStore, type DarkMode } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
+import { useA11yStore } from "@/stores/a11yStore";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,7 @@ function ThemePreviewCard({ mode, selected, onClick }: { mode: DarkMode; selecte
 export function ThemeBgSetting() {
   const { darkMode, setDarkMode, parallax, setParallax } = useThemeStore();
   const { opacity, setOpacity, blur, setBlur, reset } = useBackgroundStore();
+  const { contentBlurOpacity, setContentBlurOpacity } = useA11yStore();
 
   const handlePickImage = async () => {
     // TODO: 打开文件选择器
@@ -118,7 +120,8 @@ export function ThemeBgSetting() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-foreground mb-6">主题与背景</h2>
+      <h2 className="text-xl font-bold text-foreground mb-1">主题与背景</h2>
+      <p className="text-sm text-muted-foreground mb-6">切换深色模式、更换背景图片与调整视觉效果</p>
 
       <div className="space-y-6">
         {/* ===== 深色模式 ===== */}
@@ -178,6 +181,23 @@ export function ThemeBgSetting() {
               >
                 <Switch checked={parallax} onCheckedChange={setParallax} />
               </SettingRow>
+            </GlassCard>
+
+            <GlassCard>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">强内容遮罩不透明度</p>
+                  <p className="text-[13px] text-muted-foreground mt-0.5">设置页面背景模糊遮罩的不透明度，当前 {contentBlurOpacity}%</p>
+                </div>
+                <Slider
+                  className="w-[180px] shrink-0"
+                  value={[contentBlurOpacity]}
+                  min={0}
+                  max={100}
+                  step={1}
+                  onValueChange={(v) => setContentBlurOpacity(Array.isArray(v) ? v[0] : v)}
+                />
+              </div>
             </GlassCard>
 
             <GlassCard>

@@ -9,7 +9,9 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(SidecarManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::sidecar_request,

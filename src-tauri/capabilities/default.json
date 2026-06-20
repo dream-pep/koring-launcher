@@ -17,7 +17,9 @@
     "core:window:allow-set-focus",
     "core:webview:allow-create-webview-window",
     "opener:default",
+    "process:default",
     "shell:allow-execute",
+    "updater:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [
