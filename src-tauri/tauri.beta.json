@@ -1,0 +1,8 @@
+{
+  "build": {
+    "beforeBuildCommand": "echo skip-beta-build"
+  },
+  "bundle": {
+    "targets": []
+  }
+}

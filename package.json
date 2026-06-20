@@ -13,7 +13,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:t": "node scripts/switch-icon.js dev && tauri dev",
-    "dev:vs": "./dev-vs.cmd"
+    "dev:vs": "./dev-vs.cmd",
+    "build:vs": "./build-vs.cmd",
+    "build:beta:vs": "./build-vs.cmd --mode beta"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -21,6 +23,8 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@react-three/fiber": "^9.6.1",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.5",

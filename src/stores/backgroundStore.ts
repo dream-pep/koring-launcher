@@ -1,133 +1,74 @@
 import { create } from "zustand";
-import {
-  setImageBackground,
-  setColorBackground,
-  setBackgroundBlur,
-  setBackgroundOpacity,
-  setBackgroundAnimation,
-  getBackgroundConfig,
-  setTheme,
-  resetBackground,
-} from "../api/background";
-import type { AnimationType, Theme, BackgroundConfig } from "../api/background";
 
-interface BackgroundState {
-  type: "image" | "color" | "gradient" | "particles";
-  image?: string;
-  color?: string;
+const STORAGE_KEY = "koring-background";
+
+type BackgroundType = "image" | "color";
+
+interface BackgroundConfig {
+  type: BackgroundType;
+  image: string;
   blur: number;
   opacity: number;
-  animation: AnimationType;
-  animationSpeed: number;
-  theme: Theme;
-  loading: boolean;
-  error: string | null;
-
-  setImage: (url: string, blur?: number, opacity?: number) => Promise<void>;
-  setColor: (color: string) => Promise<void>;
-  setBlur: (blur: number) => Promise<void>;
-  setOpacity: (opacity: number) => Promise<void>;
-  setAnimation: (type: AnimationType, speed?: number) => Promise<void>;
-  setTheme: (theme: Theme) => Promise<void>;
-  fetchConfig: () => Promise<void>;
-  reset: () => Promise<void>;
-  clearError: () => void;
 }
 
-const defaultConfig: BackgroundConfig = {
-  type: "color",
-  color: "#1a1a2e",
+const DEFAULT_CONFIG: BackgroundConfig = {
+  type: "image",
+  image: "/background.png",
   blur: 0,
   opacity: 1,
-  animation: "none",
-  animationSpeed: 1,
-  theme: "dark",
 };
 
+function loadConfig(): BackgroundConfig {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+  } catch {}
+  return { ...DEFAULT_CONFIG };
+}
+
+function saveConfig(config: BackgroundConfig) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+}
+
+interface BackgroundState extends BackgroundConfig {
+  setImage: (url: string) => void;
+  setColor: (color: string) => void;
+  setBlur: (blur: number) => void;
+  setOpacity: (opacity: number) => void;
+  reset: () => void;
+}
+
 export const useBackgroundStore = create<BackgroundState>((set) => ({
-  ...defaultConfig,
-  loading: false,
-  error: null,
+  ...loadConfig(),
 
-  setImage: async (url, blur, opacity) => {
-    set({ loading: true, error: null });
-    try {
-      const config = await setImageBackground(url, blur, opacity);
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
+  setImage: (url) => {
+    const next: BackgroundConfig = { type: "image", image: url, blur: 0, opacity: 1 };
+    saveConfig(next);
+    set(next);
   },
 
-  setColor: async (color) => {
-    set({ loading: true, error: null });
-    try {
-      const config = await setColorBackground(color);
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
+  setColor: (color) => {
+    const next: BackgroundConfig = { type: "color", image: color, blur: 0, opacity: 1 };
+    saveConfig(next);
+    set(next);
   },
 
-  setBlur: async (blur) => {
-    set({ loading: true, error: null });
-    try {
-      const config = await setBackgroundBlur(blur);
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
+  setBlur: (blur) => {
+    const config = loadConfig();
+    config.blur = blur;
+    saveConfig(config);
+    set({ blur });
   },
 
-  setOpacity: async (opacity) => {
-    set({ loading: true, error: null });
-    try {
-      const config = await setBackgroundOpacity(opacity);
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
+  setOpacity: (opacity) => {
+    const config = loadConfig();
+    config.opacity = opacity;
+    saveConfig(config);
+    set({ opacity });
   },
 
-  setAnimation: async (type, speed) => {
-    set({ loading: true, error: null });
-    try {
-      const config = await setBackgroundAnimation(type, speed);
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
+  reset: () => {
+    saveConfig(DEFAULT_CONFIG);
+    set({ ...DEFAULT_CONFIG });
   },
-
-  setTheme: async (theme) => {
-    set({ loading: true, error: null });
-    try {
-      const config = await setTheme(theme);
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
-  },
-
-  fetchConfig: async () => {
-    set({ loading: true, error: null });
-    try {
-      const config = await getBackgroundConfig();
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
-  },
-
-  reset: async () => {
-    set({ loading: true, error: null });
-    try {
-      const config = await resetBackground();
-      set({ ...config, loading: false });
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-    }
-  },
-
-  clearError: () => set({ error: null }),
 }));

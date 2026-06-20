@@ -1,18 +1,21 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { BUILD_MODE } from "@/lib/mode";
+import { TaskButton } from "@/components/task/TaskButton";
 import clsx from "clsx";
 
 interface WindowControlsProps {
   showMinimize?: boolean;
   showMaximize?: boolean;
   showClose?: boolean;
+  isSub?: boolean;
 }
 
 export function WindowControls({
   showMinimize = true,
   showMaximize = true,
   showClose = true,
+  isSub = false,
 }: WindowControlsProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const appWindow = getCurrentWindow();
@@ -49,6 +52,14 @@ export function WindowControls({
           {badgeLabel}
         </span>
       )}
+
+      {/* Task button — hidden in sub mode */}
+      {!isSub && (
+        <div className="mr-0.5">
+          <TaskButton />
+        </div>
+      )}
+
       {showMinimize && (
         <div onClick={handleMinimize} className={btnClass}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">

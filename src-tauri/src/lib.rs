@@ -10,6 +10,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(SidecarManager::new()))
@@ -57,8 +58,16 @@ pub fn run() {
             {
                 let handle = app.handle().clone();
                 let state = app.state::<Mutex<SidecarManager>>();
-                let mut sidecar = state.inner().lock().map_err(|e| e.to_string())?;
-                sidecar.spawn(&handle)?;
+                match state.inner().lock() {
+                    Ok(mut sidecar) => {
+                        if let Err(e) = sidecar.spawn(&handle) {
+                            eprintln!("[koring] sidecar spawn failed (non-fatal): {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[koring] sidecar lock failed (non-fatal): {}", e);
+                    }
+                }
             }
             Ok(())
         })

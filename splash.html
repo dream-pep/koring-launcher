@@ -5,68 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>koring-launcher</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body, #root {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      font-family: system-ui, -apple-system, sans-serif;
-    }
-
-    .container {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      background: #ffffff;
-      transition: background 0.3s;
-    }
-
-    .logo-area {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .logo-area img {
-      width: 260px;
-      height: auto;
-      animation: fadeIn 0.6s ease-out;
-    }
-
-    .bottom-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 24px 16px;
-      font-size: 12px;
-      color: #888888;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root { width: 100%; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
+    .container { width: 100%; height: 100%; display: flex; flex-direction: column; background: #ffffff; transition: background 0.3s; }
+    .logo-area { flex: 1; display: flex; align-items: center; justify-content: center; }
+    .logo-area img { width: 260px; height: auto; animation: fadeIn 0.6s ease-out; }
+    .bottom-bar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px 16px; font-size: 12px; color: #888888; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     @media (prefers-color-scheme: dark) {
-      .container {
-        background: #1a1a2e;
-      }
-      .logo-area img {
-        filter: invert(1);
-      }
+      .container { background: #1a1a2e; }
+      .logo-area img { filter: invert(1); }
     }
   </style>
 </head>
@@ -77,8 +25,8 @@
         <img src="/koring-licon.svg" alt="Koring Launcher" />
       </div>
       <div class="bottom-bar">
-        <span>Provided by Lingke Koring Studio</span>
-        <span>UI预览版本</span>
+        <span>Provided by Koring Studio</span>
+        <span>© Lingke</span>
       </div>
     </div>
   </div>

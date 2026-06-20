@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { BackgroundLayer } from "@/components/background/BackgroundLayer";
 import { SystemLayer } from "@/components/system/SystemLayer";
+import { StartupPopup } from "@/components/StartupPopup";
 import { useA11yStore } from "@/stores/a11yStore";
 import clsx from "clsx";
 
@@ -48,6 +49,9 @@ export function RootLayout({
         showMaximize={showMaximize}
         showClose={showClose}
       />
+
+      {/* Startup popup — only when VITE_START_POP=true */}
+      <StartupPopup />
     </div>
   );
 }

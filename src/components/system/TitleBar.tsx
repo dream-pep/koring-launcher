@@ -245,6 +245,7 @@ export function TitleBar({
           showMinimize={showMinimize}
           showMaximize={showMaximize}
           showClose={showClose}
+          isSub={isSub}
         />
       </div>
     </div>

@@ -1,10 +1,11 @@
 import { useThemeStore, type DarkMode } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
-import { useA11yStore } from "@/stores/a11yStore";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import clsx from "clsx";
+import { open } from "@tauri-apps/plugin-dialog";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 function GlassCard({ children }: { children: React.ReactNode }) {
   return <div className="glass-card px-5 py-4">{children}</div>;
@@ -107,11 +108,18 @@ function ThemePreviewCard({ mode, selected, onClick }: { mode: DarkMode; selecte
 
 export function ThemeBgSetting() {
   const { darkMode, setDarkMode, parallax, setParallax } = useThemeStore();
-  const { opacity, setOpacity, blur, setBlur, reset } = useBackgroundStore();
-  const { contentBlurOpacity, setContentBlurOpacity } = useA11yStore();
+  const { image, opacity, setOpacity, blur, setBlur, setImage, reset } = useBackgroundStore();
 
   const handlePickImage = async () => {
-    // TODO: 打开文件选择器
+    const selected = await open({
+      multiple: false,
+      filters: [
+        { name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] },
+      ],
+    });
+    if (selected) {
+      setImage(convertFileSrc(selected));
+    }
   };
 
   const handleReset = async () => {
@@ -146,6 +154,15 @@ export function ThemeBgSetting() {
                   选择图片
                 </Button>
               </SettingRow>
+              {image && image !== "/background.png" && (
+                <div className="mt-3 rounded-lg overflow-hidden border border-border/50">
+                  <img
+                    src={image}
+                    alt="背景预览"
+                    className="w-full h-[120px] object-cover"
+                  />
+                </div>
+              )}
             </GlassCard>
 
             <GlassCard>
@@ -181,23 +198,6 @@ export function ThemeBgSetting() {
               >
                 <Switch checked={parallax} onCheckedChange={setParallax} />
               </SettingRow>
-            </GlassCard>
-
-            <GlassCard>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">强内容遮罩不透明度</p>
-                  <p className="text-[13px] text-muted-foreground mt-0.5">设置页面背景模糊遮罩的不透明度，当前 {contentBlurOpacity}%</p>
-                </div>
-                <Slider
-                  className="w-[180px] shrink-0"
-                  value={[contentBlurOpacity]}
-                  min={0}
-                  max={100}
-                  step={1}
-                  onValueChange={(v) => setContentBlurOpacity(Array.isArray(v) ? v[0] : v)}
-                />
-              </div>
             </GlassCard>
 
             <GlassCard>

@@ -6,10 +6,12 @@ export type RouteKey =
   | "today"
   | "play-link"
   | "setting"
+  | "task-queue"
   | "debug"
   | "debug-splash"
   | "debug-display"
-  | "debug-version-card";
+  | "debug-version-card"
+  | "debug-task";
 
 export type TitleBarMode = "default" | "sub" | "window";
 
@@ -32,17 +34,21 @@ export const routes: RouteItem[] = [
 
 export const allRoutes: RouteItem[] = [
   ...routes,
+  { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
   { key: "debug", label: "调试", path: "/debug", hidden: true },
   { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
   { key: "debug-display", label: "显示效果调试", path: "/debug/display", hidden: true },
   { key: "debug-version-card", label: "版本卡片调试", path: "/debug/version-card", hidden: true },
+  { key: "debug-task", label: "任务队列调试", path: "/debug/task", hidden: true },
 ];
 
 const parentMap: Partial<Record<RouteKey, RouteKey>> = {
+  "task-queue": "home",
   debug: "setting",
   "debug-splash": "debug",
   "debug-display": "debug",
   "debug-version-card": "debug",
+  "debug-task": "debug",
 };
 
 const topLevelKeys = new Set(routes.map((r) => r.key));

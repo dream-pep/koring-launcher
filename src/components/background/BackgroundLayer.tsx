@@ -1,87 +1,73 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useBackgroundStore } from "@/stores/backgroundStore";
+import { useThemeStore } from "@/stores/themeStore";
 import { useRouteStore } from "@/stores/routeStore";
 import { useDevStore } from "@/stores/devStore";
 
 const DEFAULT_BG = "/background.png";
 
 export function BackgroundLayer() {
-  const { type, image, color, blur, opacity, animationSpeed, fetchConfig } = useBackgroundStore();
+  const { type, image, blur, opacity } = useBackgroundStore();
+  const parallax = useThemeStore((s) => s.parallax);
   const route = useRouteStore((s) => s.current);
   const forceDisableContentBlur = useDevStore((s) => s.forceDisableContentBlur);
   const showContentBlur = route !== "home";
 
+  const bgRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!parallax || !bgRef.current) return;
+      const x = (e.clientX / window.innerWidth - 0.5) * 20;
+      const y = (e.clientY / window.innerHeight - 0.5) * 20;
+      bgRef.current.style.transform = `translate(${x}px, ${y}px) scale(1.05)`;
+    },
+    [parallax],
+  );
+
   useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
+    if (!parallax) {
+      if (bgRef.current) bgRef.current.style.transform = "";
+      return;
+    }
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [parallax, handleMouseMove]);
+
+  const bgUrl = image || DEFAULT_BG;
 
   const getBackgroundStyle = (): React.CSSProperties => {
     const base: React.CSSProperties = {
       position: "fixed",
-      inset: 0,
+      inset: parallax ? -20 : 0,
       zIndex: 0,
       pointerEvents: "none",
       opacity,
+      transition: parallax ? "transform 0.1s ease-out" : undefined,
     };
 
     if (blur > 0) {
       base.filter = `blur(${blur}px)`;
     }
 
-    switch (type) {
-      case "image":
-        return {
-          ...base,
-          backgroundImage: `url(${image || DEFAULT_BG})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        };
-      case "color":
-        return {
-          ...base,
-          backgroundColor: color || "#1a1a2e",
-          backgroundImage: `url(${DEFAULT_BG})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        };
-      case "gradient":
-        return {
-          ...base,
-          background: `linear-gradient(135deg, ${color || "#1a1a2e"}, #16213e, #0f3460)`,
-          animation: `gradient-shift ${10 / animationSpeed}s ease infinite`,
-        };
-      case "particles":
-        return {
-          ...base,
-          background: `radial-gradient(circle at 20% 50%, rgba(${color || "26,26,46"}, 0.8) 0%, transparent 50%),
-                       radial-gradient(circle at 80% 20%, rgba(22, 33, 62, 0.6) 0%, transparent 40%),
-                       radial-gradient(circle at 50% 80%, rgba(15, 52, 96, 0.4) 0%, transparent 60%)`,
-          animation: `particles-float ${20 / animationSpeed}s ease-in-out infinite`,
-        };
-      default:
-        return {
-          ...base,
-          backgroundImage: `url(${DEFAULT_BG})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        };
+    if (type === "color") {
+      return {
+        ...base,
+        backgroundColor: bgUrl,
+      };
     }
+
+    return {
+      ...base,
+      backgroundImage: `url(${bgUrl})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    };
   };
 
   return (
     <>
-      <style>{`
-        @keyframes gradient-shift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        @keyframes particles-float {
-          0%, 100% { transform: translateY(0) rotate(0deg); }
-          33% { transform: translateY(-10px) rotate(1deg); }
-          66% { transform: translateY(10px) rotate(-1deg); }
-        }
-      `}</style>
-      <div style={getBackgroundStyle()} />
+      <div ref={bgRef} style={getBackgroundStyle()} />
       <div
         className="content-blur-overlay"
         style={{ opacity: showContentBlur && !forceDisableContentBlur ? 1 : 0 }}
