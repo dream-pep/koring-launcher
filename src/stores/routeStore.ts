@@ -7,13 +7,15 @@ export type RouteKey =
   | "play-link"
   | "setting"
   | "task-queue"
+  | "oobe"
+  | "oobe/about-info"
   | "debug"
   | "debug-splash"
   | "debug-display"
   | "debug-version-card"
   | "debug-task";
 
-export type TitleBarMode = "default" | "sub" | "window";
+export type TitleBarMode = "default" | "sub" | "window" | "oobe";
 
 export type TransitionDirection = "forward" | "backward";
 
@@ -22,6 +24,7 @@ interface RouteItem {
   label: string;
   path: string;
   hidden?: boolean;
+  backable?: boolean;
 }
 
 export const routes: RouteItem[] = [
@@ -35,6 +38,8 @@ export const routes: RouteItem[] = [
 export const allRoutes: RouteItem[] = [
   ...routes,
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
+  { key: "oobe", label: "OOBE", path: "/oobe", hidden: true },
+  { key: "oobe/about-info", label: "关于信息", path: "/oobe/about-info", hidden: true, backable: true },
   { key: "debug", label: "调试", path: "/debug", hidden: true },
   { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
   { key: "debug-display", label: "显示效果调试", path: "/debug/display", hidden: true },
@@ -42,16 +47,12 @@ export const allRoutes: RouteItem[] = [
   { key: "debug-task", label: "任务队列调试", path: "/debug/task", hidden: true },
 ];
 
-const parentMap: Partial<Record<RouteKey, RouteKey>> = {
-  "task-queue": "home",
-  debug: "setting",
-  "debug-splash": "debug",
-  "debug-display": "debug",
-  "debug-version-card": "debug",
-  "debug-task": "debug",
-};
-
 const topLevelKeys = new Set(routes.map((r) => r.key));
+
+function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
+  if (key === "oobe") return "oobe";
+  return topLevelKeys.has(key) ? "default" : "sub";
+}
 
 function startTransition(dir: TransitionDirection, callback: () => void) {
   document.documentElement.dataset.transitionDir = dir;
@@ -66,6 +67,7 @@ interface RouteState {
   current: RouteKey;
   titleBarMode: TitleBarMode;
   direction: TransitionDirection;
+  history: RouteKey[];
   navigate: (key: RouteKey) => void;
   setTitleBarMode: (mode: TitleBarMode) => void;
   goBack: () => void;
@@ -75,28 +77,31 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   current: "home",
   titleBarMode: "default",
   direction: "forward",
+  history: [],
   navigate: (key) => {
-    const parent = parentMap[key];
+    const prev = get().current;
+    if (prev === key) return;
     startTransition("forward", () => {
       set({
         current: key,
-        titleBarMode: parent && !topLevelKeys.has(key) ? "sub" : "default",
+        titleBarMode: getRouteTitleBarMode(key),
         direction: "forward",
+        history: [...get().history, prev],
       });
     });
   },
   setTitleBarMode: (mode) => set({ titleBarMode: mode }),
   goBack: () => {
-    const { current } = get();
-    const parent = parentMap[current];
-    if (parent) {
-      startTransition("backward", () => {
-        set({
-          current: parent,
-          titleBarMode: topLevelKeys.has(parent) ? "default" : "sub",
-          direction: "backward",
-        });
+    const { history } = get();
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    startTransition("backward", () => {
+      set({
+        current: prev,
+        titleBarMode: getRouteTitleBarMode(prev),
+        history: history.slice(0, -1),
+        direction: "backward",
       });
-    }
+    });
   },
 }));

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useConfigStore } from "@/stores/configStore";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 
@@ -29,9 +29,8 @@ function PathInput({ label, desc, value, onChange }: { label: string; desc: stri
 }
 
 export function GameDirSetting() {
-  const [gameDir, setGameDir] = useState(".minecraft");
-  const [resourceDir, setResourceDir] = useState("");
-  const [savesDir, setSavesDir] = useState("");
+  const game = useConfigStore((s) => s.config.game);
+  const setGame = useConfigStore((s) => s.setGame);
 
   return (
     <div>
@@ -46,8 +45,8 @@ export function GameDirSetting() {
             <PathInput
               label="游戏安装根目录"
               desc="Minecraft 游戏文件的根目录，包含 versions、saves、resourcepacks 等文件夹"
-              value={gameDir}
-              onChange={setGameDir}
+              value={game.gameDir}
+              onChange={(v) => setGame({ gameDir: v })}
             />
             <GlassCard>
               <div className="flex items-center justify-between">
@@ -71,8 +70,8 @@ export function GameDirSetting() {
             <PathInput
               label="资源包路径"
               desc="自定义资源包（材质包）的存放目录，留空使用默认路径"
-              value={resourceDir}
-              onChange={setResourceDir}
+              value={game.resourceDir}
+              onChange={(v) => setGame({ resourceDir: v })}
             />
           </div>
         </div>
@@ -84,8 +83,8 @@ export function GameDirSetting() {
             <PathInput
               label="存档路径"
               desc="自定义世界存档的存放目录，留空使用默认路径"
-              value={savesDir}
-              onChange={setSavesDir}
+              value={game.savesDir}
+              onChange={(v) => setGame({ savesDir: v })}
             />
           </div>
         </div>

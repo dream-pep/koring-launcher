@@ -1,5 +1,16 @@
 import { create } from "zustand";
-import type { Task, TaskType, TaskProgress, TaskLog, TaskContext } from "@/types/task";
+import { onIpcEvent, ipcInvoke } from "@/api/ipc";
+import { isDev } from "@/lib/mode";
+import type {
+  Task,
+  TaskType,
+  TaskProgress,
+  TaskLog,
+  TaskContext,
+  TaskExecutor,
+  XmclTaskDef,
+  XmclTaskEvent,
+} from "@/types/task";
 
 const STORAGE_KEY = "koring-task-history";
 const MAX_HISTORY = 50;
@@ -30,13 +41,88 @@ function saveHistory(tasks: Task[]) {
   }
 }
 
-interface TaskExecutor {
-  (ctx: TaskContext): Promise<void>;
+// Sidecar event listener cache
+const eventListeners = new Map<string, () => void>();
+
+function updateTask(taskId: string, patch: Partial<Task>) {
+  useTaskStore.setState((state) => ({
+    tasks: state.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t)),
+  }));
+}
+
+function listenToSidecarEvents(taskId: string) {
+  const unlisten = onIpcEvent<{ taskId: string; event: string; [key: string]: unknown }>(
+    "task:progress",
+    (data) => {
+      if (data.taskId !== taskId) return;
+
+      switch (data.event) {
+        case "task:started":
+          updateTask(taskId, {
+            status: "running",
+            startedAt: Date.now(),
+            xmclPath: data.xmclPath as string,
+          });
+          break;
+
+        case "task:progress":
+          updateTask(taskId, {
+            progress: {
+              current: data.current as number,
+              total: data.total as number,
+              stage: data.stage as string,
+            },
+          });
+          break;
+
+        case "task:log": {
+          const log: TaskLog = { time: Date.now(), level: data.level as "info" | "warn" | "error", message: data.message as string };
+          const current = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+          if (current) {
+            updateTask(taskId, { logs: [...current.logs, log] });
+          }
+          break;
+        }
+
+        case "task:completed":
+          updateTask(taskId, {
+            status: "completed",
+            finishedAt: Date.now(),
+          });
+          eventListeners.get(taskId)?.();
+          eventListeners.delete(taskId);
+          setTimeout(() => {
+            const state = useTaskStore.getState();
+            saveHistory(state.tasks);
+          }, 0);
+          break;
+
+        case "task:failed": {
+          const errLog: TaskLog = { time: Date.now(), level: "error", message: data.error as string };
+          const cur = useTaskStore.getState().tasks.find((t) => t.id === taskId);
+          updateTask(taskId, {
+            status: "failed",
+            finishedAt: Date.now(),
+            logs: cur ? [...cur.logs, errLog] : [errLog],
+          });
+          eventListeners.get(taskId)?.();
+          eventListeners.delete(taskId);
+          setTimeout(() => {
+            const state = useTaskStore.getState();
+            saveHistory(state.tasks);
+          }, 0);
+          break;
+        }
+      }
+    }
+  );
+
+  eventListeners.set(taskId, unlisten);
 }
 
 interface TaskState {
   tasks: Task[];
-  executors: Map<string, TaskExecutor>;
+  localExecutors: Map<string, TaskExecutor>;
   abortControllers: Map<string, AbortController>;
 
   // Derived
@@ -46,18 +132,23 @@ interface TaskState {
   pendingCount: () => number;
   runningCount: () => number;
 
-  // Actions
+  // Local task actions (runs executor in browser)
   addTask: (type: TaskType, title: string, description: string | undefined, executor: TaskExecutor) => string;
+
+  // IPC task actions (runs @xmcl/task in main process)
+  addSidecarTask: (def: XmclTaskDef) => string;
+
+  // Common actions
   cancelTask: (id: string) => void;
   removeTask: (id: string) => void;
   clearHistory: () => void;
   retryTask: (id: string) => void;
-  _startTask: (id: string) => void;
+  _startLocalTask: (id: string) => void;
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: loadHistory(),
-  executors: new Map(),
+  localExecutors: new Map(),
   abortControllers: new Map(),
 
   isRunning: () => get().tasks.some((t) => t.status === "running" || t.status === "pending"),
@@ -68,7 +159,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   addTask: (type, title, description, executor) => {
     const id = generateId();
-    const task: Task = {
+    const newTask: Task = {
       id,
       type,
       title,
@@ -79,23 +170,100 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     };
 
     set((state) => {
-      const tasks = [...state.tasks, task];
-      const executors = new Map(state.executors);
-      executors.set(id, executor);
-      return { tasks, executors };
+      const tasks = [...state.tasks, newTask];
+      const localExecutors = new Map(state.localExecutors);
+      localExecutors.set(id, executor);
+      return { tasks, localExecutors };
     });
 
-    // Auto-start
-    get()._startTask(id);
+    get()._startLocalTask(id);
+    return id;
+  },
+
+  addSidecarTask: (def) => {
+    const id = generateId();
+    const newTask: Task = {
+      id,
+      type: def.type,
+      title: def.title,
+      description: def.description,
+      status: "pending",
+      logs: [],
+      createdAt: Date.now(),
+    };
+
+    set((state) => ({
+      tasks: [...state.tasks, newTask],
+    }));
+
+    // In dev mode, main process is not running — fall back to local simulation
+    if (isDev) {
+      const executor: TaskExecutor = async (ctx) => {
+        ctx.addLog("info", `[Dev Fallback] 模拟 @xmcl/task 执行器: ${def.executorName}`);
+        const steps = 20;
+        for (let i = 0; i <= steps; i++) {
+          if (ctx.abortSignal.aborted) throw new Error("已取消");
+          ctx.updateProgress({ current: i, total: steps, stage: `步骤 ${i}/${steps}` });
+          ctx.addLog("info", `进度 ${Math.round((i / steps) * 100)}%`);
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        ctx.addLog("info", "任务完成（Dev 模拟）");
+      };
+
+      const localExecutors = new Map(get().localExecutors);
+      localExecutors.set(id, executor);
+      set({ localExecutors });
+      get()._startLocalTask(id);
+      return id;
+    }
+
+    // Listen for main process events
+    listenToSidecarEvents(id);
+
+    // Send start command to main process
+    ipcInvoke("task:start", {
+      taskId: id,
+      type: def.type,
+      title: def.title,
+      description: def.description,
+      executorName: def.executorName,
+      params: def.params,
+    }).catch((err) => {
+      // If main process fails to start, mark as failed
+      set((state) => ({
+        tasks: state.tasks.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                status: "failed" as const,
+                finishedAt: Date.now(),
+                logs: [...t.logs, { time: Date.now(), level: "error" as const, message: String(err) }],
+              }
+            : t,
+        ),
+      }));
+      eventListeners.get(id)?.();
+      eventListeners.delete(id);
+    });
+
     return id;
   },
 
   cancelTask: (id) => {
-    const { abortControllers } = get();
+    const { abortControllers, tasks } = get();
+    const task = tasks.find((t) => t.id === id);
+
+    // Cancel local task
     const controller = abortControllers.get(id);
     if (controller) {
       controller.abort();
     }
+
+    // Cancel IPC task
+    if (task && !controller) {
+      ipcInvoke("task:cancel", { taskId: id }).catch(() => {});
+    }
+
     set((state) => {
       const tasks = state.tasks.map((t) =>
         t.id === id && (t.status === "pending" || t.status === "running")
@@ -107,15 +275,21 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       saveHistory(tasks);
       return { tasks, abortControllers };
     });
+
+    eventListeners.get(id)?.();
+    eventListeners.delete(id);
   },
 
   removeTask: (id) => {
+    eventListeners.get(id)?.();
+    eventListeners.delete(id);
+
     set((state) => {
       const tasks = state.tasks.filter((t) => t.id !== id);
-      const executors = new Map(state.executors);
-      executors.delete(id);
+      const localExecutors = new Map(state.localExecutors);
+      localExecutors.delete(id);
       saveHistory(tasks);
-      return { tasks, executors };
+      return { tasks, localExecutors };
     });
   },
 
@@ -128,36 +302,81 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   retryTask: (id) => {
-    const { tasks, executors } = get();
+    const { tasks, localExecutors } = get();
     const original = tasks.find((t) => t.id === id);
-    const executor = executors.get(id);
-    if (!original || !executor) return;
+    const executor = localExecutors.get(id);
+    if (!original) return;
 
-    const newTask: Task = {
-      ...original,
-      id: generateId(),
-      status: "pending",
-      progress: undefined,
-      logs: [],
-      createdAt: Date.now(),
-      startedAt: undefined,
-      finishedAt: undefined,
-    };
+    if (executor) {
+      // Retry local task
+      const newId = generateId();
+      const newTask: Task = {
+        ...original,
+        id: newId,
+        status: "pending",
+        progress: undefined,
+        logs: [],
+        createdAt: Date.now(),
+        startedAt: undefined,
+        finishedAt: undefined,
+      };
 
-    set((state) => {
-      const tasks = [...state.tasks, newTask];
-      const executors = new Map(state.executors);
-      executors.set(newTask.id, executor);
-      return { tasks, executors };
-    });
+      set((state) => {
+        const tasks = [...state.tasks, newTask];
+        const localExecutors = new Map(state.localExecutors);
+        localExecutors.set(newId, executor);
+        return { tasks, localExecutors };
+      });
 
-    get()._startTask(newTask.id);
+      get()._startLocalTask(newId);
+    } else {
+      // Retry IPC task (re-add with same params)
+      const newId = generateId();
+      const newTask: Task = {
+        ...original,
+        id: newId,
+        status: "pending",
+        progress: undefined,
+        logs: [],
+        createdAt: Date.now(),
+        startedAt: undefined,
+        finishedAt: undefined,
+      };
+
+      set((state) => ({
+        tasks: [...state.tasks, newTask],
+      }));
+
+      listenToSidecarEvents(newId);
+
+      ipcInvoke("task:start", {
+        taskId: newId,
+        type: original.type,
+        title: original.title,
+        description: original.description,
+        executorName: "sleep",
+        params: {},
+      }).catch((err) => {
+        set((state) => ({
+          tasks: state.tasks.map((t) =>
+            t.id === newId
+              ? {
+                  ...t,
+                  status: "failed" as const,
+                  finishedAt: Date.now(),
+                  logs: [...t.logs, { time: Date.now(), level: "error" as const, message: String(err) }],
+                }
+              : t,
+          ),
+        }));
+      });
+    }
   },
 
-  _startTask: (id: string) => {
-    const { tasks, executors } = get();
+  _startLocalTask: (id: string) => {
+    const { tasks, localExecutors } = get();
     const task = tasks.find((t) => t.id === id);
-    const executor = executors.get(id);
+    const executor = localExecutors.get(id);
     if (!task || task.status !== "pending" || !executor) return;
 
     const controller = new AbortController();

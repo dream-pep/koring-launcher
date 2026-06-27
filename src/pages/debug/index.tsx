@@ -1,5 +1,5 @@
 import { useRouteStore } from "@/stores/routeStore";
-import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical } from "lucide-react";
+import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket } from "lucide-react";
 
 const debugPages = [
   {
@@ -33,6 +33,14 @@ const debugPages = [
     desc: "测试任务调度、进度条、日志与 Sheet 面板",
     color: "text-cyan-500",
     bg: "bg-cyan-500/10",
+  },
+  {
+    key: "oobe" as const,
+    icon: Rocket,
+    title: "OOBE 开箱体验",
+    desc: "查看开箱引导页面，标题栏切换为 OOBE 模式",
+    color: "text-pink-500",
+    bg: "bg-pink-500/10",
   },
 ];
 

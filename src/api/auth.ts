@@ -1,4 +1,4 @@
-import { sidecarRequest } from "./sidecar";
+import { ipcInvoke } from './ipc';
 
 export interface AuthResult {
   username: string;
@@ -13,12 +13,12 @@ export interface AuthResult {
 }
 
 export async function offlineLogin(username: string): Promise<AuthResult> {
-  return sidecarRequest<AuthResult>("auth:offline-login", { username });
+  return ipcInvoke<AuthResult>('auth:offline-login', { username });
 }
 
 export async function microsoftLoginStart(clientId: string, redirectUri?: string) {
-  return sidecarRequest<{ state: string; authUrl: string }>(
-    "auth:microsoft-login-start",
+  return ipcInvoke<{ state: string; authUrl: string }>(
+    'auth:microsoft-login-start',
     { client_id: clientId, redirect_uri: redirectUri }
   );
 }
@@ -28,7 +28,7 @@ export async function microsoftLoginCallback(
   clientId: string,
   redirectUri?: string
 ): Promise<AuthResult> {
-  return sidecarRequest<AuthResult>("auth:microsoft-login-callback", {
+  return ipcInvoke<AuthResult>('auth:microsoft-login-callback', {
     code,
     client_id: clientId,
     redirect_uri: redirectUri,
@@ -36,7 +36,7 @@ export async function microsoftLoginCallback(
 }
 
 export async function validateToken(accessToken: string): Promise<boolean> {
-  const result = await sidecarRequest<{ valid: boolean }>("auth:validate-token", {
+  const result = await ipcInvoke<{ valid: boolean }>('auth:validate-token', {
     accessToken,
   });
   return result.valid;

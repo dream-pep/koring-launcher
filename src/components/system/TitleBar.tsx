@@ -1,6 +1,5 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useRef, useState, useEffect, useCallback } from "react";
-import { useRouteStore, routes } from "@/stores/routeStore";
+import { useRouteStore, routes, allRoutes } from "@/stores/routeStore";
 import { WindowControls } from "./WindowControls";
 
 interface TitleBarProps {
@@ -14,7 +13,6 @@ export function TitleBar({
   showMaximize = true,
   showClose = true,
 }: TitleBarProps) {
-  const appWindow = getCurrentWindow();
   const current = useRouteStore((s) => s.current);
   const navigate = useRouteStore((s) => s.navigate);
   const titleBarMode = useRouteStore((s) => s.titleBarMode);
@@ -22,6 +20,10 @@ export function TitleBar({
 
   const isSub = titleBarMode === "sub";
   const isDefault = titleBarMode === "default";
+  const isOobe = titleBarMode === "oobe";
+
+  const currentRoute = allRoutes.find((r) => r.key === current);
+  const showBack = isSub || (isOobe && currentRoute?.backable);
 
   const currentIdx = routes.findIndex((r) => r.key === current);
 
@@ -49,7 +51,6 @@ export function TitleBar({
 
   useEffect(() => {
     if (isDefault) {
-      // 延迟一帧等 DOM 更新后再计算指示条位置
       requestAnimationFrame(() => updateIndicator(currentIdx));
     }
   }, [currentIdx, updateIndicator, isDefault]);
@@ -61,7 +62,6 @@ export function TitleBar({
     return () => window.removeEventListener("resize", onResize);
   }, [currentIdx, updateIndicator, isDefault]);
 
-  // document 级别拖拽事件
   useEffect(() => {
     if (!isDefault) return;
 
@@ -129,12 +129,6 @@ export function TitleBar({
     [currentIdx],
   );
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest("[data-no-drag]")) return;
-    appWindow.startDragging();
-  };
-
   const handleBtnClick = useCallback(
     (key: string) => {
       if (hasDragged.current) {
@@ -149,8 +143,8 @@ export function TitleBar({
   return (
     <div
       className="titlebar fixed top-0 left-0 right-0 h-[40px] flex items-center z-[100] pointer-events-auto"
-      onMouseDown={handleMouseDown}
       style={{
+        WebkitAppRegion: "drag",
         background: "var(--titlebar-bg)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
@@ -158,16 +152,16 @@ export function TitleBar({
         userSelect: "none",
       }}
     >
-      {/* 左侧区域：返回按钮 + 品牌文字 */}
-      <div className="flex items-center pl-3 shrink-0 relative z-10">
-        {/* 返回按钮：sub 模式显示 */}
+      {/* 左侧区域：品牌文字 */}
+      <div className="flex items-center pl-3 shrink-0 relative z-10" style={{ WebkitAppRegion: "no-drag" }}>
+        {/* 返回按钮 */}
         <div
-          data-no-drag
           className="overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
           style={{
-            width: isSub ? 68 : 0,
-            opacity: isSub ? 1 : 0,
-            marginRight: isSub ? 8 : 0,
+            WebkitAppRegion: "no-drag",
+            width: showBack ? 68 : 0,
+            opacity: showBack ? 1 : 0,
+            marginRight: showBack ? 8 : 0,
           }}
         >
           <button
@@ -188,7 +182,7 @@ export function TitleBar({
         </span>
       </div>
 
-      {/* 中间区域：胶囊菜单，绝对定位居中 */}
+      {/* 中间区域：胶囊菜单 */}
       <div
         className="absolute left-1/2 -translate-x-1/2 flex justify-center transition-opacity duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         style={{
@@ -200,9 +194,8 @@ export function TitleBar({
           <div
             ref={navRef}
             className="relative flex items-center"
-            data-no-drag
             onPointerDown={handleNavPointerDown}
-            style={{ touchAction: "none" }}
+            style={{ touchAction: "none", WebkitAppRegion: "no-drag" }}
           >
             <div
               className="absolute h-[28px] rounded-full"
@@ -240,12 +233,13 @@ export function TitleBar({
       </div>
 
       {/* 右侧：窗口控制 */}
-      <div className="flex items-center shrink-0 justify-end ml-auto relative z-10">
+      <div className="flex items-center shrink-0 justify-end ml-auto relative z-10" style={{ WebkitAppRegion: "no-drag" }}>
         <WindowControls
           showMinimize={showMinimize}
           showMaximize={showMaximize}
           showClose={showClose}
           isSub={isSub}
+          isOobe={isOobe}
         />
       </div>
     </div>

@@ -1,32 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { Play, Square, RotateCw } from "lucide-react";
 import { GlassCard, SettingRow, PageHeader } from "./components";
 
 const openSplash = async () => {
   try {
-    const existing = await WebviewWindow.getByLabel("splashscreen");
-    if (existing) {
-      await existing.show();
-      await existing.setFocus();
-      return;
-    }
-    const splash = new WebviewWindow("splashscreen", {
-      url: "/splash.html",
-      width: 480,
-      height: 320,
-      decorations: false,
-      transparent: true,
-      center: true,
-      visible: true,
-      resizable: false,
-      minWidth: 480,
-      maxWidth: 480,
-      minHeight: 320,
-      maxHeight: 320,
-    } as any);
-    splash.once("tauri://error", (e) => console.error("Splash window error:", e));
+    await window.electronAPI?.invoke('window:openSplash');
   } catch (err) {
     console.error("Failed to open splash:", err);
   }
@@ -34,8 +13,7 @@ const openSplash = async () => {
 
 const closeSplash = async () => {
   try {
-    const splash = await WebviewWindow.getByLabel("splashscreen");
-    if (splash) await splash.close();
+    await window.electronAPI?.invoke('window:closeSplash');
   } catch (err) {
     console.error("Failed to close splash:", err);
   }

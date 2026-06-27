@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { getVersion } from "@tauri-apps/api/app";
-import { BUILD_MODE } from "@/lib/mode";
+import { BUILD_MODE, LOGO_SVG } from "@/lib/mode";
 
 export default function Splash() {
   const [phase, setPhase] = useState<"enter" | "visible">("enter");
   const [version, setVersion] = useState("");
 
   useEffect(() => {
-    getVersion().then(setVersion);
+    window.electronAPI?.invoke('system:info').then((result: any) => {
+      setVersion(result?.data?.app_version || '');
+    }).catch(() => {});
     const t = setTimeout(() => setPhase("visible"), 50);
     return () => clearTimeout(t);
   }, []);
@@ -29,7 +30,7 @@ export default function Splash() {
         }}
       >
         <img
-          src="/koring-licon.svg"
+          src={LOGO_SVG}
           alt="Koring Launcher"
           className="splash-logo"
           style={{ width: 260, height: "auto" }}

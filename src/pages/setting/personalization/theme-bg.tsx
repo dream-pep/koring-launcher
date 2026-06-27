@@ -3,9 +3,8 @@ import { useBackgroundStore } from "@/stores/backgroundStore";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_BG } from "@/lib/mode";
 import clsx from "clsx";
-import { open } from "@tauri-apps/plugin-dialog";
-import { convertFileSrc } from "@tauri-apps/api/core";
 
 function GlassCard({ children }: { children: React.ReactNode }) {
   return <div className="glass-card px-5 py-4">{children}</div>;
@@ -111,14 +110,14 @@ export function ThemeBgSetting() {
   const { image, opacity, setOpacity, blur, setBlur, setImage, reset } = useBackgroundStore();
 
   const handlePickImage = async () => {
-    const selected = await open({
-      multiple: false,
+    // In Electron, use the native file dialog via IPC
+    const result = await window.electronAPI?.invoke('dialog:openFile', {
       filters: [
         { name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] },
       ],
-    });
-    if (selected) {
-      setImage(convertFileSrc(selected));
+    }) as string | null;
+    if (result) {
+      setImage(result);
     }
   };
 
@@ -154,7 +153,7 @@ export function ThemeBgSetting() {
                   选择图片
                 </Button>
               </SettingRow>
-              {image && image !== "/background.png" && (
+              {image && image !== DEFAULT_BG && (
                 <div className="mt-3 rounded-lg overflow-hidden border border-border/50">
                   <img
                     src={image}

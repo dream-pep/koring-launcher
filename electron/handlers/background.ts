@@ -1,0 +1,94 @@
+import electron from 'electron';
+import { loadConfig, saveConfig } from '../config';
+
+const { ipcMain } = electron;
+
+export function registerBackgroundHandlers() {
+  ipcMain.handle('background:set-image', async (_event, payload: { url: string; blur?: number; opacity?: number }) => {
+    try {
+      const config = loadConfig();
+      config.background.bgType = 'image';
+      config.background.image = payload.url;
+      if (payload.blur !== undefined) config.background.blur = payload.blur;
+      if (payload.opacity !== undefined) config.background.opacity = payload.opacity;
+      saveConfig(config);
+      return { success: true, data: config.background, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('background:set-color', async (_event, payload: { color: string }) => {
+    try {
+      const config = loadConfig();
+      config.background.bgType = 'color';
+      config.background.image = payload.color;
+      saveConfig(config);
+      return { success: true, data: config.background, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('background:set-blur', async (_event, payload: { blur: number }) => {
+    try {
+      const config = loadConfig();
+      config.background.blur = payload.blur;
+      saveConfig(config);
+      return { success: true, data: config.background, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('background:set-opacity', async (_event, payload: { opacity: number }) => {
+    try {
+      const config = loadConfig();
+      config.background.opacity = payload.opacity;
+      saveConfig(config);
+      return { success: true, data: config.background, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('background:set-animation', async (_event, payload: { type: string; speed?: number }) => {
+    try {
+      // Animation config is not persisted in current design, return defaults
+      return { success: true, data: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 }, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('background:get', async () => {
+    try {
+      const config = loadConfig();
+      return { success: true, data: config.background, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('background:set-theme', async (_event, payload: { theme: string }) => {
+    try {
+      const config = loadConfig();
+      config.theme.darkMode = payload.theme;
+      saveConfig(config);
+      return { success: true, data: config.background, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('background:reset', async () => {
+    try {
+      const config = loadConfig();
+      config.background = { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 };
+      saveConfig(config);
+      return { success: true, data: config.background, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+}

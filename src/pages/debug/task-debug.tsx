@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Check,
   Ban,
+  Server,
 } from "lucide-react";
 
 const taskTypes: { type: TaskType; label: string; icon: typeof Download; color: string; bg: string }[] = [
@@ -26,8 +27,9 @@ const taskTypes: { type: TaskType; label: string; icon: typeof Download; color: 
   { type: "custom", label: "自定义", icon: Zap, color: "text-gray-500", bg: "bg-gray-500/10" },
 ];
 
-function simulateTask(type: TaskType, title: string, duration: number, shouldFail = false) {
-  useTaskStore.getState().addTask(type, title, `模拟 ${duration / 1000}s 任务`, async (ctx) => {
+/** Local task simulation (runs in browser) */
+function simulateLocalTask(type: TaskType, title: string, duration: number, shouldFail = false) {
+  useTaskStore.getState().addTask(type, title, `本地模拟 ${duration / 1000}s`, async (ctx) => {
     const steps = 20;
     const interval = duration / steps;
     for (let i = 0; i <= steps; i++) {
@@ -44,6 +46,22 @@ function simulateTask(type: TaskType, title: string, duration: number, shouldFai
       await new Promise((r) => setTimeout(r, interval));
     }
     ctx.addLog("info", "任务完成");
+  });
+}
+
+/** IPC @xmcl/task simulation (runs in main process via AbortableTask) */
+function simulateSidecarTask(
+  type: TaskType,
+  title: string,
+  executorName: string,
+  params: Record<string, unknown>,
+) {
+  useTaskStore.getState().addSidecarTask({
+    type,
+    title,
+    description: `IPC @xmcl/task: ${executorName}`,
+    executorName,
+    params,
   });
 }
 
@@ -68,7 +86,7 @@ export function TaskDebug() {
 
   return (
     <div className="max-w-2xl mx-auto p-8">
-      <PageHeader title="任务队列调试" desc="测试任务调度、进度条、日志与任务队列页面" />
+      <PageHeader title="任务队列调试" desc="测试 @xmcl/task 任务调度、进度条、日志与任务队列页面" />
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3 mb-8">
@@ -124,10 +142,82 @@ export function TaskDebug() {
         </div>
       </div>
 
-      {/* Add tasks by type */}
+      {/* Sidecar @xmcl/task executors */}
+      <div className="mb-8">
+        <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Server className="w-4 h-4" />
+          Sidecar @xmcl/task 执行器
+        </h3>
+        <div className="space-y-3">
+          <GlassCard>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">sleep 执行器</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">3s 计时任务，AbortableTask + 进度追踪</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => simulateSidecarTask("custom", "Sidecar Sleep 3s", "sleep", { duration: 3000 })}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-[12px] font-medium transition-colors"
+                >
+                  成功
+                </button>
+                <button
+                  onClick={() =>
+                    simulateSidecarTask("custom", "Sidecar Sleep (失败)", "sleep", {
+                      duration: 3000,
+                      failAt: 10,
+                      failMessage: "模拟 IPC 任务失败",
+                    })
+                  }
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-[12px] font-medium transition-colors"
+                >
+                  失败
+                </button>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">download 执行器</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">模拟下载 100 单位，分块进度更新</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    simulateSidecarTask("download", "Sidecar Download", "download", { total: 100, threads: 4 })
+                  }
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-[12px] font-medium transition-colors"
+                >
+                  运行
+                </button>
+              </div>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">install 执行器</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">模拟安装 10 步骤，每步 200ms</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => simulateSidecarTask("install", "Sidecar Install", "install", { steps: 10 })}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-[12px] font-medium transition-colors"
+                >
+                  运行
+                </button>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      </div>
+
+      {/* Local browser tasks */}
       <div className="mb-8">
         <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3">
-          添加模拟任务
+          本地浏览器任务
         </h3>
         <div className="space-y-3">
           {taskTypes.map((tt) => (
@@ -139,20 +229,18 @@ export function TaskDebug() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{tt.label}任务</p>
-                    <p className="text-[13px] text-muted-foreground mt-0.5">
-                      模拟 3s 成功任务
-                    </p>
+                    <p className="text-[13px] text-muted-foreground mt-0.5">本地模拟 3s</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => simulateTask(tt.type, `模拟${tt.label}任务`, 3000)}
+                    onClick={() => simulateLocalTask(tt.type, `模拟${tt.label}任务`, 3000)}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-[12px] font-medium transition-colors"
                   >
                     成功
                   </button>
                   <button
-                    onClick={() => simulateTask(tt.type, `模拟${tt.label}任务(失败)`, 3000, true)}
+                    onClick={() => simulateLocalTask(tt.type, `模拟${tt.label}任务(失败)`, 3000, true)}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-[12px] font-medium transition-colors"
                   >
                     失败
@@ -173,14 +261,14 @@ export function TaskDebug() {
           <GlassCard>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-foreground">并行任务测试</p>
-                <p className="text-[13px] text-muted-foreground mt-0.5">同时添加 3 个不同类型任务，验证并行执行</p>
+                <p className="text-sm font-medium text-foreground">并行本地+Sidecar任务</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">同时运行本地和 IPC 任务，验证混合执行</p>
               </div>
               <button
                 onClick={() => {
-                  simulateTask("install", "并行安装", 4000);
-                  simulateTask("download", "并行下载", 3000);
-                  simulateTask("sync", "并行同步", 5000);
+                  simulateLocalTask("install", "本地安装", 4000);
+                  simulateSidecarTask("download", "Sidecar下载", "download", { total: 80, threads: 4 });
+                  simulateSidecarTask("custom", "Sidecar同步", "sleep", { duration: 5000 });
                 }}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-sm font-medium transition-colors"
               >
@@ -193,10 +281,10 @@ export function TaskDebug() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-foreground">取消任务测试</p>
-                <p className="text-[13px] text-muted-foreground mt-0.5">添加 5s 长任务，可在任务队列中取消</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">Sidecar 5s 长任务，可在任务队列中取消</p>
               </div>
               <button
-                onClick={() => simulateTask("download", "可取消任务", 5000)}
+                onClick={() => simulateSidecarTask("download", "可取消任务", "sleep", { duration: 5000 })}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-sm font-medium transition-colors"
               >
                 <Ban className="w-4 h-4" />
@@ -232,7 +320,10 @@ export function TaskDebug() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{t.title}</p>
-                      <p className="text-[11px] text-muted-foreground">{t.type} · {t.status} · {t.logs.length} 条日志</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {t.type} · {t.status} · {t.logs.length} 条日志
+                        {t.xmclPath && <span className="ml-1 text-primary/60">@xmcl</span>}
+                      </p>
                     </div>
                     <button
                       onClick={() => removeTask(t.id)}

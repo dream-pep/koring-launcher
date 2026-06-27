@@ -144,9 +144,12 @@
     }
   body {
     @apply bg-background text-foreground;
+    margin: 0;
+    overflow: hidden;
     }
   html {
     @apply font-sans;
+    overflow: hidden;
     }
 }
 
@@ -260,9 +263,7 @@
 .content-blur-overlay {
   position: fixed;
   inset: 0;
-  backdrop-filter: blur(80px) saturate(120%);
-  -webkit-backdrop-filter: blur(80px) saturate(120%);
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
   background: rgba(255, 255, 255, var(--content-blur-opacity, 0.5));
   transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);

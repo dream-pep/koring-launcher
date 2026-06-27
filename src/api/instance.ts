@@ -1,4 +1,4 @@
-import { sidecarRequest } from "./sidecar";
+import { ipcInvoke } from './ipc';
 
 export interface InstanceConfig {
   name: string;
@@ -26,7 +26,7 @@ export async function createInstance(
   javaPath?: string,
   memory?: { min?: string; max?: string }
 ): Promise<InstanceInfo> {
-  return sidecarRequest<InstanceInfo>("instance:create", {
+  return ipcInvoke<InstanceInfo>('instance:create', {
     name,
     gamePath,
     mcVersion,
@@ -38,14 +38,14 @@ export async function createInstance(
 }
 
 export async function listInstances(instancesPath: string): Promise<InstanceInfo[]> {
-  return sidecarRequest<InstanceInfo[]>("instance:list", { instancesPath });
+  return ipcInvoke<InstanceInfo[]>('instance:list', { instancesPath });
 }
 
 export async function deleteInstance(
   name: string,
   instancesPath: string
 ): Promise<{ deleted: string }> {
-  return sidecarRequest<{ deleted: string }>("instance:delete", {
+  return ipcInvoke<{ deleted: string }>('instance:delete', {
     name,
     instancesPath,
   });
@@ -55,5 +55,5 @@ export async function getInstanceInfo(
   name: string,
   instancesPath: string
 ): Promise<InstanceInfo> {
-  return sidecarRequest<InstanceInfo>("instance:info", { name, instancesPath });
+  return ipcInvoke<InstanceInfo>('instance:info', { name, instancesPath });
 }

@@ -4,14 +4,13 @@ import {
   downloadAndInstall,
   type DownloadProgress,
 } from "../api/update";
-import type { Update } from "@tauri-apps/plugin-updater";
 
 interface UpdateState {
   checking: boolean;
   downloading: boolean;
   installed: boolean;
   progress: DownloadProgress | null;
-  update: Update | null;
+  update: { version: string; releaseNotes?: string } | null;
   error: string | null;
   check: () => Promise<void>;
   install: () => Promise<void>;
@@ -37,12 +36,9 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   },
 
   install: async () => {
-    const { update } = get();
-    if (!update) return;
-
     set({ downloading: true, error: null, progress: null });
     try {
-      await downloadAndInstall(update, (progress) => {
+      await downloadAndInstall((progress) => {
         set({ progress });
       });
       set({ downloading: false, installed: true });

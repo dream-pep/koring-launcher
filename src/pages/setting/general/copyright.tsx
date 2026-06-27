@@ -1,5 +1,4 @@
 import { ExternalLink } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
 
 function GlassCard({ children }: { children: React.ReactNode }) {
   return <div className="glass-card px-5 py-4">{children}</div>;
@@ -18,13 +17,11 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
 }
 
 const openLink = (url: string) => {
-  open(url).catch(() => {
-    window.open(url, "_blank");
-  });
+  window.open(url, "_blank");
 };
 
 const licenses = [
-  { name: "Tauri", license: "MIT / Apache-2.0", url: "https://github.com/tauri-apps/tauri" },
+  { name: "Electron", license: "MIT", url: "https://github.com/electron/electron" },
   { name: "React", license: "MIT", url: "https://github.com/facebook/react" },
   { name: "@xmcl/core", license: "MIT", url: "https://github.com/VoxelCogs/xmcl" },
   { name: "@xmcl/installer", license: "MIT", url: "https://github.com/VoxelCogs/xmcl" },

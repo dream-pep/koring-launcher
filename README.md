@@ -1,43 +1,42 @@
 # Koring Launcher
 
-Minecraft launcher built with Tauri 2 + React 19 + TypeScript + Sidecar (Node.js/@xmcl).
+Minecraft launcher built with Electron + React 19 + TypeScript + Node.js (@xmcl).
 
 ## Quick Start
 
 ```bash
 pnpm install
-pnpm dev:t          # full app (frontend + Rust + sidecar skip in dev)
-pnpm dev            # frontend only (vite, port 1420)
-cd sidecar && pnpm dev  # sidecar dev (tsx)
+pnpm dev                # full app (frontend + electron)
+pnpm dev:renderer       # frontend only (vite, port 1420)
+pnpm dev:main           # electron main process only
 ```
 
 ## Build
 
 ```bash
-pnpm tauri build         # production (auto-switches to run icon)
-pnpm build:beta          # beta build
-cd sidecar && pnpm compile  # compile sidecar to exe first
+pnpm build              # production build (vite + tsc)
+pnpm dist:win           # build Windows installer
+pnpm dist:mac           # build macOS DMG
+pnpm dist:linux         # build Linux AppImage
 ```
 
 ## Architecture
 
 ```
 src/                     Frontend (React 19 + Vite 7 + Tailwind v4 + shadcn/ui + Zustand)
-src-tauri/               Backend (Rust/Tauri 2)
-sidecar/                 Node.js sidecar (@xmcl/* packages)
+electron/                Main process (Node.js/TypeScript, @xmcl/* packages)
 public/                  Static assets (icons, fonts, images)
-scripts/                 Build scripts
 ```
 
 **IPC Flow:**
-Frontend → `invoke()` → Rust commands → sidecar stdin → sidecar stdout → Tauri events → Frontend
+Frontend → `ipcRenderer.invoke()` → `ipcMain.handle()` → main process → `webContents.send()` → Frontend
 
 ## Project Structure
 
 ```
 src/
-├── api/                  # Frontend API layer (sidecar IPC wrappers)
-│   ├── sidecar.ts        # Generic request/response
+├── api/                  # Frontend API layer (IPC wrappers)
+│   ├── ipc.ts            # Core IPC utilities
 │   ├── background.ts     # Background control
 │   ├── install.ts        # Minecraft install
 │   ├── launch.ts         # Game launch
@@ -58,6 +57,31 @@ src/
 │   ├── mode.ts           # Build mode detection (dev/beta/run)
 │   └── utils.ts          # cn() helper
 └── App.tsx               # Root component with state router
+
+electron/
+├── main.ts               # Electron entry, window management
+├── preload.ts            # Context bridge (window.electronAPI)
+├── config.ts             # YAML config management
+├── auth.ts               # Auth data persistence
+├── core/                 # @xmcl/* integrations
+│   ├── auth.ts           # Microsoft OAuth, Xbox Live, MC auth
+│   ├── installer.ts      # @xmcl/installer
+│   ├── launcher.ts       # @xmcl/core game launcher
+│   ├── modrinth.ts       # Modrinth/CurseForge API
+│   └── instance.ts       # Instance management
+├── handlers/             # IPC handlers
+│   ├── config.ts         # Config load/save
+│   ├── auth.ts           # Auth operations
+│   ├── install.ts        # Install operations
+│   ├── launch.ts         # Game launch
+│   ├── mods.ts           # Mod operations
+│   ├── instance.ts       # Instance operations
+│   ├── background.ts     # Background operations
+│   ├── task.ts           # Task system
+│   ├── system.ts         # System info
+│   └── window.ts         # Window controls
+└── types/
+    └── electron.d.ts     # TypeScript declarations
 ```
 
 ## Three-Layer Page Structure
@@ -96,8 +120,6 @@ Three icon variants in `public/`:
 | beta | `beta.png` / `beta.ico` | Testing |
 | run | `run.png` / `run.ico` | Production release |
 
-**Auto-switching:** Build scripts automatically copy the correct icon to `src-tauri/icons/` before building.
-
 **Frontend usage:**
 ```tsx
 import { APP_ICON, BUILD_MODE, isDev } from "@/lib/mode";
@@ -106,46 +128,31 @@ import { APP_ICON, BUILD_MODE, isDev } from "@/lib/mode";
 {isDev && <span>Dev Mode</span>}
 ```
 
-**Manual switch:**
-```bash
-pnpm icon:dev    # switch to dev icon
-pnpm icon:beta   # switch to beta icon
-pnpm icon:run    # switch to release icon
-```
+## IPC Handlers
 
-## Sidecar
-
-Node.js process communicating with Rust via stdin/stdout JSON protocol.
-
-**Handlers:**
+- `config:*` — Config load/save
+- `auth:*` — Microsoft OAuth, offline login
 - `install:*` — Minecraft install, mod loader, version lists
 - `launch:*` — Game launch, diagnose
-- `auth:*` — Microsoft OAuth, offline login
 - `mods:*` — Modrinth/CurseForge search, install
 - `instance:*` — Instance CRUD
 - `background:*` — Background image/color/blur/animation/theme
-
-**Compile:**
-```bash
-cd sidecar
-pnpm compile        # ARM64 Windows (default)
-pnpm compile:x64    # x86_64 Windows
-```
+- `task:*` — Task system progress
+- `system:*` — System info
+- `window:*` — Minimize/maximize/close
 
 ## Key Gotchas
 
-- **Sidecar binary required**: `src-tauri/binaries/koring-sidecar-<target-triple>.exe` must exist. Skipped in debug mode (`#[cfg(debug_assertions)]`).
-- **@xmcl packages are Node.js only**: `@xmcl/core`, `@xmcl/installer` require `fs`/`child_process`. Only `@xmcl/user`, `@xmcl/modrinth`, `@xmcl/curseforge` work in browser.
+- **@xmcl packages run in main process**: `@xmcl/core`, `@xmcl/installer` require `fs`/`child_process`. All run in Electron main process.
 - **Path alias**: `@/` maps to `src/`.
-- **Window dragging**: Use `appWindow.startDragging()` API, not `data-tauri-drag-region` (unreliable with transparent windows).
-- **Transparent windows**: Require `decorations: false` + `transparent: true` in tauri.conf.json.
-- **Permissions**: Window creation needs `core:webview:allow-create-webview-window` (not `core:window`).
+- **Window dragging**: Use CSS `-webkit-app-region: drag` on titlebar.
+- **Transparent windows**: `transparent: true` + `frame: false` in BrowserWindow options.
+- **Auth storage**: JSON file (`koring-auth.json`) stored next to executable.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 19, Vite 7, Tailwind CSS v4, shadcn/ui, Zustand |
-| Backend | Rust, Tauri 2 |
-| Sidecar | Node.js, TypeScript, @xmcl/* packages |
-| Build | pnpm, Cargo, bun (sidecar compile) |
+| Main Process | Node.js, TypeScript, @xmcl/* packages |
+| Build | pnpm, Vite, electron-builder |

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useConfigStore } from "@/stores/configStore";
 import { Slider } from "@/components/ui/slider";
 
 function GlassCard({ children }: { children: React.ReactNode }) {
@@ -12,10 +12,8 @@ const downloadSources = [
 ];
 
 export function DownloadSetting() {
-  const [fileSource, setFileSource] = useState("mirror");
-  const [versionSource, setVersionSource] = useState("mirror");
-  const [threads, setThreads] = useState(16);
-  const [speedLimit, setSpeedLimit] = useState("0");
+  const dl = useConfigStore((s) => s.config.download);
+  const setDownload = useConfigStore((s) => s.setDownload);
 
   return (
     <div>
@@ -34,7 +32,7 @@ export function DownloadSetting() {
                 <div className="space-y-2 mt-2">
                   {downloadSources.map((opt) => (
                     <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="fileSource" checked={fileSource === opt.value} onChange={() => setFileSource(opt.value)} className="accent-primary" />
+                      <input type="radio" name="fileSource" checked={dl.fileSource === opt.value} onChange={() => setDownload({ fileSource: opt.value })} className="accent-primary" />
                       <span className="text-sm text-foreground">{opt.label}</span>
                     </label>
                   ))}
@@ -49,7 +47,7 @@ export function DownloadSetting() {
                 <div className="space-y-2 mt-2">
                   {downloadSources.map((opt) => (
                     <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="versionSource" checked={versionSource === opt.value} onChange={() => setVersionSource(opt.value)} className="accent-primary" />
+                      <input type="radio" name="versionSource" checked={dl.versionSource === opt.value} onChange={() => setDownload({ versionSource: opt.value })} className="accent-primary" />
                       <span className="text-sm text-foreground">{opt.label}</span>
                     </label>
                   ))}
@@ -70,11 +68,11 @@ export function DownloadSetting() {
                     <p className="text-sm font-medium text-foreground">最大下载线程数</p>
                     <p className="text-[13px] text-muted-foreground mt-0.5">同时下载的文件数量，过高可能导致不稳定</p>
                   </div>
-                  <span className="text-[13px] text-muted-foreground tabular-nums shrink-0 ml-4">{threads}</span>
+                  <span className="text-[13px] text-muted-foreground tabular-nums shrink-0 ml-4">{dl.threads}</span>
                 </div>
                 <Slider
-                  value={[threads]}
-                  onValueChange={(v) => setThreads(Array.isArray(v) ? v[0] : v)}
+                  value={[dl.threads]}
+                  onValueChange={(v) => setDownload({ threads: Array.isArray(v) ? v[0] : v })}
                   min={1}
                   max={64}
                   step={1}
@@ -99,8 +97,8 @@ export function DownloadSetting() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    value={speedLimit}
-                    onChange={(e) => setSpeedLimit(e.target.value)}
+                    value={dl.speedLimit}
+                    onChange={(e) => setDownload({ speedLimit: Number(e.target.value) })}
                     min={0}
                     className="w-28 h-8 px-3 rounded-md border border-input bg-background text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />

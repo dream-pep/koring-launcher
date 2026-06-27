@@ -7,16 +7,35 @@ export function useTheme() {
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
 
-    const apply = () => {
+    const applySync = () => {
       const mode = useThemeStore.getState().darkMode;
-      let dark = false;
-      if (mode === "auto") dark = mq.matches;
-      else if (mode === "dark") dark = true;
-      document.documentElement.classList.toggle("dark", dark);
+      if (mode === "auto") {
+        document.documentElement.classList.toggle("dark", mq.matches);
+      } else if (mode === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
     };
 
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    const applyAuto = async () => {
+      const mode = useThemeStore.getState().darkMode;
+      if (mode !== "auto") {
+        applySync();
+        return;
+      }
+      try {
+        const theme = await window.electronAPI?.getTheme();
+        if (theme !== null && theme !== undefined) {
+          document.documentElement.classList.toggle("dark", theme === "dark");
+          return;
+        }
+      } catch {}
+      applySync();
+    };
+
+    applyAuto();
+    mq.addEventListener("change", applySync);
+    return () => mq.removeEventListener("change", applySync);
   }, [darkMode]);
 }

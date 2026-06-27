@@ -1,4 +1,4 @@
-import { BUILD_MODE } from "@/lib/mode";
+import { BUILD_MODE, LOGO_SVG } from "@/lib/mode";
 import { useUpdateStore } from "@/stores/updateStore";
 import { relaunchApp } from "@/api/update";
 import Silk from "@/components/silk/Silk";
@@ -76,7 +76,7 @@ export function VersionCard({
         </span>
 
         {/* Logo */}
-        <img src="/koring-licon.svg" alt="Koring" className="w-50 h-20 drop-shadow-lg" style={{ filter: "brightness(0) invert(1)" }} />
+        <img src={LOGO_SVG} alt="Koring" className="w-50 h-20 drop-shadow-lg" style={{ filter: "brightness(0) invert(1)" }} />
 
         {/* 版本号 */}
         <p className="text-sm text-white/70 font-medium">v{VERSION}</p>

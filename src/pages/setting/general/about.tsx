@@ -1,7 +1,6 @@
 import { VersionCard } from "@/components/VersionCard";
 import { BUILD_MODE } from "@/lib/mode";
 import { ExternalLink, GitFork } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
 
 function GlassCard({ children }: { children: React.ReactNode }) {
   return <div className="glass-card px-5 py-4">{children}</div>;
@@ -30,9 +29,7 @@ const OFFICIAL_URL = "https://koring.app";
 
 export function AboutSetting() {
   const openLink = (url: string) => {
-    open(url).catch(() => {
-      window.open(url, "_blank");
-    });
+    window.open(url, "_blank");
   };
 
   return (
@@ -59,8 +56,8 @@ export function AboutSetting() {
               </SettingRow>
             </GlassCard>
             <GlassCard>
-              <SettingRow label="技术栈" desc="Tauri 2 + React 19 + TypeScript + @xmcl">
-                <span className="text-[13px] text-muted-foreground">Rust · Node.js</span>
+              <SettingRow label="技术栈" desc="Electron + React 19 + TypeScript + @xmcl">
+                <span className="text-[13px] text-muted-foreground">Node.js</span>
               </SettingRow>
             </GlassCard>
           </div>

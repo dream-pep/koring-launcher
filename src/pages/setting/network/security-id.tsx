@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback } from "react";
+import { useConfigStore } from "@/stores/configStore";
 import { Switch } from "@/components/ui/switch";
 import { ShieldCheck } from "lucide-react";
 
@@ -19,8 +20,17 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
 }
 
 export function SecurityIdSetting() {
-  const [enabled, setEnabled] = useState(false);
-  const [authUrl, setAuthUrl] = useState("");
+  const enabled = useConfigStore((s) => s.config.network.securityId.enabled);
+  const authUrl = useConfigStore((s) => s.config.network.securityId.authUrl);
+  const setNetwork = useConfigStore((s) => s.setNetwork);
+
+  const handleToggle = useCallback((v: boolean) => {
+    setNetwork({ securityId: { enabled: v, authUrl: "" } });
+  }, [setNetwork]);
+
+  const handleUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setNetwork({ securityId: { enabled: true, authUrl: e.target.value } });
+  }, [setNetwork]);
 
   return (
     <div>
@@ -28,7 +38,6 @@ export function SecurityIdSetting() {
       <p className="text-sm text-muted-foreground mb-6">管理账户安全验证、设备识别与登录保护</p>
 
       <div className="space-y-6">
-        {/* ===== 认证服务 ===== */}
         <div>
           <h3 className="text-lg font-bold text-foreground mb-3">认证服务</h3>
           <div className="space-y-3">
@@ -37,7 +46,7 @@ export function SecurityIdSetting() {
                 label="启用第三方认证"
                 desc="使用自定义认证服务器替代 Microsoft 认证（适用于离线服务器）"
               >
-                <Switch checked={enabled} onCheckedChange={setEnabled} />
+                <Switch checked={enabled} onCheckedChange={handleToggle} />
               </SettingRow>
             </GlassCard>
 
@@ -51,7 +60,7 @@ export function SecurityIdSetting() {
                     <input
                       type="text"
                       value={authUrl}
-                      onChange={(e) => setAuthUrl(e.target.value)}
+                      onChange={handleUrlChange}
                       placeholder="https://auth.example.com"
                       className="flex-1 h-8 px-3 rounded-md border border-input bg-background text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     />

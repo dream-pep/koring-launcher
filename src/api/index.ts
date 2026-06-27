@@ -1,4 +1,4 @@
-export * from "./sidecar";
+export * from "./ipc";
 export * from "./install";
 export * from "./launch";
 export * from "./auth";

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useConfigStore } from "@/stores/configStore";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Cpu, FolderSearch } from "lucide-react";
@@ -37,11 +37,8 @@ const gcOptions = [
 ];
 
 export function JavaMemSetting() {
-  const [javaPath, setJavaPath] = useState("");
-  const [memMode, setMemMode] = useState<"auto" | "custom">("auto");
-  const [memGB, setMemGB] = useState(4);
-  const [gc, setGc] = useState("auto");
-  const [jvmArgs, setJvmArgs] = useState("");
+  const java = useConfigStore((s) => s.config.java);
+  const setJava = useConfigStore((s) => s.setJava);
 
   return (
     <div>
@@ -62,20 +59,19 @@ export function JavaMemSetting() {
               </SettingRow>
             </GlassCard>
 
-            {/* 检测结果列表 */}
-            {mockJavaList.map((java) => (
-              <GlassCard key={java.path}>
+            {mockJavaList.map((j) => (
+              <GlassCard key={j.path}>
                 <div className="flex items-center gap-3">
                   <Cpu className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">
-                      {java.vendor} {java.version}
+                      {j.vendor} {j.version}
                     </p>
                     <p className="text-[11px] text-muted-foreground/60 mt-0.5 font-mono truncate">
-                      {java.path}
+                      {j.path}
                     </p>
                   </div>
-                  <Button size="sm" variant="outline" className="shrink-0">
+                  <Button size="sm" variant="outline" className="shrink-0" onClick={() => setJava({ javaPath: j.path })}>
                     使用
                   </Button>
                 </div>
@@ -88,8 +84,8 @@ export function JavaMemSetting() {
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    value={javaPath}
-                    onChange={(e) => setJavaPath(e.target.value)}
+                    value={java.javaPath}
+                    onChange={(e) => setJava({ javaPath: e.target.value })}
                     placeholder="输入 javaw.exe 完整路径"
                     className="flex-1 h-8 px-3 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   />
@@ -108,23 +104,23 @@ export function JavaMemSetting() {
               <div className="space-y-3">
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="mem" checked={memMode === "auto"} onChange={() => setMemMode("auto")} className="accent-primary" />
+                    <input type="radio" name="mem" checked={java.memMode === "auto"} onChange={() => setJava({ memMode: "auto" })} className="accent-primary" />
                     <span className="text-sm text-foreground">自动配置</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="mem" checked={memMode === "custom"} onChange={() => setMemMode("custom")} className="accent-primary" />
+                    <input type="radio" name="mem" checked={java.memMode === "custom"} onChange={() => setJava({ memMode: "custom" })} className="accent-primary" />
                     <span className="text-sm text-foreground">自定义</span>
                   </label>
                 </div>
-                {memMode === "custom" && (
+                {java.memMode === "custom" && (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[13px] text-muted-foreground">分配内存</span>
-                      <span className="text-[13px] text-muted-foreground tabular-nums">{memGB} GB</span>
+                      <span className="text-[13px] text-muted-foreground tabular-nums">{java.memGB} GB</span>
                     </div>
                     <Slider
-                      value={[memGB]}
-                      onValueChange={(v) => setMemGB(Array.isArray(v) ? v[0] : v)}
+                      value={[java.memGB]}
+                      onValueChange={(v) => setJava({ memGB: Array.isArray(v) ? v[0] : v })}
                       min={1}
                       max={16}
                       step={1}
@@ -149,8 +145,8 @@ export function JavaMemSetting() {
                 <p className="text-sm font-medium text-foreground">额外 JVM 启动参数</p>
                 <p className="text-[13px] text-muted-foreground">每行一个参数，例如 -XX:+UseZGC</p>
                 <textarea
-                  value={jvmArgs}
-                  onChange={(e) => setJvmArgs(e.target.value)}
+                  value={java.jvmArgs}
+                  onChange={(e) => setJava({ jvmArgs: e.target.value })}
                   placeholder="可选，留空使用默认参数"
                   rows={3}
                   className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none font-mono"
@@ -170,7 +166,7 @@ export function JavaMemSetting() {
                 <div className="space-y-2">
                   {gcOptions.map((opt) => (
                     <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="gc" checked={gc === opt.value} onChange={() => setGc(opt.value)} className="accent-primary" />
+                      <input type="radio" name="gc" checked={java.gc === opt.value} onChange={() => setJava({ gc: opt.value })} className="accent-primary" />
                       <span className="text-sm text-foreground">{opt.label}</span>
                     </label>
                   ))}

@@ -1,5 +1,4 @@
-import { sidecarRequest, onEvent } from "./sidecar";
-import type { UnlistenFn } from "@tauri-apps/api/event";
+import { ipcInvoke, onIpcEvent } from './ipc';
 
 export interface LaunchOptions {
   gamePath: string;
@@ -23,19 +22,26 @@ export interface LaunchResult {
 }
 
 export async function launchGame(options: LaunchOptions): Promise<LaunchResult> {
-  return sidecarRequest<LaunchResult>("launch:launch", options);
+  return ipcInvoke<LaunchResult>('launch:launch', options);
 }
 
 export async function diagnoseVersion(
   gamePath: string,
   version: string
 ) {
-  return sidecarRequest("launch:diagnose", { gamePath, version });
+  return ipcInvoke('launch:diagnose', { gamePath, version });
 }
 
 export function onGameEvent(
   requestId: string,
   callback: (event: { event: string; [key: string]: unknown }) => void
-): Promise<UnlistenFn> {
-  return onEvent(requestId, callback as (e: Record<string, unknown>) => void);
+): () => void {
+  return onIpcEvent<{ requestId: string; event: string; [key: string]: unknown }>(
+    'launch:event',
+    (data) => {
+      if (data.requestId === requestId) {
+        callback(data);
+      }
+    }
+  );
 }

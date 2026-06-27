@@ -1,4 +1,4 @@
-import { sidecarRequest } from "./sidecar";
+import { ipcInvoke } from './ipc';
 
 export interface ModSearchResult {
   id: string;
@@ -10,7 +10,7 @@ export interface ModSearchResult {
   categories?: string[];
   versions?: string[];
   loaders?: string[];
-  source: "modrinth" | "curseforge";
+  source: 'modrinth' | 'curseforge';
 }
 
 export interface ModVersionResult {
@@ -33,9 +33,9 @@ export async function searchMods(
   loader?: string,
   limit?: number,
   offset?: number,
-  source: "modrinth" | "curseforge" = "modrinth"
+  source: 'modrinth' | 'curseforge' = 'modrinth'
 ): Promise<ModSearchResult[]> {
-  return sidecarRequest<ModSearchResult[]>("mods:search", {
+  return ipcInvoke<ModSearchResult[]>('mods:search', {
     query,
     gameVersion,
     loader,
@@ -47,18 +47,18 @@ export async function searchMods(
 
 export async function getModDetail(
   projectId: string,
-  source: "modrinth" | "curseforge"
+  source: 'modrinth' | 'curseforge'
 ): Promise<ModSearchResult> {
-  return sidecarRequest<ModSearchResult>("mods:detail", { projectId, source });
+  return ipcInvoke<ModSearchResult>('mods:detail', { projectId, source });
 }
 
 export async function getModVersions(
   projectId: string,
   gameVersion?: string,
   loader?: string,
-  source: "modrinth" | "curseforge" = "modrinth"
+  source: 'modrinth' | 'curseforge' = 'modrinth'
 ): Promise<ModVersionResult[]> {
-  return sidecarRequest<ModVersionResult[]>("mods:versions", {
+  return ipcInvoke<ModVersionResult[]>('mods:versions', {
     projectId,
     gameVersion,
     loader,
@@ -70,9 +70,9 @@ export async function installMod(
   projectId: string,
   versionId: string | undefined,
   gamePath: string,
-  source: "modrinth" | "curseforge" = "modrinth"
+  source: 'modrinth' | 'curseforge' = 'modrinth'
 ): Promise<{ projectId: string; versionId: string; filename: string; path: string }> {
-  return sidecarRequest("mods:install", {
+  return ipcInvoke('mods:install', {
     projectId,
     versionId,
     gamePath,

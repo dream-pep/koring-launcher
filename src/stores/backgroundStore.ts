@@ -1,36 +1,14 @@
 import { create } from "zustand";
-
-const STORAGE_KEY = "koring-background";
+import { useConfigStore } from "./configStore";
+import { DEFAULT_BG } from "@/lib/mode";
 
 type BackgroundType = "image" | "color";
 
-interface BackgroundConfig {
+interface BackgroundState {
   type: BackgroundType;
   image: string;
   blur: number;
   opacity: number;
-}
-
-const DEFAULT_CONFIG: BackgroundConfig = {
-  type: "image",
-  image: "/background.png",
-  blur: 0,
-  opacity: 1,
-};
-
-function loadConfig(): BackgroundConfig {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
-  } catch {}
-  return { ...DEFAULT_CONFIG };
-}
-
-function saveConfig(config: BackgroundConfig) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-}
-
-interface BackgroundState extends BackgroundConfig {
   setImage: (url: string) => void;
   setColor: (color: string) => void;
   setBlur: (blur: number) => void;
@@ -38,37 +16,48 @@ interface BackgroundState extends BackgroundConfig {
   reset: () => void;
 }
 
+const DEFAULT: { type: BackgroundType; image: string; blur: number; opacity: number } = {
+  type: "image",
+  image: DEFAULT_BG,
+  blur: 0,
+  opacity: 1,
+};
+
 export const useBackgroundStore = create<BackgroundState>((set) => ({
-  ...loadConfig(),
+  ...DEFAULT,
 
   setImage: (url) => {
-    const next: BackgroundConfig = { type: "image", image: url, blur: 0, opacity: 1 };
-    saveConfig(next);
-    set(next);
+    set({ type: "image", image: url, blur: 0, opacity: 1 });
+    useConfigStore.getState().setBackground({ bgType: "image", image: url, blur: 0, opacity: 100 });
   },
 
   setColor: (color) => {
-    const next: BackgroundConfig = { type: "color", image: color, blur: 0, opacity: 1 };
-    saveConfig(next);
-    set(next);
+    set({ type: "color", image: color, blur: 0, opacity: 1 });
+    useConfigStore.getState().setBackground({ bgType: "color", image: color, blur: 0, opacity: 100 });
   },
 
   setBlur: (blur) => {
-    const config = loadConfig();
-    config.blur = blur;
-    saveConfig(config);
     set({ blur });
+    useConfigStore.getState().setBackground({ blur });
   },
 
   setOpacity: (opacity) => {
-    const config = loadConfig();
-    config.opacity = opacity;
-    saveConfig(config);
     set({ opacity });
+    useConfigStore.getState().setBackground({ opacity: Math.round(opacity * 100) });
   },
 
   reset: () => {
-    saveConfig(DEFAULT_CONFIG);
-    set({ ...DEFAULT_CONFIG });
+    set({ ...DEFAULT });
+    useConfigStore.getState().setBackground({ bgType: "image", image: DEFAULT_BG, blur: 0, opacity: 100 });
   },
 }));
+
+export function syncBackgroundFromConfig() {
+  const bg = useConfigStore.getState().config.background;
+  useBackgroundStore.setState({
+    type: bg.bgType as BackgroundType,
+    image: bg.image,
+    blur: bg.blur,
+    opacity: bg.opacity / 100,
+  });
+}

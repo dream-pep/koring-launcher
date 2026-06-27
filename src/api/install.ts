@@ -1,4 +1,4 @@
-import { sidecarRequest } from "./sidecar";
+import { ipcInvoke } from './ipc';
 
 export interface VersionInfo {
   id: string;
@@ -12,7 +12,7 @@ export interface VersionManifest {
 }
 
 export async function getVersionList(type?: string): Promise<VersionManifest> {
-  return sidecarRequest<VersionManifest>("install:version-list", { type });
+  return ipcInvoke<VersionManifest>('install:version-list', { type });
 }
 
 export async function installMinecraft(
@@ -21,7 +21,7 @@ export async function installMinecraft(
   javaPath?: string,
   downloadThreads?: number
 ): Promise<{ version: string; gamePath: string }> {
-  return sidecarRequest("install:minecraft", {
+  return ipcInvoke('install:minecraft', {
     version,
     gamePath,
     javaPath,
@@ -32,11 +32,11 @@ export async function installMinecraft(
 export async function installModLoader(
   mcVersion: string,
   gamePath: string,
-  loaderType: "forge" | "fabric" | "quilt" | "neoforge",
+  loaderType: 'forge' | 'fabric' | 'quilt' | 'neoforge',
   loaderVersion?: string,
   javaPath?: string
 ): Promise<{ loaderType: string; mcVersion: string; loaderVersion: string }> {
-  return sidecarRequest("install:mod-loader", {
+  return ipcInvoke('install:mod-loader', {
     mcVersion,
     gamePath,
     loaderType,
@@ -46,9 +46,9 @@ export async function installModLoader(
 }
 
 export async function getForgeVersions(mcVersion?: string) {
-  return sidecarRequest("install:forge-version-list", { mcVersion });
+  return ipcInvoke('install:forge-version-list', { mcVersion });
 }
 
 export async function getFabricVersions(mcVersion?: string) {
-  return sidecarRequest("install:fabric-version-list", { mcVersion });
+  return ipcInvoke('install:fabric-version-list', { mcVersion });
 }

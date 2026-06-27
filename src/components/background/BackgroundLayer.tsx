@@ -3,8 +3,7 @@ import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useRouteStore } from "@/stores/routeStore";
 import { useDevStore } from "@/stores/devStore";
-
-const DEFAULT_BG = "/background.png";
+import { DEFAULT_BG } from "@/lib/mode";
 
 export function BackgroundLayer() {
   const { type, image, blur, opacity } = useBackgroundStore();
@@ -35,6 +34,7 @@ export function BackgroundLayer() {
   }, [parallax, handleMouseMove]);
 
   const bgUrl = image || DEFAULT_BG;
+  const contentBlur = showContentBlur && !forceDisableContentBlur;
 
   const getBackgroundStyle = (): React.CSSProperties => {
     const base: React.CSSProperties = {
@@ -43,12 +43,13 @@ export function BackgroundLayer() {
       zIndex: 0,
       pointerEvents: "none",
       opacity,
-      transition: parallax ? "transform 0.1s ease-out" : undefined,
+      transition: "filter 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s ease-out",
     };
 
-    if (blur > 0) {
-      base.filter = `blur(${blur}px)`;
-    }
+    const filters: string[] = [];
+    if (blur > 0) filters.push(`blur(${blur}px)`);
+    if (contentBlur) filters.push("blur(24px) saturate(120%)");
+    if (filters.length) base.filter = filters.join(" ");
 
     if (type === "color") {
       return {
@@ -70,7 +71,7 @@ export function BackgroundLayer() {
       <div ref={bgRef} style={getBackgroundStyle()} />
       <div
         className="content-blur-overlay"
-        style={{ opacity: showContentBlur && !forceDisableContentBlur ? 1 : 0 }}
+        style={{ opacity: contentBlur ? 1 : 0 }}
       />
       <div className="dark:block hidden fixed inset-0 z-0 pointer-events-none bg-black/35" />
     </>

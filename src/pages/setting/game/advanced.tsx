@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useConfigStore } from "@/stores/configStore";
 import { Switch } from "@/components/ui/switch";
 
 function GlassCard({ children }: { children: React.ReactNode }) {
@@ -30,13 +30,8 @@ const windowSize = [
 ];
 
 export function AdvancedSetting() {
-  const [afterLaunch, setAfterLaunch] = useState("close");
-  const [winMode, setWinMode] = useState("default");
-  const [customWidth, setCustomWidth] = useState("854");
-  const [customHeight, setCustomHeight] = useState("480");
-  const [gameArgs, setGameArgs] = useState("");
-  const [preLaunchCmd, setPreLaunchCmd] = useState("");
-  const [debugMode, setDebugMode] = useState(false);
+  const adv = useConfigStore((s) => s.config.advanced);
+  const setAdvanced = useConfigStore((s) => s.setAdvanced);
 
   return (
     <div>
@@ -55,7 +50,7 @@ export function AdvancedSetting() {
                 <div className="space-y-2 mt-2">
                   {launcherBehavior.map((opt) => (
                     <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="afterLaunch" checked={afterLaunch === opt.value} onChange={() => setAfterLaunch(opt.value)} className="accent-primary" />
+                      <input type="radio" name="afterLaunch" checked={adv.afterLaunch === opt.value} onChange={() => setAdvanced({ afterLaunch: opt.value })} className="accent-primary" />
                       <span className="text-sm text-foreground">{opt.label}</span>
                     </label>
                   ))}
@@ -76,20 +71,20 @@ export function AdvancedSetting() {
                   <div className="space-y-2">
                     {windowSize.map((opt) => (
                       <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name="winMode" checked={winMode === opt.value} onChange={() => setWinMode(opt.value)} className="accent-primary" />
+                        <input type="radio" name="winMode" checked={adv.winMode === opt.value} onChange={() => setAdvanced({ winMode: opt.value })} className="accent-primary" />
                         <span className="text-sm text-foreground">{opt.label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                {winMode === "custom" && (
+                {adv.winMode === "custom" && (
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] text-muted-foreground">宽</span>
                       <input
                         type="number"
-                        value={customWidth}
-                        onChange={(e) => setCustomWidth(e.target.value)}
+                        value={adv.customWidth}
+                        onChange={(e) => setAdvanced({ customWidth: Number(e.target.value) })}
                         className="w-20 h-8 px-2 rounded-md border border-input bg-background text-sm text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                     </div>
@@ -98,8 +93,8 @@ export function AdvancedSetting() {
                       <span className="text-[13px] text-muted-foreground">高</span>
                       <input
                         type="number"
-                        value={customHeight}
-                        onChange={(e) => setCustomHeight(e.target.value)}
+                        value={adv.customHeight}
+                        onChange={(e) => setAdvanced({ customHeight: Number(e.target.value) })}
                         className="w-20 h-8 px-2 rounded-md border border-input bg-background text-sm text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring"
                       />
                     </div>
@@ -120,8 +115,8 @@ export function AdvancedSetting() {
                 <p className="text-[13px] text-muted-foreground">附加到游戏启动命令末尾的参数</p>
                 <input
                   type="text"
-                  value={gameArgs}
-                  onChange={(e) => setGameArgs(e.target.value)}
+                  value={adv.gameArgs}
+                  onChange={(e) => setAdvanced({ gameArgs: e.target.value })}
                   placeholder="可选，例如 --demo"
                   className="w-full h-8 px-3 rounded-md border border-input bg-background text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
@@ -140,8 +135,8 @@ export function AdvancedSetting() {
                 <p className="text-[13px] text-muted-foreground">游戏启动前自动执行的命令或程序路径</p>
                 <input
                   type="text"
-                  value={preLaunchCmd}
-                  onChange={(e) => setPreLaunchCmd(e.target.value)}
+                  value={adv.preLaunchCmd}
+                  onChange={(e) => setAdvanced({ preLaunchCmd: e.target.value })}
                   placeholder="可选，例如 D:\scripts\pre-launch.bat"
                   className="w-full h-8 px-3 rounded-md border border-input bg-background text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 />
@@ -156,7 +151,7 @@ export function AdvancedSetting() {
           <div className="space-y-3">
             <GlassCard>
               <SettingRow label="调试模式" desc="启用后将在控制台输出详细日志，可能影响性能">
-                <Switch checked={debugMode} onCheckedChange={setDebugMode} />
+                <Switch checked={adv.debugMode} onCheckedChange={(v) => setAdvanced({ debugMode: v })} />
               </SettingRow>
             </GlassCard>
           </div>

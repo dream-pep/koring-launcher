@@ -1,17 +1,16 @@
-import { cpSync, existsSync } from "fs";
-import { join } from "path";
+const { cpSync, existsSync } = require('fs');
+const { join } = require('path');
 
 const mode = process.argv[2];
-const validModes = ["dev", "beta", "run"];
+const validModes = ['dev', 'beta', 'run'];
 
 if (!mode || !validModes.includes(mode)) {
-  console.error(`Usage: node scripts/switch-icon.js <${validModes.join("|")}>`);
+  console.error(`Usage: node scripts/switch-icon.js <${validModes.join('|')}>`);
   process.exit(1);
 }
 
-const root = join(import.meta.dirname, "..");
-const publicDir = join(root, "public");
-const iconsDir = join(root, "src-tauri", "icons");
+const root = join(__dirname, '..');
+const publicDir = join(root, 'public');
 
 const png = join(publicDir, `${mode}.png`);
 const ico = join(publicDir, `${mode}.ico`);
@@ -25,9 +24,7 @@ if (!existsSync(ico)) {
   process.exit(1);
 }
 
-// Tauri 2 only needs icon.png (source) + icon.ico
-// It auto-generates 32x32, 128x128, 128x128@2x, icns from icon.png during build
-cpSync(png, join(iconsDir, "icon.png"), { overwrite: true });
-cpSync(ico, join(iconsDir, "icon.ico"), { overwrite: true });
+cpSync(png, join(publicDir, 'icon.png'), { overwrite: true });
+cpSync(ico, join(publicDir, 'icon.ico'), { overwrite: true });
 
 console.log(`[switch-icon] Mode: ${mode} → icon.png + icon.ico updated`);
