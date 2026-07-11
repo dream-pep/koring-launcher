@@ -1,4 +1,5 @@
 import { BUILD_MODE, LOGO_SVG } from "@/lib/mode";
+import { VERSION } from "@/lib/version";
 import { useUpdateStore } from "@/stores/updateStore";
 import { relaunchApp } from "@/api/update";
 import Silk from "@/components/silk/Silk";
@@ -16,8 +17,6 @@ const modeLabels: Record<string, string> = {
   beta: "测试版",
   run: "正式版",
 };
-
-const VERSION = "0.1.0";
 
 type UpdateState = "latest" | "hasUpdate" | "installed";
 
@@ -50,12 +49,12 @@ export function VersionCard({
   return (
     <div
       className={clsx(
-        "relative overflow-hidden rounded-xl border border-white/10",
+        "relative overflow-hidden rounded-xl border border-white/10 min-h-[200px]",
         className,
       )}
     >
       {/* Silk 背景 */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0" style={{ background: color }}>
         <Silk speed={3} scale={1.2} color={color} noiseIntensity={1.2} rotation={0.3} />
       </div>
 

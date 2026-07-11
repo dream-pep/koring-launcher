@@ -15,7 +15,9 @@ pnpm dev:main           # electron main process only
 
 ```bash
 pnpm build              # production build (vite + tsc)
-pnpm dist:win           # build Windows installer
+pnpm dist:dev           # dev icon + Windows installer
+pnpm dist:beta          # beta icon + Windows installer
+pnpm dist:run           # production icon + Windows installer
 pnpm dist:mac           # build macOS DMG
 pnpm dist:linux         # build Linux AppImage
 ```
@@ -26,6 +28,7 @@ pnpm dist:linux         # build Linux AppImage
 src/                     Frontend (React 19 + Vite 7 + Tailwind v4 + shadcn/ui + Zustand)
 electron/                Main process (Node.js/TypeScript, @xmcl/* packages)
 public/                  Static assets (icons, fonts, images)
+build/                   Build resources (generated, gitignored)
 ```
 
 **IPC Flow:**
@@ -54,12 +57,12 @@ src/
 │   ├── Home.tsx          # Main page
 │   └── Debug.tsx         # Debug tools
 ├── lib/
-│   ├── mode.ts           # Build mode detection (dev/beta/run)
+│   ├── mode.ts           # Build mode constants (DEFAULT_BG, LOGO_SVG, APP_ICON)
 │   └── utils.ts          # cn() helper
 └── App.tsx               # Root component with state router
 
 electron/
-├── main.ts               # Electron entry, window management
+├── main.ts               # Electron entry, window management, splash→main transition
 ├── preload.ts            # Context bridge (window.electronAPI)
 ├── config.ts             # YAML config management
 ├── auth.ts               # Auth data persistence
@@ -79,7 +82,7 @@ electron/
 │   ├── background.ts     # Background operations
 │   ├── task.ts           # Task system
 │   ├── system.ts         # System info
-│   └── window.ts         # Window controls
+│   └── window.ts         # Window controls + splash management
 └── types/
     └── electron.d.ts     # TypeScript declarations
 ```
@@ -109,22 +112,35 @@ electron/
 - Window: 480×320, no decorations, transparent, locked size
 - Auto-adapts to system dark mode (`prefers-color-scheme`)
 - Logo: `filter: invert(1)` in dark mode
+- Startup: splash shows first → main loads behind → transition after `ready-to-show` + 1.5s minimum
 
 ## Icon System
 
-Three icon variants in `public/`:
+Three icon variants in `public/icons/`:
 
-| Mode | File | Use Case |
-|------|------|----------|
-| dev | `dev.png` / `dev.ico` | Development |
-| beta | `beta.png` / `beta.ico` | Testing |
-| run | `run.png` / `run.ico` | Production release |
+```
+public/icons/
+  dev/icon.ico, icon.png    # Development
+  beta/icon.ico, icon.png   # Testing
+  run/icon.ico, icon.png    # Production release
+```
+
+**Build-time switching:**
+```bash
+pnpm icon:dev    # copies public/icons/dev/ → build/
+pnpm icon:beta   # copies public/icons/beta/ → build/
+pnpm icon:run    # copies public/icons/run/ → build/
+```
+
+`electron-builder.yml` reads icons from `build/` (`buildResources: build`).
 
 **Frontend usage:**
 ```tsx
-import { APP_ICON, BUILD_MODE, isDev } from "@/lib/mode";
+import { APP_ICON, DEFAULT_BG, LOGO_SVG, BUILD_MODE, isDev } from "@/lib/mode";
 
 <img src={APP_ICON} />
+<img src={LOGO_SVG} />
+<img src={DEFAULT_BG} />
 {isDev && <span>Dev Mode</span>}
 ```
 
@@ -139,15 +155,19 @@ import { APP_ICON, BUILD_MODE, isDev } from "@/lib/mode";
 - `background:*` — Background image/color/blur/animation/theme
 - `task:*` — Task system progress
 - `system:*` — System info
-- `window:*` — Minimize/maximize/close
+- `window:*` — Minimize/maximize/close + splash management
+- `dialog:*` — File picker
 
 ## Key Gotchas
 
 - **@xmcl packages run in main process**: `@xmcl/core`, `@xmcl/installer` require `fs`/`child_process`. All run in Electron main process.
 - **Path alias**: `@/` maps to `src/`.
-- **Window dragging**: Use CSS `-webkit-app-region: drag` on titlebar.
+- **Window dragging**: Use CSS `WebkitAppRegion: "drag"` as inline style (Electron only respects CSS property, not HTML attributes).
 - **Transparent windows**: `transparent: true` + `frame: false` in BrowserWindow options.
-- **Auth storage**: JSON file (`koring-auth.json`) stored next to executable.
+- **Mutable win ref**: `electron/main.ts` uses a mutable `win` object — all handlers read `win.mainWindow` at runtime (not captured at registration time).
+- **Asset paths**: Use `import.meta.env.BASE_URL` prefix for public assets (e.g., `${import.meta.env.BASE_URL}background.png`). Absolute paths like `/background.png` break in packaged app.
+- **Config**: YAML format (`Koring.yml`) stored next to executable. Sparse save (only non-default values).
+- **Auth**: JSON file (`koring-auth.json`) stored next to executable.
 
 ## Tech Stack
 

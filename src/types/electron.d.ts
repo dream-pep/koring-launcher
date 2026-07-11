@@ -10,6 +10,8 @@ interface ElectronAPI {
   onResized: (callback: () => void) => () => void;
 
   getTheme: () => Promise<'light' | 'dark' | 'system' | null>;
+
+  openExternal: (url: string) => Promise<void>;
 }
 
 declare global {

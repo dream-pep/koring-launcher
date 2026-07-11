@@ -2,26 +2,27 @@ appId: com.lingke.koring.launcher
 productName: Koring Launcher
 directories:
   output: dist-electron
+  buildResources: build
 files:
   - dist/**
   - electron/**/*.js
   - "!electron/**/*.ts"
 win:
   target: nsis
-  icon: public/icon.ico
+  icon: build/icon.ico
   artifactName: "koring-launcher-${version}-setup.${ext}"
 mac:
   target: dmg
-  icon: public/icon.png
+  icon: build/icon.png
 linux:
   target: AppImage
-  icon: public/icon.png
+  icon: build/icon.png
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: public/icon.ico
-  uninstallerIcon: public/icon.ico
-  installerHeaderIcon: public/icon.ico
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Koring Launcher

@@ -1,5 +1,27 @@
 import electron from 'electron';
+import path from 'path';
+import fs from 'fs';
 const { contextBridge, ipcRenderer } = electron;
+
+const MIME_MAP: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+};
+
+function getFileAsDataUrl(filePath: string): string | null {
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const mime = MIME_MAP[ext] || 'image/png';
+    return `data:${mime};base64,${buffer.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Generic IPC
@@ -28,4 +50,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Theme
   getTheme: () => ipcRenderer.invoke('window:getTheme'),
+
+  // Background image — pick file, copy to userData, return base64 data URL
+  pickBackgroundImage: async (): Promise<string | null> => {
+    const result = await ipcRenderer.invoke('dialog:openFile', {
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+    });
+    if (!result) return null;
+    const { srcPath, ext } = result as { srcPath: string; ext: string };
+    // Copy to userData via main process
+    const destPath = await ipcRenderer.invoke('background:copyToUserData', srcPath, ext);
+    if (!destPath) return null;
+    return getFileAsDataUrl(destPath);
+  },
+
+  // Get cached background as base64 data URL
+  getBackgroundDataUrl: async (): Promise<string | null> => {
+    const filePath = await ipcRenderer.invoke('background:getCachedPath');
+    if (!filePath) return null;
+    return getFileAsDataUrl(filePath);
+  },
+
+  // Open external URL in system browser
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 });

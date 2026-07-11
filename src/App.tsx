@@ -12,6 +12,7 @@ import { Store } from "./pages/store";
 import { Today } from "./pages/today";
 import { PlayLink } from "./pages/play-link";
 import { Setting } from "./pages/setting";
+import { Gallery } from "./pages/gallery";
 import { TaskQueue } from "./pages/task-queue";
 import { Debug } from "./pages/debug";
 import { SplashDebug } from "./pages/debug/splash-debug";
@@ -27,6 +28,7 @@ const pageMap = {
   today: Today,
   "play-link": PlayLink,
   setting: Setting,
+  gallery: Gallery,
   "task-queue": TaskQueue,
   oobe: Oobe,
   "oobe/about-info": OobeAboutInfo,

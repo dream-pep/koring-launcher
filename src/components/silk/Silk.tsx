@@ -74,17 +74,19 @@ interface SilkPlaneProps {
 }
 
 const SilkPlane = forwardRef(function SilkPlane({ uniforms }: SilkPlaneProps, ref: React.Ref<Mesh>) {
-  const { viewport } = useThree();
+  const { viewport, invalidate } = useThree();
 
   useLayoutEffect(() => {
     if (ref && typeof ref === "object" && ref.current) {
       ref.current.scale.set(viewport.width, viewport.height, 1);
     }
-  }, [ref, viewport]);
+    invalidate();
+  }, [ref, viewport, invalidate]);
 
   useFrame((_, delta) => {
     if (ref && typeof ref === "object" && ref.current) {
       (ref.current.material as ShaderMaterial).uniforms.uTime.value += 0.1 * delta;
+      invalidate();
     }
   });
 
@@ -121,7 +123,11 @@ const Silk = ({ speed = 5, scale = 1, color = "#7B7481", noiseIntensity = 1.5, r
   );
 
   return (
-    <Canvas dpr={[1, 2]} frameloop="always">
+    <Canvas
+      dpr={[1, 2]}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", background: "black" }}
+      gl={{ antialias: true, alpha: false }}
+    >
       <SilkPlane ref={meshRef} uniforms={uniforms} />
     </Canvas>
   );

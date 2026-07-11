@@ -146,8 +146,8 @@ export function TitleBar({
       style={{
         WebkitAppRegion: "drag",
         background: "var(--titlebar-bg)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
         borderBottom: "1px solid var(--titlebar-border)",
         userSelect: "none",
       }}

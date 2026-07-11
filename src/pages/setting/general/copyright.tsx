@@ -17,7 +17,7 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
 }
 
 const openLink = (url: string) => {
-  window.open(url, "_blank");
+  window.electronAPI?.openExternal(url);
 };
 
 const licenses = [
@@ -50,9 +50,9 @@ export function CopyrightSetting() {
         <div>
           <h3 className="text-lg font-bold text-foreground mb-3">项目协议</h3>
           <GlassCard>
-            <SettingRow label="MIT License" desc="Copyright © 2024 Koring Launcher Contributors">
+            <SettingRow label="LL-1.0 (LingkeLice 1.0)" desc="Copyright © Shenzhen Lingke Network Technology Co., Ltd.">
               <button
-                onClick={() => openLink("https://opensource.org/licenses/MIT")}
+                onClick={() => openLink("https://support.lingke.ink/LL-1.0")}
                 className="inline-flex items-center gap-1.5 text-[13px] text-primary hover:underline"
               >
                 查看

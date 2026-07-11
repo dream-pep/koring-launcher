@@ -1,4 +1,6 @@
 import electron from 'electron';
+import fs from 'fs';
+import path from 'path';
 import { loadConfig, saveConfig } from '../config';
 
 const { ipcMain } = electron;
@@ -89,6 +91,30 @@ export function registerBackgroundHandlers() {
       return { success: true, data: config.background, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // Copy file to userData and return the destination path
+  ipcMain.handle('background:copyToUserData', async (_event, srcPath: string, ext: string) => {
+    try {
+      const userDataPath = electron.app.getPath('userData');
+      const destPath = path.join(userDataPath, `background-custom${ext}`);
+      fs.copyFileSync(srcPath, destPath);
+      return destPath;
+    } catch {
+      return null;
+    }
+  });
+
+  // Get cached background file path from userData
+  ipcMain.handle('background:getCachedPath', async () => {
+    try {
+      const userDataPath = electron.app.getPath('userData');
+      const files = fs.readdirSync(userDataPath).filter(f => f.startsWith('background-custom'));
+      if (files.length === 0) return null;
+      return path.join(userDataPath, files[0]);
+    } catch {
+      return null;
     }
   });
 }

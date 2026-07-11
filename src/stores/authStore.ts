@@ -65,7 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const { state, authUrl } = await microsoftLoginStart(clientId);
       set({ msAuthUrl: authUrl, msAuthState: state, loading: false });
-      window.open(authUrl, "_blank");
+      window.electronAPI?.openExternal(authUrl);
     } catch (e: any) {
       set({ error: e.message, loading: false });
     }

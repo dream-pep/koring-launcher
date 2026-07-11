@@ -29,7 +29,7 @@ const OFFICIAL_URL = "https://koring.app";
 
 export function AboutSetting() {
   const openLink = (url: string) => {
-    window.open(url, "_blank");
+    window.electronAPI?.openExternal(url);
   };
 
   return (

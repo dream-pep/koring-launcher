@@ -110,14 +110,9 @@ export function ThemeBgSetting() {
   const { image, opacity, setOpacity, blur, setBlur, setImage, reset } = useBackgroundStore();
 
   const handlePickImage = async () => {
-    // In Electron, use the native file dialog via IPC
-    const result = await window.electronAPI?.invoke('dialog:openFile', {
-      filters: [
-        { name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] },
-      ],
-    }) as string | null;
-    if (result) {
-      setImage(result);
+    const dataUrl = await (window as any).electronAPI?.pickBackgroundImage();
+    if (dataUrl) {
+      setImage(dataUrl);
     }
   };
 

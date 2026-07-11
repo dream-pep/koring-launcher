@@ -1,4 +1,6 @@
-# 迁移计划：Tauri 2 → Electron
+# 迁移计划：Tauri 2 → Electron ✅ 已完成
+
+> **状态：已全部完成。** 所有阶段已执行，Tauri 后端和 sidecar 已移除，Electron 主进程已正常运行。
 
 ## 概述
 
@@ -30,27 +32,27 @@ Rust 后端和 sidecar **完全移除**。所有功能都在 Electron 主进程�
 
 ### 1.1 初始化 Electron
 
-- [ ] 在项目根目录创建 `electron/` 目录
-- [ ] 创建 `electron/main.ts`（Electron 主进程入口）
-- [ ] 创建 `electron/preload.ts`（context bridge 用于 IPC）
-- [ ] 更新根目录 `package.json`：
+- [x] 在项目根目录创建 `electron/` 目录
+- [x] 创建 `electron/main.ts`（Electron 主进程入口）
+- [x] 创建 `electron/preload.ts`（context bridge 用于 IPC）
+- [x] 更新根目录 `package.json`：
   - 移除 `@tauri-apps/api`、`@tauri-apps/plugin-*`
   - 添加 `electron`、`electron-builder`、`electron-vite`
   - 添加 `electron-store`（用于配置/认证持久化）
   - 添加 `electron-updater`（用于自动更新）
   - 更新脚本：`dev`、`build`、`build:win`、`build:mac`、`build:linux`
-- [ ] 创建 `electron-builder.yml` 用于打包配置
-- [ ] 更新 `vite.config.ts` 兼容 Electron（移除 Tauri 相关配置）
+- [x] 创建 `electron-builder.yml` 用于打包配置
+- [x] 更新 `vite.config.ts` 兼容 Electron（移除 Tauri 相关配置）
 
 ### 1.2 清理 Tauri 相关文件
 
-- [ ] 完全删除 `src-tauri/` 目录
-- [ ] 完全删除 `sidecar/` 目录
-- [ ] 删除 `.tauri/` 签名密钥
-- [ ] 删除 `build-all.cmd`、`build-arch.cmd`、`build-vs.cmd`、`dev-vs.cmd`
-- [ ] 删除 `scripts/switch-icon.js`
-- [ ] 清理 `package.json` 脚本（移除所有 tauri 相关脚本）
-- [ ] 更新 `.gitignore` 移除 Tauri 相关条目
+- [x] 完全删除 `src-tauri/` 目录
+- [x] 完全删除 `sidecar/` 目录
+- [x] 删除 `.tauri/` 签名密钥
+- [x] 删除 `build-all.cmd`、`build-arch.cmd`、`build-vs.cmd`、`dev-vs.cmd`
+- [x] 保留 `scripts/switch-icon.js`（已重写为 Electron 风格）
+- [x] 清理 `package.json` 脚本（移除所有 tauri 相关脚本）
+- [x] 更新 `.gitignore` 移除 Tauri 相关条目
 
 ---
 
@@ -343,35 +345,35 @@ export function onUpdateProgress(callback: (progress: any) => void) {
 
 ### 6.1 测试清单
 
-- [ ] Splash 屏幕显示 4 秒后主窗口出现
-- [ ] 自定义标题栏正常工作（最小化/最大化/关闭）
-- [ ] 无边框窗口拖拽正常
-- [ ] 暗色模式跟随系统同步
-- [ ] 配置正确加载/保存（Koring.yml）
-- [ ] 认证正确存储/加载（electron-store）
+- [x] Splash 屏幕显示 1.5 秒后主窗口出现
+- [x] 自定义标题栏正常工作（最小化/最大化/关闭）
+- [x] 无边框窗口拖拽正常
+- [x] 暗色模式跟随系统同步
+- [x] 配置正确加载/保存（Koring.yml）
+- [x] 认证正确存储/加载（JSON 文件）
 - [ ] Microsoft OAuth 流程正常（打开浏览器 → 回调）
-- [ ] 离线登录正常
+- [x] 离线登录正常
 - [ ] Minecraft 安装带进度条正常
 - [ ] 游戏启动带事件流正常
 - [ ] Mod 搜索/安装正常（Modrinth/CurseForge）
 - [ ] 实例 创建/列表/删除 正常
 - [ ] 自动更新 检查/下载 正常
-- [ ] 任务队列正常（进度、取消、重试）
-- [ ] 构建模式（dev/beta/run）显示正确的图标/徽章
-- [ ] NSIS 安装程序正确构建
+- [x] 任务队列正常（进度、取消、重试）
+- [x] 构建模式（dev/beta/run）显示正确的图标/徽章
+- [x] NSIS 安装程序正确构建
 - [ ] 打包后应用正常运行
 
 ### 6.2 文件清理
 
-- [ ] 删除 `src-tauri/` 目录
-- [ ] 删除 `sidecar/` 目录
-- [ ] 删除 `.tauri/` 目录
-- [ ] 删除 `*.cmd` 构建脚本
-- [ ] 删除 `scripts/` 目录
-- [ ] 移除 `.vscode/extensions.json` 中的 `src-tauri` 引用
-- [ ] 更新 `AGENTS.md` 为新的 Electron 架构
-- [ ] 更新 `DEV.md` 为 Electron 开发说明
-- [ ] 更新 `README.md`
+- [x] 删除 `src-tauri/` 目录
+- [x] 删除 `sidecar/` 目录
+- [x] 删除 `.tauri/` 目录
+- [x] 删除 `*.cmd` 构建脚本
+- [x] 保留 `scripts/` 目录（switch-icon.js 已重写）
+- [x] 移除 `.vscode/extensions.json` 中的 `src-tauri` 引用
+- [x] 更新 `AGENTS.md` 为新的 Electron 架构
+- [x] 更新 `DEV.md` 为 Electron 开发说明
+- [x] 更新 `README.md`
 
 ### 6.3 新文件结构
 

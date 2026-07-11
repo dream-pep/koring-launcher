@@ -6,6 +6,7 @@ export type RouteKey =
   | "today"
   | "play-link"
   | "setting"
+  | "gallery"
   | "task-queue"
   | "oobe"
   | "oobe/about-info"
@@ -29,6 +30,7 @@ interface RouteItem {
 
 export const routes: RouteItem[] = [
   { key: "home", label: "首页", path: "/home" },
+  { key: "gallery", label: "实例", path: "/gallery" },
   { key: "store", label: "资源", path: "/store" },
   { key: "today", label: "资讯", path: "/today" },
   { key: "play-link", label: "联机", path: "/play-link" },

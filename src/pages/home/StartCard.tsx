@@ -37,6 +37,7 @@ export function StartCard({ onSettingsClick }: StartCardProps) {
 
       {/* Instance button */}
       <button
+        onClick={() => navigate("gallery")}
         className="flex items-center justify-center w-9 h-9 mr-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150 cursor-pointer shrink-0 rounded-full"
         aria-label="选择实例"
       >

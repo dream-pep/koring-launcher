@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useRouteStore } from "@/stores/routeStore";
@@ -11,8 +11,19 @@ export function BackgroundLayer() {
   const route = useRouteStore((s) => s.current);
   const forceDisableContentBlur = useDevStore((s) => s.forceDisableContentBlur);
   const showContentBlur = route !== "home";
+  const [bgImage, setBgImage] = useState(image);
 
   const bgRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (image && image !== DEFAULT_BG && !image.startsWith("data:")) {
+      (window as any).electronAPI?.getBackgroundDataUrl?.().then((dataUrl: string | null) => {
+        if (dataUrl) setBgImage(dataUrl);
+      });
+      return;
+    }
+    setBgImage(image);
+  }, [image]);
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -33,7 +44,7 @@ export function BackgroundLayer() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [parallax, handleMouseMove]);
 
-  const bgUrl = image || DEFAULT_BG;
+  const bgUrl = bgImage || DEFAULT_BG;
   const contentBlur = showContentBlur && !forceDisableContentBlur;
 
   const getBackgroundStyle = (): React.CSSProperties => {

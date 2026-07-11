@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "sonner/dist/styles.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/inter";
 
@@ -198,9 +199,11 @@
 /* 内容区转场：前进方向 */
 ::view-transition-old(content) {
   animation: 0.3s cubic-bezier(0.4, 0, 0.2, 1) both page-out-forward;
+  pointer-events: none;
 }
 ::view-transition-new(content) {
   animation: 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s both page-in-forward;
+  pointer-events: auto;
 }
 
 /* 设置子页面转场（已弃用 View Transitions，改用 keyframe） */
@@ -208,10 +211,12 @@
 /* 内容区转场：后退方向 */
 :root[data-transition-dir="backward"] ::view-transition-old(content) {
   animation-name: page-out-backward;
+  pointer-events: none;
 }
 :root[data-transition-dir="backward"] ::view-transition-new(content) {
   animation-name: page-in-backward;
   animation-delay: 0.05s;
+  pointer-events: auto;
 }
 
 @keyframes page-out-forward {

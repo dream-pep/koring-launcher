@@ -6,8 +6,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerWindowHandlers = registerWindowHandlers;
 const electron_1 = __importDefault(require("electron"));
 const path_1 = __importDefault(require("path"));
-const { ipcMain, dialog } = electron_1.default;
+const { ipcMain, dialog, shell } = electron_1.default;
 const isDev = !electron_1.default.app.isPackaged;
+const MIME_MAP = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    bmp: 'image/bmp',
+    svg: 'image/svg+xml',
+};
 function createSplashWindow() {
     const splash = new electron_1.default.BrowserWindow({
         width: 480,
@@ -67,7 +76,7 @@ function registerWindowHandlers(win) {
         }
         return { success: true };
     });
-    // File dialog
+    // File dialog — returns source path and extension for preload to handle
     ipcMain.handle('dialog:openFile', async (_event, payload) => {
         const result = await dialog.showOpenDialog(win.mainWindow, {
             properties: ['openFile'],
@@ -75,6 +84,12 @@ function registerWindowHandlers(win) {
         });
         if (result.canceled || result.filePaths.length === 0)
             return null;
-        return result.filePaths[0];
+        const srcPath = result.filePaths[0];
+        const ext = path_1.default.extname(srcPath).toLowerCase() || '.png';
+        return { srcPath, ext };
+    });
+    // Open external URL in system browser
+    ipcMain.handle('shell:openExternal', async (_event, url) => {
+        await shell.openExternal(url);
     });
 }

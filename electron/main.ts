@@ -22,6 +22,10 @@ const win: { mainWindow: electron.BrowserWindow | null; splashWindow: electron.B
 };
 
 function createSplashWindow(): electron.BrowserWindow {
+  const iconPath = isDev
+    ? path.join(__dirname, '../build/icon.ico')
+    : path.join(__dirname, '../build/icon.ico');
+
   const splash = new electron.BrowserWindow({
     width: 480,
     height: 320,
@@ -30,6 +34,7 @@ function createSplashWindow(): electron.BrowserWindow {
     resizable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -46,15 +51,20 @@ function createSplashWindow(): electron.BrowserWindow {
 }
 
 function createMainWindow(): electron.BrowserWindow {
+  const iconPath = isDev
+    ? path.join(__dirname, '../build/icon.ico')
+    : path.join(__dirname, '../build/icon.ico');
+
   const main = new electron.BrowserWindow({
     width: 1000,
     height: 700,
     minWidth: 800,
     minHeight: 600,
-    transparent: true,
     frame: false,
+    transparent: false,
     resizable: true,
     show: false,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -86,7 +96,7 @@ function registerAllHandlers() {
   registerInstallHandlers(win);
   registerLaunchHandlers(win);
   registerModsHandlers();
-  registerInstanceHandlers();
+  registerInstanceHandlers(win);
   registerBackgroundHandlers();
   registerTaskHandlers(win);
   registerSystemHandlers();

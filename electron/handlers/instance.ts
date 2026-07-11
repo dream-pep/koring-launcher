@@ -1,27 +1,54 @@
 import electron from 'electron';
-import { createInstance, listInstances, deleteInstance, getInstanceInfo } from '../core/instance';
+import {
+  createInstance,
+  listInstances,
+  getInstanceInfo,
+  deleteInstance,
+  updateInstance,
+  installInstanceGame,
+  launchInstance,
+  diagnoseInstance,
+  getMinecraftVersionList,
+  getForgeVersionList,
+  getFabricVersionList,
+  getQuiltVersionList,
+  type InstanceRuntime,
+  type InstanceConfig,
+} from '../core/instance';
 
 const { ipcMain } = electron;
 
-export function registerInstanceHandlers() {
+interface WinRef {
+  mainWindow: electron.BrowserWindow | null;
+}
+
+export function registerInstanceHandlers(win: WinRef) {
   ipcMain.handle('instance:create', async (_event, payload: {
     name: string;
     gamePath: string;
-    mcVersion: string;
-    loaderType?: string;
-    loaderVersion?: string;
-    javaPath?: string;
-    memory?: { min?: string; max?: string };
+    runtime: InstanceRuntime;
+    author?: string;
+    description?: string;
+    java?: string;
+    minMemory?: number;
+    maxMemory?: number;
+    vmOptions?: string[];
+    mcOptions?: string[];
   }) => {
     try {
       const data = await createInstance(
         payload.name,
         payload.gamePath,
-        payload.mcVersion,
-        payload.loaderType,
-        payload.loaderVersion,
-        payload.javaPath,
-        payload.memory
+        payload.runtime,
+        {
+          author: payload.author,
+          description: payload.description,
+          java: payload.java,
+          minMemory: payload.minMemory,
+          maxMemory: payload.maxMemory,
+          vmOptions: payload.vmOptions,
+          mcOptions: payload.mcOptions,
+        }
       );
       return { success: true, data, error: null };
     } catch (e: unknown) {
@@ -29,27 +56,139 @@ export function registerInstanceHandlers() {
     }
   });
 
-  ipcMain.handle('instance:list', async (_event, payload: { instancesPath: string }) => {
+  ipcMain.handle('instance:list', async (_event, payload: { gamePath: string }) => {
     try {
-      const data = await listInstances(payload.instancesPath);
+      const data = await listInstances(payload.gamePath);
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }
   });
 
-  ipcMain.handle('instance:delete', async (_event, payload: { name: string; instancesPath: string }) => {
+  ipcMain.handle('instance:info', async (_event, payload: { name: string; gamePath: string }) => {
     try {
-      const data = await deleteInstance(payload.name, payload.instancesPath);
+      const data = await getInstanceInfo(payload.name, payload.gamePath);
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }
   });
 
-  ipcMain.handle('instance:info', async (_event, payload: { name: string; instancesPath: string }) => {
+  ipcMain.handle('instance:delete', async (_event, payload: { name: string; gamePath: string }) => {
     try {
-      const data = await getInstanceInfo(payload.name, payload.instancesPath);
+      const data = await deleteInstance(payload.name, payload.gamePath);
+      return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('instance:update', async (_event, payload: {
+    name: string;
+    gamePath: string;
+    patch: Partial<Omit<InstanceConfig, 'name' | 'creationDate'>>;
+  }) => {
+    try {
+      const data = await updateInstance(payload.name, payload.gamePath, payload.patch);
+      return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('instance:install', async (_event, payload: { name: string; gamePath: string }) => {
+    try {
+      const requestId = `install-${Date.now()}`;
+
+      installInstanceGame(payload.name, payload.gamePath, {
+        onProgress: (progress) => {
+          win.mainWindow?.webContents.send('instance:progress', { requestId, ...progress });
+        },
+      }).then((data) => {
+        win.mainWindow?.webContents.send('instance:install-complete', { requestId, data });
+      }).catch((err) => {
+        win.mainWindow?.webContents.send('instance:install-error', { requestId, error: String(err) });
+      });
+
+      return { success: true, data: { requestId }, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('instance:launch', async (_event, payload: {
+    name: string;
+    gamePath: string;
+    username: string;
+    uuid: string;
+    accessToken?: string;
+    javaPath?: string;
+    server?: { host: string; port?: number };
+  }) => {
+    try {
+      const requestId = `launch-${Date.now()}`;
+
+      launchInstance(payload.name, payload.gamePath, {
+        username: payload.username,
+        uuid: payload.uuid,
+        accessToken: payload.accessToken,
+        javaPath: payload.javaPath,
+        server: payload.server,
+        onEvent: (event) => {
+          win.mainWindow?.webContents.send('instance:launch-event', { requestId, ...event });
+        },
+      }).then((data) => {
+        win.mainWindow?.webContents.send('instance:launch-complete', { requestId, data });
+      }).catch((err) => {
+        win.mainWindow?.webContents.send('instance:launch-error', { requestId, error: String(err) });
+      });
+
+      return { success: true, data: { requestId }, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('instance:diagnose', async (_event, payload: { name: string; gamePath: string }) => {
+    try {
+      const data = await diagnoseInstance(payload.name, payload.gamePath);
+      return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // Version list APIs
+  ipcMain.handle('instance:version-list', async (_event, payload: { type?: string }) => {
+    try {
+      const data = await getMinecraftVersionList(payload.type);
+      return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('instance:forge-version-list', async (_event, payload: { mcVersion?: string }) => {
+    try {
+      const data = await getForgeVersionList(payload.mcVersion);
+      return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('instance:fabric-version-list', async (_event, payload: { mcVersion?: string }) => {
+    try {
+      const data = await getFabricVersionList(payload.mcVersion);
+      return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  ipcMain.handle('instance:quilt-version-list', async (_event, payload: { mcVersion?: string }) => {
+    try {
+      const data = await getQuiltVersionList(payload.mcVersion);
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };

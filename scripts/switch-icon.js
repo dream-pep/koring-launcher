@@ -1,4 +1,4 @@
-const { cpSync, existsSync } = require('fs');
+const { cpSync, existsSync, mkdirSync } = require('fs');
 const { join } = require('path');
 
 const mode = process.argv[2];
@@ -10,10 +10,11 @@ if (!mode || !validModes.includes(mode)) {
 }
 
 const root = join(__dirname, '..');
-const publicDir = join(root, 'public');
+const srcDir = join(root, 'public', 'icons', mode);
+const buildDir = join(root, 'build');
 
-const png = join(publicDir, `${mode}.png`);
-const ico = join(publicDir, `${mode}.ico`);
+const png = join(srcDir, 'icon.png');
+const ico = join(srcDir, 'icon.ico');
 
 if (!existsSync(png)) {
   console.error(`Icon not found: ${png}`);
@@ -24,7 +25,9 @@ if (!existsSync(ico)) {
   process.exit(1);
 }
 
-cpSync(png, join(publicDir, 'icon.png'), { overwrite: true });
-cpSync(ico, join(publicDir, 'icon.ico'), { overwrite: true });
+mkdirSync(buildDir, { recursive: true });
 
-console.log(`[switch-icon] Mode: ${mode} → icon.png + icon.ico updated`);
+cpSync(png, join(buildDir, 'icon.png'), { overwrite: true });
+cpSync(ico, join(buildDir, 'icon.ico'), { overwrite: true });
+
+console.log(`[switch-icon] Mode: ${mode} → build/icon.png + build/icon.ico updated`);
