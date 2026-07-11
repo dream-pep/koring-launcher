@@ -14,22 +14,23 @@ import {
 } from "@/api/config";
 import { DEFAULT_BG } from "@/lib/mode";
 
-// TODO: re-enable when ready
-// let saveTimer: ReturnType<typeof setTimeout> | null = null;
-// function debouncedSave(config: AppConfig) {
-//   if (saveTimer) clearTimeout(saveTimer);
-//   saveTimer = setTimeout(() => {
-//     saveConfig(config).catch((e) => {
-//       console.error("[config] save failed:", e);
-//     });
-//   }, 300);
-// }
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedSave(config: AppConfig) {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveConfig(config).catch((e) => {
+      console.error("[config] save failed:", e);
+    });
+  }, 300);
+}
 
 interface ConfigState {
   config: AppConfig;
   loaded: boolean;
+  isFirstLaunch: boolean;
 
   init: () => Promise<void>;
+  applyPreloaded: (config: AppConfig, isFirstLaunch: boolean) => void;
   setTheme: (patch: Partial<ThemeConfig>) => void;
   setA11y: (patch: Partial<A11yConfig>) => void;
   setBackground: (patch: Partial<BackgroundConfig>) => void;
@@ -38,10 +39,12 @@ interface ConfigState {
   setAdvanced: (patch: Partial<AdvancedConfig>) => void;
   setDownload: (patch: Partial<DownloadConfig>) => void;
   setNetwork: (patch: Partial<NetworkConfig>) => void;
+  setOobe: (value: boolean) => void;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   version: 1,
+  oobe: true,
   theme: { darkMode: "auto", parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: "image", image: DEFAULT_BG, blur: 0, opacity: 100 },
@@ -55,56 +58,84 @@ const DEFAULT_CONFIG: AppConfig = {
 export const useConfigStore = create<ConfigState>((set, get) => ({
   config: DEFAULT_CONFIG,
   loaded: false,
+  isFirstLaunch: false,
+
+  applyPreloaded: (config, isFirstLaunch) => {
+    set({ config, isFirstLaunch, loaded: true });
+  },
 
   init: async () => {
-    // TODO: re-enable when ready — load from Rust/Koring.yml
-    // try {
-    //   const config = await getConfig();
-    //   set({ config, loaded: true });
-    // } catch (e) {
-    //   console.error("[config] init failed, using defaults:", e);
-    //   set({ loaded: true });
-    // }
-    set({ loaded: true });
+    // If already preloaded, skip IPC call
+    if (get().loaded) return;
+    try {
+      const config = await getConfig();
+      set({ config, loaded: true });
+    } catch (e) {
+      console.error("[config] init failed, using defaults:", e);
+      set({ loaded: true });
+    }
   },
 
   setTheme: (patch) => {
     const { config } = get();
-    set({ config: { ...config, theme: { ...config.theme, ...patch } } });
+    const next = { ...config, theme: { ...config.theme, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
   },
 
   setA11y: (patch) => {
     const { config } = get();
-    set({ config: { ...config, a11y: { ...config.a11y, ...patch } } });
+    const next = { ...config, a11y: { ...config.a11y, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
   },
 
   setBackground: (patch) => {
     const { config } = get();
-    set({ config: { ...config, background: { ...config.background, ...patch } } });
+    const next = { ...config, background: { ...config.background, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
   },
 
   setGame: (patch) => {
     const { config } = get();
-    set({ config: { ...config, game: { ...config.game, ...patch } } });
+    const next = { ...config, game: { ...config.game, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
   },
 
   setJava: (patch) => {
     const { config } = get();
-    set({ config: { ...config, java: { ...config.java, ...patch } } });
+    const next = { ...config, java: { ...config.java, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
   },
 
   setAdvanced: (patch) => {
     const { config } = get();
-    set({ config: { ...config, advanced: { ...config.advanced, ...patch } } });
+    const next = { ...config, advanced: { ...config.advanced, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
   },
 
   setDownload: (patch) => {
     const { config } = get();
-    set({ config: { ...config, download: { ...config.download, ...patch } } });
+    const next = { ...config, download: { ...config.download, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
   },
 
   setNetwork: (patch) => {
     const { config } = get();
-    set({ config: { ...config, network: { ...config.network, ...patch } } });
+    const next = { ...config, network: { ...config.network, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
+  },
+
+  setOobe: (value) => {
+    const { config } = get();
+    const next = { ...config, oobe: value };
+    set({ config: next });
+    debouncedSave(next);
   },
 }));

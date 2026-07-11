@@ -1,6 +1,7 @@
 import { VersionCard } from "@/components/VersionCard";
 import { BUILD_MODE } from "@/lib/mode";
-import { ExternalLink, GitFork } from "lucide-react";
+import { ExternalLink, GitFork, RotateCcw } from "lucide-react";
+import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
 
 function GlassCard({ children }: { children: React.ReactNode }) {
   return <div className="glass-card px-5 py-4">{children}</div>;
@@ -28,8 +29,20 @@ const GITHUB_URL = "https://github.com/koring-launcher/koring-launcher";
 const OFFICIAL_URL = "https://koring.app";
 
 export function AboutSetting() {
+  const openDialog = useConfirmDialogStore((s) => s.openDialog);
+
   const openLink = (url: string) => {
     window.electronAPI?.openExternal(url);
+  };
+
+  const handleResetClick = () => {
+    openDialog({
+      title: "您确定要还原所有配置吗？",
+      description: "您还原后，您的实例将会保留，但是所有个性化配置将全部丢失，并且需要重新进行激活",
+      confirmLabel: "确认还原",
+      countdown: 5,
+      onConfirm: () => window.electronAPI?.resetConfig(),
+    });
   };
 
   return (
@@ -91,6 +104,22 @@ export function AboutSetting() {
               </SettingRow>
             </GlassCard>
           </div>
+        </div>
+
+        {/* 危险操作 */}
+        <div>
+          <h3 className="text-lg font-bold text-foreground mb-3">危险操作</h3>
+          <GlassCard>
+            <SettingRow label="还原所有设置" desc="删除所有配置文件并重启应用">
+              <button
+                onClick={handleResetClick}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                还原
+              </button>
+            </SettingRow>
+          </GlassCard>
         </div>
       </div>
     </div>

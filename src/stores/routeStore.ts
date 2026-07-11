@@ -9,12 +9,18 @@ export type RouteKey =
   | "gallery"
   | "task-queue"
   | "oobe"
+  | "oobe/language"
+  | "oobe/agreement"
+  | "oobe/version"
+  | "oobe/beta-test"
+  | "oobe/finish"
   | "oobe/about-info"
   | "debug"
   | "debug-splash"
   | "debug-display"
   | "debug-version-card"
-  | "debug-task";
+  | "debug-task"
+  | "debug-crash";
 
 export type TitleBarMode = "default" | "sub" | "window" | "oobe";
 
@@ -41,6 +47,11 @@ export const allRoutes: RouteItem[] = [
   ...routes,
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
   { key: "oobe", label: "OOBE", path: "/oobe", hidden: true },
+  { key: "oobe/language", label: "语言设置", path: "/oobe/language", hidden: true },
+  { key: "oobe/agreement", label: "同意协议", path: "/oobe/agreement", hidden: true },
+  { key: "oobe/version", label: "当前版本", path: "/oobe/version", hidden: true },
+  { key: "oobe/beta-test", label: "测试协议", path: "/oobe/beta-test", hidden: true },
+  { key: "oobe/finish", label: "完成", path: "/oobe/finish", hidden: true },
   { key: "oobe/about-info", label: "关于信息", path: "/oobe/about-info", hidden: true, backable: true },
   { key: "debug", label: "调试", path: "/debug", hidden: true },
   { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
@@ -52,7 +63,7 @@ export const allRoutes: RouteItem[] = [
 const topLevelKeys = new Set(routes.map((r) => r.key));
 
 function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
-  if (key === "oobe") return "oobe";
+  if (key === "oobe" || key.startsWith("oobe/")) return "oobe";
   return topLevelKeys.has(key) ? "default" : "sub";
 }
 

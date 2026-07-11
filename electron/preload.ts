@@ -51,6 +51,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Theme
   getTheme: () => ipcRenderer.invoke('window:getTheme'),
 
+  // Config preloading
+  onConfigPreload: (callback: (data: { config: unknown; isFirstLaunch: boolean }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { config: unknown; isFirstLaunch: boolean }) => callback(data);
+    ipcRenderer.on('config:preload', handler);
+    return () => ipcRenderer.removeListener('config:preload', handler);
+  },
+
   // Background image — pick file, copy to userData, return base64 data URL
   pickBackgroundImage: async (): Promise<string | null> => {
     const result = await ipcRenderer.invoke('dialog:openFile', {
@@ -73,4 +80,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Open external URL in system browser
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+
+  // Crash monitoring — devtools only
+  simulateCrash: () => ipcRenderer.invoke('crash:simulate'),
+  testCrashDialog: () => ipcRenderer.invoke('crash:testDialog'),
+
+  // Config reset
+  resetConfig: () => ipcRenderer.invoke('config:reset'),
 });

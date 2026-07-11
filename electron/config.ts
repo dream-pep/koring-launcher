@@ -7,7 +7,7 @@ const { app } = electron;
 const CONFIG_FILE = 'Koring.yml';
 const CURRENT_VERSION = 1;
 
-function configPath(): string {
+export function configPath(): string {
   if (app.isPackaged) {
     return path.join(path.dirname(app.getPath('exe')), CONFIG_FILE);
   }
@@ -76,6 +76,7 @@ export interface NetworkConfig {
 
 export interface AppConfig {
   version: number;
+  oobe: boolean;
   theme: ThemeConfig;
   a11y: A11yConfig;
   background: BackgroundConfig;
@@ -88,6 +89,7 @@ export interface AppConfig {
 
 const DEFAULTS: AppConfig = {
   version: CURRENT_VERSION,
+  oobe: true,
   theme: { darkMode: 'auto', parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 },
@@ -127,6 +129,14 @@ function diffValue(full: unknown, defaultVal: unknown): unknown {
   }
 
   return Object.keys(result).length === 0 ? undefined : result;
+}
+
+export function configExists(): boolean {
+  try {
+    return fs.existsSync(configPath());
+  } catch {
+    return false;
+  }
 }
 
 export function loadConfig(): AppConfig {

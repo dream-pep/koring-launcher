@@ -1,8 +1,7 @@
 import { type ReactNode } from "react";
 import { BackgroundLayer } from "@/components/background/BackgroundLayer";
 import { SystemLayer } from "@/components/system/SystemLayer";
-import { StartupPopup } from "@/components/StartupPopup";
-import { BetaWarning } from "@/components/BetaWarning";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Toaster } from "sonner";
 import { useA11yStore } from "@/stores/a11yStore";
 import clsx from "clsx";
@@ -52,11 +51,8 @@ export function RootLayout({
         showClose={showClose}
       />
 
-      {/* Startup popup — only when VITE_START_POP=true */}
-      <StartupPopup />
-
-      {/* Beta warning toast */}
-      <BetaWarning />
+      {/* Global confirm dialog */}
+      <ConfirmDialog />
 
       {/* Sonner toaster */}
       <Toaster

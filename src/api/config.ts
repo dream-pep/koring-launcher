@@ -62,6 +62,7 @@ export interface NetworkConfig {
 
 export interface AppConfig {
   version: number;
+  oobe: boolean;
   theme: ThemeConfig;
   a11y: A11yConfig;
   background: BackgroundConfig;

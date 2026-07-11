@@ -1,5 +1,6 @@
 import electron from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { registerConfigHandlers } from './handlers/config';
 import { registerAuthHandlers } from './handlers/auth';
 import { registerInstallHandlers } from './handlers/install';
@@ -10,16 +11,46 @@ import { registerBackgroundHandlers } from './handlers/background';
 import { registerTaskHandlers } from './handlers/task';
 import { registerSystemHandlers } from './handlers/system';
 import { registerWindowHandlers } from './handlers/window';
+import { registerCrashHandlers, setupCrashListeners, testCrashDialog } from './handlers/crash-monitor';
+import { loadConfig, saveConfig, configExists } from './config';
 
 const { app } = electron;
 
 const isDev = !app.isPackaged;
 
-// Mutable ref — handlers always read from this
+// GPU acceleration flags
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+
 const win: { mainWindow: electron.BrowserWindow | null; splashWindow: electron.BrowserWindow | null } = {
   mainWindow: null,
   splashWindow: null,
 };
+
+// Startup checks: .minecraft dir + config file + first launch detection
+function runStartupChecks(): { isFirstLaunch: boolean; config: ReturnType<typeof loadConfig> } {
+  const dataPath = app.isPackaged
+    ? path.dirname(app.getPath('exe'))
+    : path.join(__dirname, '..');
+
+  // 1. Ensure .minecraft directory exists
+  const minecraftDir = path.join(dataPath, '.minecraft');
+  if (!fs.existsSync(minecraftDir)) {
+    fs.mkdirSync(minecraftDir, { recursive: true });
+  }
+
+  // 2. Check if config exists, if not create with defaults
+  const hasConfig = configExists();
+  const isFirstLaunch = !hasConfig;
+
+  // 3. Load (or create) config
+  const config = loadConfig();
+  if (isFirstLaunch) {
+    saveConfig(config);
+  }
+
+  return { isFirstLaunch, config };
+}
 
 function createSplashWindow(): electron.BrowserWindow {
   const iconPath = isDev
@@ -101,10 +132,14 @@ function registerAllHandlers() {
   registerTaskHandlers(win);
   registerSystemHandlers();
   registerWindowHandlers(win);
+  registerCrashHandlers();
 }
 
 app.whenReady().then(() => {
   registerAllHandlers();
+
+  // Run startup checks before creating windows
+  const { isFirstLaunch, config } = runStartupChecks();
 
   // 1. Show splash immediately
   win.splashWindow = createSplashWindow();
@@ -112,7 +147,12 @@ app.whenReady().then(() => {
   // 2. Create main window in background
   win.mainWindow = createMainWindow();
 
-  // 3. When main window finishes loading, wait a minimum time then transition
+  // 3. Preload config into renderer before it renders
+  win.mainWindow.webContents.on('did-finish-load', () => {
+    win.mainWindow?.webContents.send('config:preload', { config, isFirstLaunch });
+  });
+
+  // 4. When main window finishes loading, wait a minimum time then transition
   let mainReady = false;
   let splashMinTimeDone = false;
 
@@ -133,6 +173,9 @@ app.whenReady().then(() => {
     mainReady = true;
     tryTransition();
   });
+
+  // Setup crash listeners on main window
+  setupCrashListeners(win.mainWindow);
 
   // Minimum splash display time (1.5s)
   setTimeout(() => {

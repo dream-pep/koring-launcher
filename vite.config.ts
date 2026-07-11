@@ -20,6 +20,7 @@ export default defineConfig(async () => ({
       input: {
         main: path.resolve(__dirname, "index.html"),
         splash: path.resolve(__dirname, "splash.html"),
+        crash: path.resolve(__dirname, "crash.html"),
       },
     },
   },

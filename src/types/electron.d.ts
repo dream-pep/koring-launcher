@@ -11,7 +11,16 @@ interface ElectronAPI {
 
   getTheme: () => Promise<'light' | 'dark' | 'system' | null>;
 
+  onConfigPreload: (callback: (data: { config: unknown; isFirstLaunch: boolean }) => void) => () => void;
+
   openExternal: (url: string) => Promise<void>;
+
+  // Crash monitoring
+  simulateCrash: () => Promise<void>;
+  testCrashDialog: () => Promise<void>;
+
+  // Config reset
+  resetConfig: () => Promise<void>;
 }
 
 declare global {

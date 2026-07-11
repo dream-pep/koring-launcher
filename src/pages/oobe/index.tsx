@@ -1,29 +1,64 @@
 import { useRouteStore } from "@/stores/routeStore";
-import { Rocket, ChevronRight } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
 
-export function Oobe() {
-  const goBack = useRouteStore((s) => s.goBack);
+const words = ["Hello.", "你好。", "こんにちは。", "안녕하세요。", "Bonjour."];
+
+function TypewriterText() {
+  const [wordIndex, setWordIndex] = useState(0);
+  const [displayed, setDisplayed] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    const word = words[wordIndex];
+
+    if (!isDeleting) {
+      if (displayed.length < word.length) {
+        timerRef.current = setTimeout(() => {
+          setDisplayed(word.slice(0, displayed.length + 1));
+        }, 120);
+      } else {
+        timerRef.current = setTimeout(() => setIsDeleting(true), 1800);
+      }
+    } else {
+      if (displayed.length > 0) {
+        timerRef.current = setTimeout(() => {
+          setDisplayed(displayed.slice(0, -1));
+        }, 60);
+      } else {
+        setIsDeleting(false);
+        setWordIndex((i) => (i + 1) % words.length);
+      }
+    }
+
+    return () => clearTimeout(timerRef.current);
+  }, [displayed, isDeleting, wordIndex]);
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-8">
-      <div className="flex flex-col items-center text-center max-w-md">
-        <div className="p-4 rounded-2xl bg-primary/10 mb-6">
-          <Rocket className="w-10 h-10 text-primary" />
-        </div>
+    <span className="inline-block min-w-[200px] text-center">
+      {displayed}
+      <span className="inline-block w-[2px] h-[1em] bg-foreground/60 ml-0.5 align-middle animate-pulse" />
+    </span>
+  );
+}
 
-        <h1 className="text-2xl font-bold text-foreground mb-2">
-          欢迎使用 Koring Launcher
-        </h1>
-        <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-          这是 OOBE（开箱体验）页面。在这里可以引导用户完成初始设置。
-        </p>
+export function Oobe() {
+  const navigate = useRouteStore((s) => s.navigate);
 
+  return (
+    <div className="h-full flex flex-col items-center justify-center relative">
+      {/* 中心动画文字 */}
+      <div className="text-5xl font-bold tracking-tight text-foreground">
+        <TypewriterText />
+      </div>
+
+      {/* 下方按钮 */}
+      <div className="absolute bottom-12">
         <button
-          onClick={goBack}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-sm font-medium transition-colors"
+          onClick={() => navigate("oobe/language")}
+          className="w-12 h-12 rounded-full bg-foreground/[0.06] hover:bg-foreground/[0.12] flex items-center justify-center text-foreground/60 hover:text-foreground transition-all duration-200 text-xl"
         >
-          返回调试
-          <ChevronRight className="w-4 h-4" />
+          →
         </button>
       </div>
     </div>

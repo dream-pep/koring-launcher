@@ -7,6 +7,7 @@ import { syncThemeFromConfig } from "./stores/themeStore";
 import { syncA11yFromConfig } from "./stores/a11yStore";
 import { syncBackgroundFromConfig } from "./stores/backgroundStore";
 import { useAuthStore } from "./stores/authStore";
+import type { AppConfig } from "./api/config";
 import { Home } from "./pages/home";
 import { Store } from "./pages/store";
 import { Today } from "./pages/today";
@@ -19,7 +20,13 @@ import { SplashDebug } from "./pages/debug/splash-debug";
 import { DisplayDebug } from "./pages/debug/display-debug";
 import { VersionCardDebug } from "./pages/debug/version-card-debug";
 import { TaskDebug } from "./pages/debug/task-debug";
+import { CrashDebug } from "./pages/debug/crash-debug";
 import { Oobe } from "./pages/oobe";
+import { OobeLanguage } from "./pages/oobe/step-language";
+import { OobeAgreement } from "./pages/oobe/step-agreement";
+import { OobeVersion } from "./pages/oobe/step-version";
+import { OobeBetaTest } from "./pages/oobe/step-beta-test";
+import { OobeFinish } from "./pages/oobe/step-finish";
 import { OobeAboutInfo } from "./pages/oobe/about-info";
 
 const pageMap = {
@@ -31,12 +38,18 @@ const pageMap = {
   gallery: Gallery,
   "task-queue": TaskQueue,
   oobe: Oobe,
+  "oobe/language": OobeLanguage,
+  "oobe/agreement": OobeAgreement,
+  "oobe/version": OobeVersion,
+  "oobe/beta-test": OobeBetaTest,
+  "oobe/finish": OobeFinish,
   "oobe/about-info": OobeAboutInfo,
   debug: Debug,
   "debug-splash": SplashDebug,
   "debug-display": DisplayDebug,
   "debug-version-card": VersionCardDebug,
   "debug-task": TaskDebug,
+  "debug-crash": CrashDebug,
 } as const;
 
 function App() {
@@ -45,12 +58,21 @@ function App() {
   const Page = pageMap[current];
 
   useEffect(() => {
-    useConfigStore.getState().init().then(() => {
+    // Listen for preloaded config from main process
+    const unsub = window.electronAPI?.onConfigPreload((data) => {
+      const { config, isFirstLaunch } = data;
+      useConfigStore.getState().applyPreloaded(config as AppConfig, isFirstLaunch);
       syncThemeFromConfig();
       syncA11yFromConfig();
       syncBackgroundFromConfig();
       useAuthStore.getState().initFromRegistry();
+      // Navigate to OOBE on first launch or if oobe not completed
+      if (isFirstLaunch || config.oobe) {
+        useRouteStore.getState().navigate("oobe");
+      }
     });
+
+    return () => { unsub?.(); };
   }, []);
 
   return (

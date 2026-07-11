@@ -1,7 +1,15 @@
 import { useRouteStore } from "@/stores/routeStore";
-import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket } from "lucide-react";
+import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle } from "lucide-react";
 
 const debugPages = [
+  {
+    key: "debug-crash" as const,
+    icon: AlertTriangle,
+    title: "崩溃测试",
+    desc: "模拟崩溃、测试崩溃弹窗、查看崩溃日志与强还原配置",
+    color: "text-red-500",
+    bg: "bg-red-500/10",
+  },
   {
     key: "debug-splash" as const,
     icon: Monitor,

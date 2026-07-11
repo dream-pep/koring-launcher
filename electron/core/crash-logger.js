@@ -36,42 +36,58 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerConfigHandlers = registerConfigHandlers;
-const electron_1 = __importDefault(require("electron"));
-const { ipcMain, app } = electron_1.default;
+exports.writeCrashLog = writeCrashLog;
+exports.readCrashLog = readCrashLog;
+exports.clearCrashLog = clearCrashLog;
 const fs = __importStar(require("fs"));
-const config_1 = require("../config");
-function registerConfigHandlers() {
-    ipcMain.handle('config:get', () => {
-        try {
-            const config = (0, config_1.loadConfig)();
-            return { success: true, data: config, error: null };
+const path = __importStar(require("path"));
+const electron_1 = __importDefault(require("electron"));
+const { app } = electron_1.default;
+const LOG_FILE = 'koring-crash.log';
+const MAX_LINES = 1000;
+function logPath() {
+    if (app.isPackaged) {
+        return path.join(path.dirname(app.getPath('exe')), LOG_FILE);
+    }
+    return path.join(__dirname, '..', LOG_FILE);
+}
+function trimFile(filePath) {
+    try {
+        if (!fs.existsSync(filePath))
+            return;
+        const lines = fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean);
+        if (lines.length > MAX_LINES) {
+            fs.writeFileSync(filePath, lines.slice(-MAX_LINES).join('\n') + '\n', 'utf-8');
         }
-        catch (e) {
-            return { success: false, data: null, error: String(e) };
+    }
+    catch { }
+}
+function writeCrashLog(entry) {
+    const filePath = logPath();
+    try {
+        const line = JSON.stringify(entry) + '\n';
+        fs.appendFileSync(filePath, line, 'utf-8');
+        trimFile(filePath);
+    }
+    catch { }
+}
+function readCrashLog() {
+    const filePath = logPath();
+    try {
+        if (!fs.existsSync(filePath))
+            return '';
+        return fs.readFileSync(filePath, 'utf-8');
+    }
+    catch {
+        return '';
+    }
+}
+function clearCrashLog() {
+    const filePath = logPath();
+    try {
+        if (fs.existsSync(filePath)) {
+            fs.writeFileSync(filePath, '', 'utf-8');
         }
-    });
-    ipcMain.handle('config:save', (_event, config) => {
-        try {
-            (0, config_1.saveConfig)(config);
-            return { success: true, data: null, error: null };
-        }
-        catch (e) {
-            return { success: false, data: null, error: String(e) };
-        }
-    });
-    ipcMain.handle('config:reset', () => {
-        try {
-            const filePath = (0, config_1.configPath)();
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
-            app.relaunch();
-            app.exit(0);
-            return { success: true, data: null, error: null };
-        }
-        catch (e) {
-            return { success: false, data: null, error: String(e) };
-        }
-    });
+    }
+    catch { }
 }
