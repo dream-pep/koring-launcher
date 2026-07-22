@@ -45,7 +45,7 @@ export function OobeLanguage() {
         ))}
       </div>
 
-      <NextButton onClick={() => navigate("oobe/agreement")} />
+      <NextButton onClick={() => navigate("oobe/login")} />
     </OobeLayout>
   );
 }

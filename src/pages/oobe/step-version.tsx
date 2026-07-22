@@ -12,7 +12,7 @@ export function OobeVersion() {
   const isTestBuild = BUILD_MODE === "dev" || BUILD_MODE === "beta";
   const badgeLabel = BUILD_MODE === "dev" ? "DEV" : BUILD_MODE === "beta" ? "BETA" : null;
 
-  const nextRoute = isTestBuild ? "oobe/beta-test" : "oobe/finish";
+  const nextRoute = isTestBuild ? "oobe/beta-test" : "oobe/login";
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}changelog-${VERSION}.txt`)

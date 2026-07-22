@@ -1,4 +1,5 @@
-import { useAuthStore } from "@/stores/authStore";
+import { useKoringAuthStore } from "@/stores/koringAuthStore";
+import { useRouteStore } from "@/stores/routeStore";
 import { BUILD_MODE } from "@/lib/mode";
 import { useUpdateStore } from "@/stores/updateStore";
 import {
@@ -62,7 +63,7 @@ interface HomeSettingProps {
 }
 
 export function HomeSetting({ onNavigate }: HomeSettingProps) {
-  const user = useAuthStore((s) => s.user);
+  const user = useKoringAuthStore((s) => s.user);
   const { update } = useUpdateStore();
 
   return (
@@ -85,17 +86,19 @@ export function HomeSetting({ onNavigate }: HomeSettingProps) {
           <h3 className="text-lg font-bold text-foreground mb-3">快速概览</h3>
           <GlassCard>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-foreground/[0.06] flex items-center justify-center shrink-0">
-                <UserCircle className="w-7 h-7 text-foreground/40" />
+              <div className="w-12 h-12 rounded-full bg-foreground/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
+                {user?.picture ? (
+                  <img src={user.picture} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <UserCircle className="w-7 h-7 text-foreground/40" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
-                  {user?.username ?? "未登录"}
+                  {user ? (user.name || user.username) : "未登录"}
                 </p>
                 <p className="text-[12px] text-muted-foreground mt-0.5">
-                  {user
-                    ? `${user.xboxProfile ? "Microsoft" : "离线"} 账户`
-                    : "登录以同步数据和皮肤"}
+                  {user ? "Koring 账户" : "登录以同步数据和皮肤"}
                 </p>
               </div>
               <span className="text-[11px] text-muted-foreground shrink-0">

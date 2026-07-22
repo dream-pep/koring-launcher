@@ -12,6 +12,7 @@ import { registerTaskHandlers } from './handlers/task';
 import { registerSystemHandlers } from './handlers/system';
 import { registerWindowHandlers } from './handlers/window';
 import { registerCrashHandlers, setupCrashListeners, testCrashDialog } from './handlers/crash-monitor';
+import { registerKoringAuthHandlers } from './handlers/koring-auth';
 import { loadConfig, saveConfig, configExists } from './config';
 
 const { app } = electron;
@@ -133,6 +134,7 @@ function registerAllHandlers() {
   registerSystemHandlers();
   registerWindowHandlers(win);
   registerCrashHandlers();
+  registerKoringAuthHandlers();
 }
 
 app.whenReady().then(() => {

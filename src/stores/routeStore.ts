@@ -6,6 +6,7 @@ export type RouteKey =
   | "today"
   | "play-link"
   | "setting"
+  | "setting/login"
   | "gallery"
   | "task-queue"
   | "oobe"
@@ -13,6 +14,8 @@ export type RouteKey =
   | "oobe/agreement"
   | "oobe/version"
   | "oobe/beta-test"
+  | "oobe/login"
+  | "oobe/welcome"
   | "oobe/finish"
   | "oobe/about-info"
   | "debug"
@@ -45,12 +48,15 @@ export const routes: RouteItem[] = [
 
 export const allRoutes: RouteItem[] = [
   ...routes,
+  { key: "setting/login", label: "登录", path: "/setting/login", hidden: true, backable: true },
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
   { key: "oobe", label: "OOBE", path: "/oobe", hidden: true },
   { key: "oobe/language", label: "语言设置", path: "/oobe/language", hidden: true },
   { key: "oobe/agreement", label: "同意协议", path: "/oobe/agreement", hidden: true },
   { key: "oobe/version", label: "当前版本", path: "/oobe/version", hidden: true },
   { key: "oobe/beta-test", label: "测试协议", path: "/oobe/beta-test", hidden: true },
+  { key: "oobe/login", label: "登录", path: "/oobe/login", hidden: true },
+  { key: "oobe/welcome", label: "欢迎", path: "/oobe/welcome", hidden: true },
   { key: "oobe/finish", label: "完成", path: "/oobe/finish", hidden: true },
   { key: "oobe/about-info", label: "关于信息", path: "/oobe/about-info", hidden: true, backable: true },
   { key: "debug", label: "调试", path: "/debug", hidden: true },

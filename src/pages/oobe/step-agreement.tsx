@@ -54,7 +54,7 @@ export function OobeAgreement() {
         </label>
       </div>
 
-      <NextButton onClick={() => navigate("oobe/version")} disabled={!checked} />
+      <NextButton onClick={() => navigate("oobe/welcome")} disabled={!checked} />
     </OobeLayout>
   );
 }

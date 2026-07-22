@@ -23,6 +23,16 @@ nsis:
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   installerHeaderIcon: build/icon.ico
+  installerHeader: build/installer-header.png
+  license: build/license.rtf
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Koring Launcher
+  include: build/installer-custom.nsh
+  script: build/installer-strings.nsh
+  uninstallDisplayName: "卸载 Koring Launcher"
+  displayLanguageSelector: true
+  installerLanguages:
+    - 2052
+    - 1028
+    - 1033
