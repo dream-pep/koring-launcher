@@ -1,9 +1,6 @@
 import { useConfigStore } from "@/stores/configStore";
-import { Slider } from "@/components/ui/slider";
-
-function GlassCard({ children }: { children: React.ReactNode }) {
-  return <div className="glass-card px-5 py-4">{children}</div>;
-}
+import { Slider, RadioGroup, Radio, Input } from "@heroui/react";
+import { SettingCard, PageHeader, SectionTitle } from "@/components/setting";
 
 const downloadSources = [
   { value: "mirror", label: "尽量使用镜像源（推荐国内用户）" },
@@ -17,51 +14,54 @@ export function DownloadSetting() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-foreground mb-1">下载</h2>
-      <p className="text-sm text-muted-foreground mb-6">配置游戏资源下载源、并发数与存储路径</p>
+      <PageHeader title="下载" desc="配置游戏资源下载源、并发数与存储路径" />
 
       <div className="space-y-6">
-        {/* ===== 下载源 ===== */}
         <div>
-          <h3 className="text-lg font-bold text-foreground mb-3">下载源</h3>
+          <SectionTitle>下载源</SectionTitle>
           <div className="space-y-3">
-            <GlassCard>
+            <SettingCard>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">文件下载源</p>
                 <p className="text-[13px] text-muted-foreground">游戏文件（jar、lib）的下载来源</p>
-                <div className="space-y-2 mt-2">
+                <RadioGroup
+                  value={dl.fileSource}
+                  onValueChange={(v) => setDownload({ fileSource: v })}
+                  className="mt-2 space-y-2"
+                >
                   {downloadSources.map((opt) => (
-                    <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="fileSource" checked={dl.fileSource === opt.value} onChange={() => setDownload({ fileSource: opt.value })} className="accent-primary" />
-                      <span className="text-sm text-foreground">{opt.label}</span>
-                    </label>
+                    <Radio key={opt.value} value={opt.value}>
+                      <Radio.Content>{opt.label}</Radio.Content>
+                    </Radio>
                   ))}
-                </div>
+                </RadioGroup>
               </div>
-            </GlassCard>
+            </SettingCard>
 
-            <GlassCard>
+            <SettingCard>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">版本列表源</p>
                 <p className="text-[13px] text-muted-foreground">获取可用游戏版本列表的来源</p>
-                <div className="space-y-2 mt-2">
+                <RadioGroup
+                  value={dl.versionSource}
+                  onValueChange={(v) => setDownload({ versionSource: v })}
+                  className="mt-2 space-y-2"
+                >
                   {downloadSources.map((opt) => (
-                    <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="versionSource" checked={dl.versionSource === opt.value} onChange={() => setDownload({ versionSource: opt.value })} className="accent-primary" />
-                      <span className="text-sm text-foreground">{opt.label}</span>
-                    </label>
+                    <Radio key={opt.value} value={opt.value}>
+                      <Radio.Content>{opt.label}</Radio.Content>
+                    </Radio>
                   ))}
-                </div>
+                </RadioGroup>
               </div>
-            </GlassCard>
+            </SettingCard>
           </div>
         </div>
 
-        {/* ===== 并发控制 ===== */}
         <div>
-          <h3 className="text-lg font-bold text-foreground mb-3">并发控制</h3>
+          <SectionTitle>并发控制</SectionTitle>
           <div className="space-y-3">
-            <GlassCard>
+            <SettingCard>
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex-1 min-w-0">
@@ -71,41 +71,44 @@ export function DownloadSetting() {
                   <span className="text-[13px] text-muted-foreground tabular-nums shrink-0 ml-4">{dl.threads}</span>
                 </div>
                 <Slider
-                  value={[dl.threads]}
-                  onValueChange={(v) => setDownload({ threads: Array.isArray(v) ? v[0] : v })}
-                  min={1}
-                  max={64}
+                  value={dl.threads}
+                  onChange={(v) => setDownload({ threads: typeof v === "number" ? v : v[0] })}
+                  minValue={1}
+                  maxValue={64}
                   step={1}
-                />
+                >
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
                 <div className="flex justify-between mt-1">
                   <span className="text-[11px] text-muted-foreground/50">1</span>
                   <span className="text-[11px] text-muted-foreground/50">64</span>
                 </div>
               </div>
-            </GlassCard>
+            </SettingCard>
           </div>
         </div>
 
-        {/* ===== 速度限制 ===== */}
         <div>
-          <h3 className="text-lg font-bold text-foreground mb-3">速度限制</h3>
+          <SectionTitle>速度限制</SectionTitle>
           <div className="space-y-3">
-            <GlassCard>
+            <SettingCard>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">下载速度上限</p>
                 <p className="text-[13px] text-muted-foreground">单位 KB/s，0 表示不限速</p>
                 <div className="flex items-center gap-2">
-                  <input
+                  <Input
                     type="number"
-                    value={dl.speedLimit}
+                    value={String(dl.speedLimit)}
                     onChange={(e) => setDownload({ speedLimit: Number(e.target.value) })}
-                    min={0}
-                    className="w-28 h-8 px-3 rounded-md border border-input bg-background text-sm font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-28"
                   />
                   <span className="text-[13px] text-muted-foreground">KB/s</span>
                 </div>
               </div>
-            </GlassCard>
+            </SettingCard>
           </div>
         </div>
       </div>

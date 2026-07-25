@@ -1,5 +1,4 @@
 import { useKoringAuthStore } from "@/stores/koringAuthStore";
-import { useRouteStore } from "@/stores/routeStore";
 import { BUILD_MODE } from "@/lib/mode";
 import { useUpdateStore } from "@/stores/updateStore";
 import {
@@ -11,11 +10,10 @@ import {
   Cpu,
   Info,
   ChevronRight,
+  Search,
 } from "lucide-react";
-
-function GlassCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={`glass-card px-5 py-4 ${className ?? ""}`}>{children}</div>;
-}
+import { Avatar } from "@heroui/react";
+import { SettingCard, PageHeader, SectionTitle } from "@/components/setting";
 
 interface ShortcutItem {
   icon: React.ReactNode;
@@ -68,31 +66,27 @@ export function HomeSetting({ onNavigate }: HomeSettingProps) {
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-foreground mb-1">主页</h2>
-      <p className="text-sm text-muted-foreground mb-6">自定义启动器主页的显示内容与常用设置的快捷入口</p>
+      <PageHeader title="主页" desc="自定义启动器主页的显示内容与常用设置的快捷入口" />
 
       <div className="space-y-6">
-        {/* ===== 搜索栏占位 ===== */}
-        <div className="glass-card flex items-center gap-3 px-4 py-3">
-          <svg className="w-4 h-4 text-muted-foreground shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
+        <SettingCard className="flex items-center gap-3 px-4 py-3">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <span className="text-sm text-muted-foreground">查找设置</span>
-        </div>
+        </SettingCard>
 
-        {/* ===== 快捷状态 ===== */}
         <div>
-          <h3 className="text-lg font-bold text-foreground mb-3">快速概览</h3>
-          <GlassCard>
+          <SectionTitle>快速概览</SectionTitle>
+          <SettingCard>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-foreground/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
+              <Avatar size="lg">
                 {user?.picture ? (
-                  <img src={user.picture} alt="" className="w-full h-full object-cover" />
+                  <Avatar.Image src={user.picture} alt="" />
                 ) : (
-                  <UserCircle className="w-7 h-7 text-foreground/40" />
+                  <Avatar.Fallback>
+                    <UserCircle className="w-7 h-7 text-foreground/40" />
+                  </Avatar.Fallback>
                 )}
-              </div>
+              </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
                   {user ? (user.name || user.username) : "未登录"}
@@ -106,12 +100,11 @@ export function HomeSetting({ onNavigate }: HomeSettingProps) {
                 {update ? " · 有更新" : ""}
               </span>
             </div>
-          </GlassCard>
+          </SettingCard>
         </div>
 
-        {/* ===== 快捷入口 ===== */}
         <div>
-          <h3 className="text-lg font-bold text-foreground mb-3">常用设置</h3>
+          <SectionTitle>常用设置</SectionTitle>
           <div className="grid grid-cols-1 gap-2">
             {shortcuts.map((s) => (
               <ShortcutTile key={s.navKey} {...s} onClick={onNavigate} />

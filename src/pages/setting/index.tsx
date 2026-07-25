@@ -133,12 +133,13 @@ export function Setting() {
 
   return (
     <div className="flex h-full">
-      {/* 侧边栏 — 无动画 */}
-      <aside className="scroll-area w-[240px] shrink-0 h-full overflow-y-auto py-5 pl-5 pr-2">
-        <nav className="space-y-5">
-          {menuData.map((group) => (
+      {/* 侧边栏 */}
+      <aside className="scroll-area w-[220px] shrink-0 h-full overflow-y-auto py-5 pl-4 pr-2">
+        <nav className="space-y-6">
+          {menuData.map((group, gi) => (
             <div key={group.title}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/30 mb-2 px-2">
+              {gi > 0 && <div className="mx-3 mb-3 border-t border-border/40" />}
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40 mb-2 px-3">
                 {group.title}
               </h3>
               <div className="space-y-0.5">
@@ -149,12 +150,15 @@ export function Setting() {
                       key={item.key}
                       onClick={() => handleItemClick(item)}
                       className={[
-                        "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[14px] transition-all duration-150",
+                        "relative w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13.5px] transition-all duration-150",
                         active
-                          ? "bg-foreground/[0.08] text-foreground font-medium shadow-sm"
+                          ? "text-foreground font-medium"
                           : "text-foreground/50 hover:text-foreground/80 hover:bg-foreground/[0.04]",
                       ].join(" ")}
                     >
+                      {active && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[16px] rounded-full bg-primary" />
+                      )}
                       <span className={active ? "text-foreground/80" : "text-foreground/35"}>
                         {item.icon}
                       </span>
@@ -168,7 +172,7 @@ export function Setting() {
         </nav>
       </aside>
 
-      {/* 内容区 — 仅内容有 fade 动画 */}
+      {/* 内容区 */}
       <main className="scroll-area flex-1 h-full overflow-y-auto p-8">
         <div key={animKey} className="setting-page-enter">
           {current?.component}

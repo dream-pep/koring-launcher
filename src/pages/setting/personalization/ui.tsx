@@ -1,8 +1,15 @@
+import { EmptyState } from "@heroui/react";
+import { Monitor } from "lucide-react";
+import { PageHeader } from "@/components/setting";
+
 export function UiSetting() {
   return (
     <div>
-      <h2 className="text-xl font-bold text-foreground mb-1">主界面</h2>
-      <p className="text-sm text-muted-foreground mb-6">自定义启动器主界面的布局、模块显示与交互方式</p>
+      <PageHeader title="主界面" desc="自定义启动器主界面的布局、模块显示与交互方式" />
+      <EmptyState className="py-16">
+        <Monitor className="w-10 h-10 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground mt-3">该功能正在开发中</p>
+      </EmptyState>
     </div>
   );
 }
