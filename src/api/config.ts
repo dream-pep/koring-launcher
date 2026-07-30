@@ -60,6 +60,18 @@ export interface NetworkConfig {
   securityId: SecurityIdConfig;
 }
 
+export interface InstanceMeta {
+  name: string;
+  displayName: string;
+  icon: string;
+  gameVersion: string;
+  loader: string;
+  loaderVersion: string;
+  createdAt: number;
+  lastPlayed: number;
+  playtime: number;
+}
+
 export interface AppConfig {
   version: number;
   oobe: boolean;
@@ -71,6 +83,7 @@ export interface AppConfig {
   advanced: AdvancedConfig;
   download: DownloadConfig;
   network: NetworkConfig;
+  instances: InstanceMeta[];
 }
 
 interface CommandResult {

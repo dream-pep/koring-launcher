@@ -11,6 +11,7 @@ import {
   type AdvancedConfig,
   type DownloadConfig,
   type NetworkConfig,
+  type InstanceMeta,
 } from "@/api/config";
 import { DEFAULT_BG } from "@/lib/mode";
 
@@ -39,6 +40,7 @@ interface ConfigState {
   setAdvanced: (patch: Partial<AdvancedConfig>) => void;
   setDownload: (patch: Partial<DownloadConfig>) => void;
   setNetwork: (patch: Partial<NetworkConfig>) => void;
+  setInstances: (instances: InstanceMeta[]) => void;
   setOobe: (value: boolean) => void;
 }
 
@@ -53,6 +55,7 @@ const DEFAULT_CONFIG: AppConfig = {
   advanced: { afterLaunch: "close", winMode: "default", customWidth: 854, customHeight: 480, gameArgs: "", preLaunchCmd: "", debugMode: false },
   download: { fileSource: "mirror", versionSource: "mirror", threads: 16, speedLimit: 0 },
   network: { securityId: { enabled: false, authUrl: "" } },
+  instances: [],
 };
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
@@ -128,6 +131,13 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   setNetwork: (patch) => {
     const { config } = get();
     const next = { ...config, network: { ...config.network, ...patch } };
+    set({ config: next });
+    debouncedSave(next);
+  },
+
+  setInstances: (instances) => {
+    const { config } = get();
+    const next = { ...config, instances };
     set({ config: next });
     debouncedSave(next);
   },

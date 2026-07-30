@@ -38,5 +38,8 @@ export default defineConfig(async () => ({
   server: {
     port: 1420,
     strictPort: true,
+    watch: {
+      ignored: ["**/Koring.yml", "**/koring-auth.json"],
+    },
   },
 }));

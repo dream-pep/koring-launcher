@@ -70,6 +70,18 @@ export interface SecurityIdConfig {
   authUrl: string;
 }
 
+export interface InstanceMeta {
+  name: string;
+  displayName: string;
+  icon: string;
+  gameVersion: string;
+  loader: string;
+  loaderVersion: string;
+  createdAt: number;
+  lastPlayed: number;
+  playtime: number;
+}
+
 export interface NetworkConfig {
   securityId: SecurityIdConfig;
 }
@@ -85,6 +97,7 @@ export interface AppConfig {
   advanced: AdvancedConfig;
   download: DownloadConfig;
   network: NetworkConfig;
+  instances: InstanceMeta[];
 }
 
 const DEFAULTS: AppConfig = {
@@ -98,6 +111,7 @@ const DEFAULTS: AppConfig = {
   advanced: { afterLaunch: 'close', winMode: 'default', customWidth: 854, customHeight: 480, gameArgs: '', preLaunchCmd: '', debugMode: false },
   download: { fileSource: 'mirror', versionSource: 'mirror', threads: 16, speedLimit: 0 },
   network: { securityId: { enabled: false, authUrl: '' } },
+  instances: [],
 };
 
 function migrate(config: AppConfig): AppConfig {
