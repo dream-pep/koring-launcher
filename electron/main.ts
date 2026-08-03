@@ -53,10 +53,19 @@ function runStartupChecks(): { isFirstLaunch: boolean; config: ReturnType<typeof
   return { isFirstLaunch, config };
 }
 
+// 根据调试/运行状态自动选择窗口图标：
+// - 开发调试（未打包）：直接使用 public/icons/dev/ 下的 dev 图标
+// - 打包运行：electron-builder 构建时 switch-icon 已把对应模式图标复制到 build/
+function getWindowIconPath(): string | undefined {
+  if (!app.isPackaged) {
+    return path.join(__dirname, '../public/icons/dev/icon.ico');
+  }
+  const packagedIcon = path.join(__dirname, '../build/icon.ico');
+  return fs.existsSync(packagedIcon) ? packagedIcon : undefined;
+}
+
 function createSplashWindow(): electron.BrowserWindow {
-  const iconPath = isDev
-    ? path.join(__dirname, '../build/icon.ico')
-    : path.join(__dirname, '../build/icon.ico');
+  const iconPath = getWindowIconPath();
 
   const splash = new electron.BrowserWindow({
     width: 480,
@@ -83,9 +92,7 @@ function createSplashWindow(): electron.BrowserWindow {
 }
 
 function createMainWindow(): electron.BrowserWindow {
-  const iconPath = isDev
-    ? path.join(__dirname, '../build/icon.ico')
-    : path.join(__dirname, '../build/icon.ico');
+  const iconPath = getWindowIconPath();
 
   const main = new electron.BrowserWindow({
     width: 1000,

@@ -1,23 +1,50 @@
-import { useEffect, useState, useCallback } from "react";
+//  __         __     __   __     ______     __  __     ______        __   __     ______     ______
+// /\ \       /\ \   /\ "-.\ \   /\  ___\   /\ \/ /    /\  ___\      /\ "-.\ \   /\  ___\   /\__  _\
+// \ \ \____  \ \ \  \ \ \-.  \  \ \ \__ \  \ \  _"-.  \ \  __\      \ \ \-.  \  \ \  __\   \/_/\ \/
+//  \ \_____\  \ \_\  \ \_\\"\_\  \ \_____\  \ \_\ \_\  \ \_____\     \ \_\\"\_\  \ \_____\    \ \_\
+//   \/_____/   \/_/   \/_/ \/_/   \/_____/   \/_/\/_/   \/_____/      \/_/ \/_/   \/_____/     \/_/
+//
+// 所有权利归Lingke Network (china)所有 | dream_pep拥有其艺术改变权力
+// 未经允许的情况下删除此版权头可能会受到民事指控
+// 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
+
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@heroui/react";
-import { Plus, Gamepad2, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Gamepad2 } from "lucide-react";
+import { toast } from "sonner";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useConfigStore } from "@/stores/configStore";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Surface } from "@/components/setting/Surface";
-import { InstanceCard } from "./InstanceCard";
-import { CreateDialog } from "./CreateDialog";
-import type { InstanceRuntime } from "@/api/instance";
+import { useAuthStore } from "@/stores/authStore";
+import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
+import { useRouteStore } from "@/stores/routeStore";
+import { onLaunchComplete, onLaunchError } from "@/api/instance";
+import { openPath } from "@/api/system";
+import { InstanceList } from "./InstanceList";
+import { InstanceDetail } from "./InstanceDetail";
+import { EditDialog } from "./EditDialog";
 
 export function Gallery() {
-  const { instances, loading, fetchInstances, create, launch } = useInstanceStore();
+  const { instances, loading, fetchInstances, remove, launch } = useInstanceStore();
   const gameConfig = useConfigStore((s) => s.config.game);
+  const javaConfig = useConfigStore((s) => s.config.java);
   const configInstances = useConfigStore((s) => s.config.instances);
   const setInstances = useConfigStore((s) => s.setInstances);
+  const user = useAuthStore((s) => s.user);
+  const openConfirm = useConfirmDialogStore((s) => s.openDialog);
+  const navigate = useRouteStore((s) => s.navigate);
+  const setStoreSection = useRouteStore((s) => s.setStoreSection);
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [launching, setLaunching] = useState<string | null>(null);
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
+  // 跳转到资源中心"原版游戏"分类创建实例
+  const goCreateInstance = useCallback(() => {
+    setStoreSection("game");
+    navigate("store");
+  }, [setStoreSection, navigate]);
+
+  // 加载实例列表
   const loadInstances = useCallback(async () => {
     await fetchInstances(gameConfig.gameDir);
   }, [fetchInstances, gameConfig.gameDir]);
@@ -26,66 +53,111 @@ export function Gallery() {
     loadInstances();
   }, [loadInstances]);
 
-  const handleCreate = async (name: string, runtime: InstanceRuntime, displayName?: string) => {
-    await create(name, gameConfig.gameDir, runtime, {
-      description: displayName,
+  // 默认选中第一个实例
+  useEffect(() => {
+    if (!selectedName && instances.length > 0) {
+      setSelectedName(instances[0].name);
+    }
+    if (selectedName && !instances.some((i) => i.name === selectedName)) {
+      setSelectedName(instances[0]?.name ?? null);
+    }
+  }, [instances, selectedName]);
+
+  // 监听启动结果
+  useEffect(() => {
+    const offComplete = onLaunchComplete(() => {
+      setLaunching(false);
+      toast.success("游戏启动成功");
     });
-
-    // Sync to Koring.yml
-    const loader = runtime.forge ? "forge"
-      : runtime.fabricLoader ? "fabric"
-      : runtime.quiltLoader ? "quilt"
-      : runtime.neoForged ? "neoforged"
-      : "vanilla";
-
-    const loaderVersion = runtime.forge || runtime.fabricLoader || runtime.quiltLoader || runtime.neoForged || "";
-
-    const updated = configInstances.filter((m) => m.name !== name);
-    updated.push({
-      name,
-      displayName: displayName || name,
-      icon: "",
-      gameVersion: runtime.minecraft,
-      loader,
-      loaderVersion,
-      createdAt: Date.now(),
-      lastPlayed: 0,
-      playtime: 0,
+    const offError = onLaunchError(({ error }) => {
+      setLaunching(false);
+      toast.error(`启动失败: ${error}`);
     });
-    setInstances(updated);
-    setCreateOpen(false);
-  };
+    return () => {
+      offComplete();
+      offError();
+    };
+  }, []);
 
-  const handlePlay = async (name: string) => {
-    setLaunching(name);
+  const selected = instances.find((i) => i.name === selectedName) ?? null;
+
+  // 启动游戏
+  const handlePlay = async () => {
+    if (!selected) return;
+    if (!user?.username || !user?.uuid) {
+      toast.warning("请先在设置中登录账号");
+      return;
+    }
+    setLaunching(true);
     try {
-      await launch(name, gameConfig.gameDir);
-    } catch {
-      // Launch events handled via IPC listeners
+      await launch(selected.name, gameConfig.gameDir, {
+        username: user.username,
+        uuid: user.uuid,
+        accessToken: user.accessToken,
+        javaPath: javaConfig.javaPath || undefined,
+      });
+    } catch (e: any) {
+      setLaunching(false);
+      toast.error(`启动失败: ${e.message || e}`);
     }
-    // Update lastPlayed in config
-    const idx = configInstances.findIndex((m) => m.name === name);
-    if (idx >= 0) {
-      const updated = [...configInstances];
-      updated[idx] = { ...updated[idx], lastPlayed: Date.now() };
-      setInstances(updated);
-    }
-    setLaunching(null);
   };
 
-  const handleSettings = (name: string) => {
-    // TODO: Navigate to instance settings
-    console.log("Settings for:", name);
+  // 删除实例（带确认）
+  const handleDelete = () => {
+    if (!selected) return;
+    openConfirm({
+      title: "删除实例",
+      description: `确定要删除实例「${selected.config.description || selected.name}」吗？该操作将删除实例目录下所有文件，且无法恢复。`,
+      confirmLabel: "删除",
+      countdown: 5,
+      onConfirm: async () => {
+        try {
+          await remove(selected.name, gameConfig.gameDir);
+          // 同步移除 Koring.yml 中的记录
+          setInstances(configInstances.filter((m) => m.name !== selected.name));
+          setSelectedName(null);
+          toast.success("实例已删除");
+        } catch (e: any) {
+          toast.error(`删除失败: ${e.message || e}`);
+        }
+      },
+    });
   };
 
-  const getDisplayName = (name: string) => {
-    return configInstances.find((m) => m.name === name)?.displayName;
+  // 编辑实例（显示名/内存）
+  const handleEditSave = async (patch: { description?: string; minMemory?: number; maxMemory?: number }) => {
+    if (!selected) return;
+    try {
+      await useInstanceStore.getState().select(selected.name, gameConfig.gameDir);
+      // 更新 instance.json
+      const result = await import("@/api/instance").then((m) =>
+        m.updateInstance(selected.name, gameConfig.gameDir, patch)
+      );
+      // 刷新列表并同步 config 显示名
+      await fetchInstances(gameConfig.gameDir);
+      const updatedMeta = configInstances.map((m) =>
+        m.name === selected.name ? { ...m, displayName: patch.description?.trim() || m.displayName } : m
+      );
+      setInstances(updatedMeta);
+      if (result) toast.success("实例设置已保存");
+    } catch (e: any) {
+      toast.error(`保存失败: ${e.message || e}`);
+    }
+  };
+
+  // 打开游戏目录
+  const handleOpenFolder = async () => {
+    if (!selected) return;
+    const result = await openPath(selected.path);
+    if (!result.success) {
+      toast.error(`无法打开目录: ${result.error || "未知错误"}`);
+    }
   };
 
   return (
     <div className="p-6 h-full overflow-y-auto scroll-area">
       {/* 头部 */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-foreground">实例管理</h1>
           <p className="text-[13px] text-muted-foreground mt-1">
@@ -93,74 +165,73 @@ export function Gallery() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="light" onPress={loadInstances} isDisabled={loading}>
+          <Button size="sm" variant="ghost" onPress={loadInstances} isDisabled={loading} className="min-w-0 w-8 h-8 p-0">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button size="sm" startContent={<Plus className="w-4 h-4" />} onPress={() => setCreateOpen(true)}>
+          <Button size="sm" onPress={goCreateInstance}>
+            <Plus className="w-4 h-4" />
             新建实例
           </Button>
         </div>
       </div>
 
-      {/* 加载骨架 */}
-      {loading && instances.length === 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Surface key={i} padding="md">
-              <div className="space-y-3">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-5 w-14 rounded-md" />
-                  <Skeleton className="h-5 w-20 rounded-md" />
-                </div>
-                <Skeleton className="h-8 w-full rounded-lg" />
-              </div>
-            </Surface>
-          ))}
+      {/* 左右布局 */}
+      <div className="grid grid-cols-[280px_1fr] gap-5 items-start">
+        {/* 左侧：实例列表 */}
+        <div className="min-w-0">
+          <p className="text-[12px] font-medium text-muted-foreground/80 mb-2 px-1">
+            我的实例（{instances.length}）
+          </p>
+          <InstanceList
+            instances={instances}
+            selectedName={selectedName}
+            loading={loading}
+            onSelect={setSelectedName}
+          />
         </div>
-      )}
 
-      {/* 空状态 */}
-      {!loading && instances.length === 0 && (
-        <Surface variant="flat" padding="lg">
-          <div className="flex flex-col items-center gap-4 py-16">
-            <div className="w-16 h-16 rounded-full bg-foreground/[0.04] dark:bg-white/[0.04] flex items-center justify-center">
-              <Gamepad2 className="w-8 h-8 text-muted-foreground/30" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">还没有任何实例</p>
-              <p className="text-[12px] text-muted-foreground/60 mt-1 max-w-[300px]">
-                点击"新建实例"创建你的第一个 Minecraft 游戏实例
-              </p>
-            </div>
-            <Button size="sm" startContent={<Plus className="w-4 h-4" />} onPress={() => setCreateOpen(true)}>
-              新建实例
-            </Button>
-          </div>
-        </Surface>
-      )}
-
-      {/* 实例网格 */}
-      {instances.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {instances.map((inst) => (
-            <InstanceCard
-              key={inst.name}
-              instance={inst}
-              displayName={getDisplayName(inst.name)}
+        {/* 右侧：实例详情 */}
+        <div className="min-w-0">
+          {selected ? (
+            <InstanceDetail
+              instance={selected}
+              isLaunching={launching}
               onPlay={handlePlay}
-              onSettings={handleSettings}
-              isLaunching={launching === inst.name}
+              onEdit={() => setEditOpen(true)}
+              onOpenFolder={handleOpenFolder}
+              onDelete={handleDelete}
             />
-          ))}
+          ) : (
+            <div className="flex flex-col items-center gap-4 py-24 rounded-2xl border border-dashed border-border/40 dark:border-white/[0.08]">
+              <div className="w-16 h-16 rounded-full bg-foreground/[0.04] dark:bg-white/[0.04] flex items-center justify-center">
+                <Gamepad2 className="w-8 h-8 text-muted-foreground/30" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  {loading ? "正在加载实例..." : "还没有任何实例"}
+                </p>
+                {!loading && (
+                  <p className="text-[12px] text-muted-foreground/60 mt-1">
+                    点击「新建实例」创建你的第一个游戏实例
+                  </p>
+                )}
+              </div>
+              {!loading && (
+                <Button size="sm" onPress={goCreateInstance}>
+                  <Plus className="w-4 h-4" />
+                  新建实例
+                </Button>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <CreateDialog
-        isOpen={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreate={handleCreate}
+      <EditDialog
+        instance={selected}
+        isOpen={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={handleEditSave}
       />
     </div>
   );

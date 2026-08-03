@@ -2,7 +2,7 @@ import electron from 'electron';
 import { execSync } from 'child_process';
 import * as os from 'os';
 
-const { ipcMain, app } = electron;
+const { ipcMain, app, shell } = electron;
 
 function getBiosId(): string {
   if (process.platform !== 'win32') return 'N/A (non-Windows)';
@@ -56,6 +56,16 @@ export function registerSystemHandlers() {
         },
         error: null,
       };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 在系统文件管理器中打开指定路径（用于"打开游戏目录"等操作）
+  ipcMain.handle('system:open-path', async (_event, payload: { path: string }) => {
+    try {
+      const error = await shell.openPath(payload.path);
+      return { success: !error, data: { error }, error: error || null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }

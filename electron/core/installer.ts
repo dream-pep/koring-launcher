@@ -6,14 +6,63 @@ import * as http from 'http';
 
 const { net } = electron;
 
-const VERSION_MANIFEST_URL = 'https://launchermeta.mojang.com/mc/game/version_manifest.json';
-const FORGE_VERSION_LIST_URL = 'https://files.minecraftforge.net/net/minecraftforge/forge/json';
-const FABRIC_VERSION_LIST_URL = 'https://meta.fabricmc.net/v2/versions';
+// ==================== BMCLAPI 镜像源配置 ====================
+// 使用 BMCLAPI（bmclapi2.bangbang93.com）镜像加速国内资源下载
+// 版本清单：launchermeta.mojang.com → bmclapi2.bangbang93.com
+// Fabric 元数据：meta.fabricmc.net → bmclapi2.bangbang93.com/fabric-meta
+const VERSION_MANIFEST_URL = 'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json';
+const FABRIC_VERSION_LIST_URL = 'https://bmclapi2.bangbang93.com/fabric-meta/v2/versions';
+
+// BMCLAPI 域名替换规则（按顺序匹配，带路径前缀的规则优先）
+// 版本 JSON/客户端：launchermeta|launcher|piston-meta|piston-data.mojang.com → bmclapi2.bangbang93.com
+// Assets：resources.download.minecraft.net → bmclapi2.bangbang93.com/assets
+// Libraries：libraries.minecraft.net → bmclapi2.bangbang93.com/maven
+// Forge：files.minecraftforge.net/maven → bmclapi2.bangbang93.com/maven
+// NeoForge：maven.neoforged.net/releases → bmclapi2.bangbang93.com/maven
+// Fabric：meta.fabricmc.net → bmclapi2.bangbang93.com/fabric-meta；maven.fabricmc.net → bmclapi2.bangbang93.com/maven
+const MIRROR_RULES: [string, string][] = [
+  ['files.minecraftforge.net/maven', 'bmclapi2.bangbang93.com/maven'],
+  ['maven.neoforged.net/releases', 'bmclapi2.bangbang93.com/maven'],
+  ['launchermeta.mojang.com', 'bmclapi2.bangbang93.com'],
+  ['launcher.mojang.com', 'bmclapi2.bangbang93.com'],
+  ['piston-meta.mojang.com', 'bmclapi2.bangbang93.com'],
+  ['piston-data.mojang.com', 'bmclapi2.bangbang93.com'],
+  ['resources.download.minecraft.net', 'bmclapi2.bangbang93.com/assets'],
+  ['libraries.minecraft.net', 'bmclapi2.bangbang93.com/maven'],
+  ['maven.minecraftforge.net', 'bmclapi2.bangbang93.com/maven'],
+  ['maven.neoforged.net', 'bmclapi2.bangbang93.com/maven'],
+  ['meta.fabricmc.net', 'bmclapi2.bangbang93.com/fabric-meta'],
+  ['maven.fabricmc.net', 'bmclapi2.bangbang93.com/maven'],
+];
+
+// 将官方资源 URL 改写为 BMCLAPI 镜像 URL（未命中的 URL 原样返回）
+export function rewriteToMirror(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const [from, to] of MIRROR_RULES) {
+      const slashIdx = from.indexOf('/');
+      const fromHost = slashIdx === -1 ? from : from.slice(0, slashIdx);
+      const fromPath = slashIdx === -1 ? '' : from.slice(slashIdx);
+      if (u.host !== fromHost) continue;
+      if (fromPath && !u.pathname.startsWith(fromPath)) continue;
+      // 命中规则，替换主机（并附加镜像路径前缀）
+      const toSlashIdx = to.indexOf('/');
+      u.host = toSlashIdx === -1 ? to : to.slice(0, toSlashIdx);
+      const toPath = toSlashIdx === -1 ? '' : to.slice(toSlashIdx);
+      u.pathname = toPath + (fromPath ? u.pathname.slice(fromPath.length) : u.pathname);
+      return u.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
 
 interface VersionInfo {
   id: string;
   type: string;
   url: string;
+  releaseTime: string;
 }
 
 interface VersionManifest {
@@ -29,9 +78,11 @@ interface DownloadProgress {
 }
 
 async function downloadFile(url: string, dest: string, onProgress?: (progress: DownloadProgress) => void): Promise<void> {
+  // 下载前统一改写为 BMCLAPI 镜像地址
+  url = rewriteToMirror(url);
   return new Promise((resolve, reject) => {
-    const client = url.startsWith('https') ? https : http;
-    const request = client.get(url, (response) => {
+    // 根据协议选择 http / https 客户端（分开调用以避免 TS 联合类型签名不兼容）
+    const handleResponse = (response: http.IncomingMessage) => {
       if (response.statusCode === 302 || response.statusCode === 301) {
         downloadFile(response.headers.location!, dest, onProgress).then(resolve).catch(reject);
         return;
@@ -52,7 +103,7 @@ async function downloadFile(url: string, dest: string, onProgress?: (progress: D
 
       const file = fs.createWriteStream(dest);
 
-      response.on('data', (chunk) => {
+      response.on('data', (chunk: Buffer) => {
         downloadedBytes += chunk.length;
         if (onProgress && totalBytes > 0) {
           onProgress({
@@ -75,7 +126,14 @@ async function downloadFile(url: string, dest: string, onProgress?: (progress: D
         fs.unlink(dest, () => {});
         reject(err);
       });
-    });
+    };
+
+    let request: http.ClientRequest;
+    if (url.startsWith('https')) {
+      request = https.get(url, handleResponse);
+    } else {
+      request = http.get(url, handleResponse);
+    }
 
     request.on('error', reject);
   });
@@ -95,11 +153,12 @@ export async function getVersionList(type?: string): Promise<VersionManifest> {
 
 export async function getForgeVersions(mcVersion?: string) {
   try {
-    const response = await net.fetch(FORGE_VERSION_LIST_URL);
+    // BMCLAPI Forge 版本列表接口（需指定 MC 版本）
+    if (!mcVersion) return { versions: [] };
+    const response = await net.fetch(`https://bmclapi2.bangbang93.com/forge/minecraft/${mcVersion}`);
     if (!response.ok) throw new Error(`Forge version list failed: ${response.status}`);
-    const data = await response.json() as { versions: Record<string, string[]> };
-    const versions = data.versions[mcVersion || ''] || [];
-    return { versions };
+    const data = await response.json() as { version: string }[];
+    return { versions: data.map((v) => v.version) };
   } catch {
     return { versions: [] };
   }

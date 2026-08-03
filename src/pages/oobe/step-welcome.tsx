@@ -21,7 +21,7 @@ export function OobeWelcome() {
     return () => clearTimeout(t);
   }, []);
 
-  const displayName = user?.name || user?.username || "用户";
+  const displayName = user?.name || user?.username || "玩家";
 
   return (
     <OobeLayout>

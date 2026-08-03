@@ -45,7 +45,8 @@ export function OobeLanguage() {
         ))}
       </div>
 
-      <NextButton onClick={() => navigate("oobe/login")} />
+      {/* 临时跳过 Koring 账户登录环节，直接进入用户协议 */}
+      <NextButton onClick={() => navigate("oobe/agreement")} />
     </OobeLayout>
   );
 }

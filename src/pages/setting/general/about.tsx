@@ -11,8 +11,8 @@ const modeLabels: Record<string, string> = {
   run: "正式版",
 };
 
-const GITHUB_URL = "https://github.com/koring-launcher/koring-launcher";
-const OFFICIAL_URL = "https://koring.app";
+const GITHUB_URL = "https://github.com/lingke-net/koring-launcher";
+const OFFICIAL_URL = "https://koring.space";
 
 export function AboutSetting() {
   const openDialog = useConfirmDialogStore((s) => s.openDialog);

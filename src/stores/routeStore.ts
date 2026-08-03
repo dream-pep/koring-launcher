@@ -18,6 +18,7 @@ export type RouteKey =
   | "oobe/welcome"
   | "oobe/finish"
   | "oobe/about-info"
+  | "oobe/legal"
   | "debug"
   | "debug-splash"
   | "debug-display"
@@ -59,6 +60,7 @@ export const allRoutes: RouteItem[] = [
   { key: "oobe/welcome", label: "欢迎", path: "/oobe/welcome", hidden: true },
   { key: "oobe/finish", label: "完成", path: "/oobe/finish", hidden: true },
   { key: "oobe/about-info", label: "关于信息", path: "/oobe/about-info", hidden: true, backable: true },
+  { key: "oobe/legal", label: "法律信息", path: "/oobe/legal", hidden: true },
   { key: "debug", label: "调试", path: "/debug", hidden: true },
   { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
   { key: "debug-display", label: "显示效果调试", path: "/debug/display", hidden: true },
@@ -87,8 +89,11 @@ interface RouteState {
   titleBarMode: TitleBarMode;
   direction: TransitionDirection;
   history: RouteKey[];
+  /** 资源中心选中的分类（原版游戏 / MOD / 整合包） */
+  storeSection: "game" | "mod" | "modpack";
   navigate: (key: RouteKey) => void;
   setTitleBarMode: (mode: TitleBarMode) => void;
+  setStoreSection: (section: "game" | "mod" | "modpack") => void;
   goBack: () => void;
 }
 
@@ -97,6 +102,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   titleBarMode: "default",
   direction: "forward",
   history: [],
+  storeSection: "game",
   navigate: (key) => {
     const prev = get().current;
     if (prev === key) return;
@@ -110,6 +116,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     });
   },
   setTitleBarMode: (mode) => set({ titleBarMode: mode }),
+  setStoreSection: (section) => set({ storeSection: section }),
   goBack: () => {
     const { history } = get();
     if (history.length === 0) return;

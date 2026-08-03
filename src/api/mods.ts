@@ -13,6 +13,19 @@ export interface ModSearchResult {
   source: 'modrinth' | 'curseforge';
 }
 
+export interface ModSearchResponse {
+  hits: ModSearchResult[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ModCategory {
+  name: string;
+  label: string;
+  projectType: string;
+}
+
 export interface ModVersionResult {
   id: string;
   name: string;
@@ -31,18 +44,30 @@ export async function searchMods(
   query?: string,
   gameVersion?: string,
   loader?: string,
+  category?: string,
+  projectType: string = "mod",
   limit?: number,
   offset?: number,
   source: 'modrinth' | 'curseforge' = 'modrinth'
-): Promise<ModSearchResult[]> {
-  return ipcInvoke<ModSearchResult[]>('mods:search', {
+): Promise<ModSearchResponse> {
+  return ipcInvoke<ModSearchResponse>('mods:search', {
     query,
     gameVersion,
     loader,
+    category,
+    projectType,
     limit,
     offset,
     source,
   });
+}
+
+export async function getCategories(projectType: string = "mod"): Promise<ModCategory[]> {
+  return ipcInvoke<ModCategory[]>('mods:categories', { projectType });
+}
+
+export async function getGameVersions(): Promise<string[]> {
+  return ipcInvoke<string[]>('mods:game-versions');
 }
 
 export async function getModDetail(

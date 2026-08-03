@@ -3,14 +3,16 @@ productName: Koring Launcher
 directories:
   output: dist-electron
   buildResources: build
+compression: maximum
+asar: true
 files:
   - dist/**
-  - electron/**/*.js
-  - "!electron/**/*.ts"
+  - electron-dist/**/*.js
 win:
   target: nsis
   icon: build/icon.ico
   artifactName: "koring-launcher-${version}-setup.${ext}"
+  requestedExecutionLevel: asInvoker
 mac:
   target: dmg
   icon: build/icon.png
@@ -23,16 +25,15 @@ nsis:
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   installerHeaderIcon: build/icon.ico
-  installerHeader: build/installer-header.png
-  license: build/license.rtf
+  installerSidebar: build/installer-header.bmp
+  license: build/license.txt
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Koring Launcher
   include: build/installer-custom.nsh
-  script: build/installer-strings.nsh
-  uninstallDisplayName: "卸载 Koring Launcher"
-  displayLanguageSelector: true
+  uninstallDisplayName: "Koring Launcher"
+  deleteAppDataOnUninstall: false
   installerLanguages:
-    - 2052
-    - 1028
-    - 1033
+    - "zh_CN"
+    - "zh_TW"
+    - "en_US"

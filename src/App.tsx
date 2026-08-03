@@ -31,6 +31,7 @@ import { OobeWelcome } from "./pages/oobe/step-welcome";
 import { OobeVersion } from "./pages/oobe/step-version";
 import { OobeBetaTest } from "./pages/oobe/step-beta-test";
 import { OobeFinish } from "./pages/oobe/step-finish";
+import { OobeLegal } from "./pages/oobe/step-legal";
 import { OobeAboutInfo } from "./pages/oobe/about-info";
 
 const pageMap = {
@@ -51,6 +52,7 @@ const pageMap = {
   "oobe/beta-test": OobeBetaTest,
   "oobe/finish": OobeFinish,
   "oobe/about-info": OobeAboutInfo,
+  "oobe/legal": OobeLegal,
   debug: Debug,
   "debug-splash": SplashDebug,
   "debug-display": DisplayDebug,

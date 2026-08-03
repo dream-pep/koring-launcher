@@ -1,0 +1,4 @@
+# 允许执行构建脚本的依赖（pnpm 10+ 默认禁止依赖运行 postinstall）
+allowBuilds:
+  electron: true
+  esbuild: true

@@ -105,4 +105,13 @@ export function registerWindowHandlers(win: WinRef) {
   ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     await shell.openExternal(url);
   });
+
+  // Folder dialog — select a directory
+  ipcMain.handle('dialog:openFolder', async () => {
+    const result = await dialog.showOpenDialog(win.mainWindow!, {
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return { folderPath: result.filePaths[0] };
+  });
 }

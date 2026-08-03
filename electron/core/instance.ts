@@ -14,6 +14,18 @@ import {
   getFabricLoaders,
   getQuiltLoaderVersionsByMinecraft,
 } from '@xmcl/installer';
+import { rewriteToMirror } from './installer';
+
+// ==================== BMCLAPI 镜像源配置 ====================
+// 版本清单（@xmcl/installer 的 getVersionList 通过 remote 参数覆盖）
+const BMCLAPI_VERSION_MANIFEST = 'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json';
+// Maven 仓库镜像（Libraries / Forge / NeoForge / Fabric 构件）
+const BMCLAPI_MAVEN = 'https://bmclapi2.bangbang93.com/maven';
+// 资源文件镜像（assets）
+const BMCLAPI_ASSETS = 'https://bmclapi2.bangbang93.com/assets';
+
+// 供 @xmcl/installer FetchOptions 使用的镜像 fetch（meta.fabricmc.net 等元数据接口走镜像）
+const mirrorFetch: typeof fetch = (url, init) => fetch(rewriteToMirror(String(url)), init);
 
 export interface InstanceRuntime {
   minecraft: string;
@@ -232,18 +244,24 @@ export async function installInstanceGame(
   callbacks?.onProgress?.({ stage: 'installing-minecraft', current: 0, total: 100, message: `Installing Minecraft ${runtime.minecraft}...` });
 
   // Install Minecraft
-  // First get version list to find the version info
-  const versionList = await getVersionList();
+  // First get version list to find the version info（走 BMCLAPI 镜像）
+  const versionList = await getVersionList({ remote: BMCLAPI_VERSION_MANIFEST, fetch: mirrorFetch });
   const versionInfo = versionList.versions.find((v) => v.id === runtime.minecraft);
   if (!versionInfo) {
     throw new Error(`Minecraft version ${runtime.minecraft} not found`);
   }
-  await xmclInstall({ id: versionInfo.id, url: versionInfo.url }, instancePath);
+  await xmclInstall({ id: versionInfo.id, url: versionInfo.url }, instancePath, {
+    // 版本 JSON / 客户端 JAR 走镜像（BMCLAPI 会回源官方地址）
+    json: (v) => rewriteToMirror(v.url),
+    client: (v) => (v.downloads.client ? rewriteToMirror(v.downloads.client.url) : []),
+    mavenHost: BMCLAPI_MAVEN,
+    assetsHost: BMCLAPI_ASSETS,
+  });
 
   // Install mod loaders
   if (runtime.forge) {
     callbacks?.onProgress?.({ stage: 'installing-forge', current: 0, total: 100, message: `Installing Forge ${runtime.forge}...` });
-    await installForge({ version: runtime.forge, mcversion: runtime.minecraft }, instancePath);
+    await installForge({ version: runtime.forge, mcversion: runtime.minecraft }, instancePath, { mavenHost: BMCLAPI_MAVEN });
   }
 
   if (runtime.fabricLoader) {
@@ -252,6 +270,7 @@ export async function installInstanceGame(
       minecraftVersion: runtime.minecraft,
       version: runtime.fabricLoader,
       minecraft: instancePath,
+      fetch: mirrorFetch,
     });
   }
 
@@ -266,7 +285,7 @@ export async function installInstanceGame(
 
   if (runtime.neoForged) {
     callbacks?.onProgress?.({ stage: 'installing-neoforge', current: 0, total: 100, message: `Installing NeoForge ${runtime.neoForged}...` });
-    await installNeoForged('neoforge', runtime.neoForged, instancePath, {});
+    await installNeoForged('neoforge', runtime.neoForged, instancePath, { mavenHost: BMCLAPI_MAVEN });
   }
 
   // Note: OptiFine requires downloading the installer JAR first
@@ -277,9 +296,9 @@ export async function installInstanceGame(
 
   callbacks?.onProgress?.({ stage: 'installing-dependencies', current: 0, total: 100, message: 'Installing dependencies...' });
 
-  // Install all dependencies (libraries + assets)
+  // Install all dependencies (libraries + assets)（走 BMCLAPI 镜像）
   const resolved: ResolvedVersion = await Version.parse(instancePath, runtime.minecraft);
-  await installDependencies(resolved);
+  await installDependencies(resolved, { mavenHost: BMCLAPI_MAVEN, assetsHost: BMCLAPI_ASSETS });
 
   callbacks?.onProgress?.({ stage: 'done', current: 100, total: 100, message: 'Installation complete' });
 
@@ -370,12 +389,13 @@ export async function diagnoseInstance(
 
 // Version list APIs
 export async function getMinecraftVersionList(type?: string) {
-  const manifest = await getVersionList();
+  // 版本清单一律走 BMCLAPI 镜像
+  const manifest = await getVersionList({ remote: BMCLAPI_VERSION_MANIFEST, fetch: mirrorFetch });
   let versions = manifest.versions;
   if (type && type !== 'all') {
-    versions = versions.filter((v) => v.type === type);
+    versions = versions.filter((v: { type: string }) => v.type === type);
   }
-  return { versions };
+  return { versions, latest: manifest.latest };
 }
 
 export async function getForgeVersionList(mcVersion?: string) {
@@ -384,15 +404,62 @@ export async function getForgeVersionList(mcVersion?: string) {
 }
 
 export async function getFabricVersionList(mcVersion?: string) {
+  // Fabric 元数据走 BMCLAPI 镜像（meta.fabricmc.net → fabric-meta）
   if (mcVersion) {
-    const loaders = await getFabricLoaders();
+    const loaders = await getFabricLoaders({ fetch: mirrorFetch });
     return { versions: loaders.map((l) => l.version) };
   }
-  const loaders = await getFabricLoaders();
+  const loaders = await getFabricLoaders({ fetch: mirrorFetch });
   return { versions: loaders.map((l) => l.version) };
 }
 
 export async function getQuiltVersionList(mcVersion?: string) {
   const loaders = await getQuiltLoaderVersionsByMinecraft({ minecraftVersion: mcVersion || '*' });
   return { versions: loaders.map((l) => l.loader.version) };
+}
+
+// 扫描目录中已安装版本的信息
+export interface ScannedVersion {
+  id: string;
+  type: string;
+  releaseTime?: string;
+  /** JAR 文件是否存在 */
+  hasJar: boolean;
+  /** JSON 文件是否存在 */
+  hasJson: boolean;
+}
+
+// 扫描指定目录，返回 versions 子目录中所有已安装版本的详细信息
+export function scanGameDirectories(gamePath: string): ScannedVersion[] {
+  const versionsPath = path.join(gamePath, 'versions');
+  if (!fs.existsSync(versionsPath)) return [];
+  try {
+    return fs.readdirSync(versionsPath, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => {
+        const id = e.name;
+        const versionDir = path.join(versionsPath, id);
+        const jsonPath = path.join(versionDir, `${id}.json`);
+        const jarPath = path.join(versionDir, `${id}.jar`);
+        const hasJson = fs.existsSync(jsonPath);
+        const hasJar = fs.existsSync(jarPath);
+
+        let type = "unknown";
+        let releaseTime: string | undefined;
+
+        // 尝试读取 version JSON 获取类型和时间
+        if (hasJson) {
+          try {
+            const raw = fs.readFileSync(jsonPath, 'utf-8');
+            const json = JSON.parse(raw);
+            type = json.type || "unknown";
+            releaseTime = json.releaseTime;
+          } catch {}
+        }
+
+        return { id, type, releaseTime, hasJar, hasJson };
+      });
+  } catch {
+    return [];
+  }
 }

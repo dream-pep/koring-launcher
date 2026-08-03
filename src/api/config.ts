@@ -24,6 +24,8 @@ export interface GameConfig {
   resourceDir: string;
   savesDir: string;
   instancesDir: string;
+  /** 已添加的游戏目录列表 */
+  gameDirs: string[];
 }
 
 export interface JavaConfig {

@@ -7,6 +7,8 @@ interface CreateDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (name: string, runtime: InstanceRuntime, displayName?: string) => Promise<void>;
+  /** 预选的 Minecraft 版本（从资源中心"原版游戏"进入时传入） */
+  initialVersion?: string;
 }
 
 const loaderOptions = [
@@ -17,12 +19,12 @@ const loaderOptions = [
   { value: "neoforged", label: "NeoForge", desc: "Forge 的现代化分支，1.20+ 推荐" },
 ];
 
-export function CreateDialog({ isOpen, onClose, onCreate }: CreateDialogProps) {
+export function CreateDialog({ isOpen, onClose, onCreate, initialVersion }: CreateDialogProps) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [loader, setLoader] = useState("vanilla");
-  const [mcVersion, setMcVersion] = useState("");
+  const [mcVersion, setMcVersion] = useState(initialVersion || "");
   const [memory, setMemory] = useState(4);
   const [creating, setCreating] = useState(false);
   const [mcVersions, setMcVersions] = useState<string[]>([]);
@@ -30,20 +32,23 @@ export function CreateDialog({ isOpen, onClose, onCreate }: CreateDialogProps) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isOpen) { loadMcVersions(); } else { resetForm(); }
+    if (isOpen) { setMcVersion(initialVersion || ""); loadMcVersions(); } else { resetForm(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const resetForm = () => {
     setStep(0); setName(""); setDisplayName("");
-    setLoader("vanilla"); setMcVersion(""); setMemory(4);
+    setLoader("vanilla"); setMcVersion(initialVersion || ""); setMemory(4);
     setError(""); setCreating(false);
   };
 
   const loadMcVersions = async () => {
     setLoadingVersions(true);
     try {
+      // instance:version-list 返回 { versions: { id, type, url }[] }
       const list = await getMinecraftVersionList();
-      const releases = list.filter((v: string) => /^1\.\d+/.test(v)).slice(0, 24);
+      const versionIds = (list.versions ?? []).map((v) => v.id);
+      const releases = versionIds.filter((v: string) => /^1\.\d+/.test(v)).slice(0, 24);
       setMcVersions(releases.length ? releases : ["1.21.4","1.21","1.20.6","1.20.4","1.20.1","1.19.4","1.19.2","1.18.2","1.17.1","1.16.5"]);
       if (!mcVersion && releases.length) setMcVersion(releases[0]);
     } catch { setMcVersions(["1.21.4","1.21","1.20.1","1.19.2","1.18.2","1.16.5"]); if (!mcVersion) setMcVersion("1.21.4"); }
@@ -130,7 +135,7 @@ export function CreateDialog({ isOpen, onClose, onCreate }: CreateDialogProps) {
 
               <div>
                 <p className="text-sm font-medium text-foreground mb-2">模组加载器</p>
-                <RadioGroup value={loader} onValueChange={setLoader}>
+                <RadioGroup value={loader} onChange={(v) => setLoader(String(v))}>
                   {loaderOptions.map((opt) => (
                     <Radio key={opt.value} value={opt.value} className="py-1.5">
                       <Radio.Content>
@@ -169,15 +174,15 @@ export function CreateDialog({ isOpen, onClose, onCreate }: CreateDialogProps) {
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-border/30 dark:border-white/[0.04]">
           <div>
-            {step > 0 && <Button variant="light" onPress={() => setStep(step - 1)}>上一步</Button>}
+            {step > 0 && <Button variant="ghost" onPress={() => setStep(step - 1)}>上一步</Button>}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="light" onPress={onClose}>取消</Button>
+            <Button variant="ghost" onPress={onClose}>取消</Button>
             {step < 2 ? (
               <Button onPress={() => setStep(step + 1)} isDisabled={step === 0 ? !name.trim() : !mcVersion}>下一步</Button>
             ) : (
-              <Button onPress={handleCreate} isDisabled={creating || !name.trim()}
-                startContent={creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : undefined}>
+              <Button onPress={handleCreate} isDisabled={creating || !name.trim()}>
+                {creating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {creating ? "创建中..." : "创建实例"}
               </Button>
             )}

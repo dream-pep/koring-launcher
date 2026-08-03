@@ -50,7 +50,7 @@ const DEFAULT_CONFIG: AppConfig = {
   theme: { darkMode: "auto", parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: "image", image: DEFAULT_BG, blur: 0, opacity: 100 },
-  game: { gameDir: ".minecraft", resourceDir: "", savesDir: "", instancesDir: ".minecraft/instances" },
+  game: { gameDir: ".minecraft", resourceDir: "", savesDir: "", instancesDir: ".minecraft/instances", gameDirs: [] },
   java: { javaPath: "", memMode: "auto", memGB: 4, gc: "auto", jvmArgs: "" },
   advanced: { afterLaunch: "close", winMode: "default", customWidth: 854, customHeight: 480, gameArgs: "", preLaunchCmd: "", debugMode: false },
   download: { fileSource: "mirror", versionSource: "mirror", threads: 16, speedLimit: 0 },

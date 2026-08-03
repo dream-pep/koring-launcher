@@ -11,6 +11,11 @@ export async function getSystemInfo(): Promise<SystemInfo> {
   return ipcInvoke<SystemInfo>('system:info');
 }
 
+// 在系统文件管理器中打开指定路径（用于"打开游戏目录"等操作）
+export async function openPath(targetPath: string): Promise<{ success: boolean; error?: string }> {
+  return ipcInvoke<{ success: boolean; error?: string }>('system:open-path', { path: targetPath });
+}
+
 export interface LocaleInfo {
   language: string;
   region: string;

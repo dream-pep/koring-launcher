@@ -12,6 +12,7 @@ import {
   getForgeVersionList,
   getFabricVersionList,
   getQuiltVersionList,
+  scanGameDirectories,
   type InstanceRuntime,
   type InstanceConfig,
 } from '../core/instance';
@@ -190,6 +191,16 @@ export function registerInstanceHandlers(win: WinRef) {
     try {
       const data = await getQuiltVersionList(payload.mcVersion);
       return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 扫描游戏目录中的已安装版本
+  ipcMain.handle('instance:scan-dir', async (_event, payload: { gamePath: string }) => {
+    try {
+      const versions = scanGameDirectories(payload.gamePath);
+      return { success: true, data: { versions }, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }

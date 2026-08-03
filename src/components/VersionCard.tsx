@@ -5,7 +5,7 @@ import { relaunchApp } from "@/api/update";
 import Silk from "@/components/silk/Silk";
 import { Button } from "@heroui/react";
 import clsx from "clsx";
-import { Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 
 const modeColors: Record<string, string> = {
   dev: "#F59E0B",
@@ -32,6 +32,8 @@ interface VersionCardProps {
   overrideMode?: string | null;
   overrideState?: UpdateState | null;
   simple?: boolean;
+  /** OOBE 模式：不显示 Silk 动画，按钮仅展示样式不做实际操作 */
+  oobe?: boolean;
 }
 
 export function VersionCard({
@@ -39,6 +41,7 @@ export function VersionCard({
   overrideMode,
   overrideState,
   simple = false,
+  oobe = false,
 }: VersionCardProps) {
   const color = modeColors[overrideMode ?? BUILD_MODE] ?? modeColors.run;
   const gradient = modeGradients[overrideMode ?? BUILD_MODE] ?? modeGradients.run;
@@ -71,13 +74,7 @@ export function VersionCard({
         </Suspense>
       )}
 
-      {/* 磨砂遮罩 */}
-      <div
-        className="absolute inset-0"
-        style={{ background: "rgba(0,0,0,0.25)", backdropFilter: "blur(12px)" }}
-      />
-
-      {/* 内容 */}
+      {/* 内容（移除颜色遮罩层，保留底部渐变与 Silk 动画渲染） */}
       <div className="relative z-10 flex flex-col items-center justify-center px-6 py-10 gap-4">
         <span className="text-[11px] font-bold tracking-wider text-white/70">{label}</span>
         <img
@@ -88,7 +85,13 @@ export function VersionCard({
         />
         <p className="text-sm text-white/70 font-medium">v{VERSION}</p>
 
-        <div className="flex items-center gap-2 mt-1">
+        {/* OOBE 模式：仅显示查看亮点按钮 */}
+          {oobe ? (
+            <div className="flex items-center gap-2 mt-1">
+              <Btn>查看亮点</Btn>
+            </div>
+        ) : (
+          <div className="flex items-center gap-2 mt-1">
           {effectiveState === "latest" && (
             <>
               <Btn onPress={check} isDisabled={checking}>
@@ -113,7 +116,8 @@ export function VersionCard({
               <Btn onPress={relaunchApp}>立即更新</Btn>
             </>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

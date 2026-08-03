@@ -56,7 +56,8 @@ export function HomeSetting({ onNavigate }: HomeSettingProps) {
       <PageHeader title="主页" desc="版本信息与常用设置的快捷入口" />
 
       <div className="space-y-6">
-        <VersionCard simple />
+        {/* 与"关于"页使用相同的版本卡片 */}
+        <VersionCard />
 
         <div>
           <SectionTitle>常用设置</SectionTitle>

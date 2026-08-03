@@ -118,8 +118,39 @@ export async function diagnoseInstance(
   return ipcInvoke<{ healthy: boolean; issues: string[] }>('instance:diagnose', { name, gamePath });
 }
 
-export async function getMinecraftVersionList(type?: string) {
-  return ipcInvoke<{ versions: { id: string; type: string; url: string }[] }>('instance:version-list', { type });
+// 版本信息（含发布时间和类型）
+export interface VersionEntry {
+  id: string;
+  type: string;
+  url: string;
+  releaseTime: string;
+}
+
+export interface VersionListResult {
+  versions: VersionEntry[];
+  latest: { release: string; snapshot: string };
+}
+
+export async function getMinecraftVersionList(type?: string): Promise<VersionListResult> {
+  return ipcInvoke<VersionListResult>('instance:version-list', { type });
+}
+
+// 扫描到的已安装版本信息
+export interface ScannedVersion {
+  id: string;
+  type: string;
+  releaseTime?: string;
+  hasJar: boolean;
+  hasJson: boolean;
+}
+
+export async function scanGameDir(gamePath: string): Promise<{ versions: ScannedVersion[] }> {
+  return ipcInvoke<{ versions: ScannedVersion[] }>('instance:scan-dir', { gamePath });
+}
+
+// 通过系统对话框选择文件夹
+export async function selectFolder(): Promise<{ folderPath: string } | null> {
+  return ipcInvoke<{ folderPath: string } | null>('dialog:openFolder');
 }
 
 export async function getForgeVersionList(mcVersion?: string) {
