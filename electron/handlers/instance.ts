@@ -13,6 +13,7 @@ import {
   getFabricVersionList,
   getQuiltVersionList,
   scanGameDirectories,
+  importExistingInstance,
   type InstanceRuntime,
   type InstanceConfig,
 } from '../core/instance';
@@ -201,6 +202,34 @@ export function registerInstanceHandlers(win: WinRef) {
     try {
       const versions = scanGameDirectories(payload.gamePath);
       return { success: true, data: { versions }, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 从已安装版本导入实例
+  ipcMain.handle('instance:import', async (_event, payload: {
+    name: string;
+    gamePath: string;
+    versionId: string;
+    description?: string;
+    java?: string;
+    minMemory?: number;
+    maxMemory?: number;
+  }) => {
+    try {
+      const data = await importExistingInstance(
+        payload.name,
+        payload.gamePath,
+        payload.versionId,
+        {
+          description: payload.description,
+          java: payload.java,
+          minMemory: payload.minMemory,
+          maxMemory: payload.maxMemory,
+        }
+      );
+      return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }

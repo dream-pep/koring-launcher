@@ -142,10 +142,34 @@ export interface ScannedVersion {
   releaseTime?: string;
   hasJar: boolean;
   hasJson: boolean;
+  /** 检测到的 mod 加载器 */
+  loaders: string[];
+  /** 是否健康（JSON + JAR 都存在） */
+  healthy: boolean;
 }
 
 export async function scanGameDir(gamePath: string): Promise<{ versions: ScannedVersion[] }> {
   return ipcInvoke<{ versions: ScannedVersion[] }>('instance:scan-dir', { gamePath });
+}
+
+// 从已安装版本导入实例
+export async function importExistingInstance(
+  name: string,
+  gamePath: string,
+  versionId: string,
+  options?: {
+    description?: string;
+    java?: string;
+    minMemory?: number;
+    maxMemory?: number;
+  }
+): Promise<InstanceInfo> {
+  return ipcInvoke<InstanceInfo>('instance:import', {
+    name,
+    gamePath,
+    versionId,
+    ...options,
+  });
 }
 
 // 通过系统对话框选择文件夹

@@ -1,9 +1,21 @@
+import { useState, useEffect } from "react";
 import { VersionCard } from "@/components/VersionCard";
 import { BUILD_MODE } from "@/lib/mode";
 import { ExternalLink, GitFork, RotateCcw } from "lucide-react";
-import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
-import { Button, Link } from "@heroui/react";
+import { Link } from "@heroui/react";
 import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 const modeLabels: Record<string, string> = {
   dev: "开发版",
@@ -15,20 +27,27 @@ const GITHUB_URL = "https://github.com/lingke-net/koring-launcher";
 const OFFICIAL_URL = "https://koring.space";
 
 export function AboutSetting() {
-  const openDialog = useConfirmDialogStore((s) => s.openDialog);
+  const [open, setOpen] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const canConfirm = countdown <= 0;
+
+  useEffect(() => {
+    if (!open) return;
+    setCountdown(5);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [open, countdown]);
 
   const openLink = (url: string) => {
     window.electronAPI?.openExternal(url);
   };
 
-  const handleResetClick = () => {
-    openDialog({
-      title: "您确定要还原所有配置吗？",
-      description: "您还原后，您的实例将会保留，但是所有个性化配置将全部丢失，并且需要重新进行激活",
-      confirmLabel: "确认还原",
-      countdown: 5,
-      onConfirm: () => window.electronAPI?.resetConfig(),
-    });
+  const handleConfirm = () => {
+    window.electronAPI?.resetConfig();
   };
 
   return (
@@ -86,10 +105,34 @@ export function AboutSetting() {
           <SectionTitle>危险操作</SectionTitle>
           <SettingCard>
             <SettingRow label="还原所有设置" desc="删除所有配置文件并重启应用">
-              <Button variant="danger" size="sm" onPress={handleResetClick}>
-                <RotateCcw className="w-4 h-4" />
-                还原
-              </Button>
+              <AlertDialog open={open} onOpenChange={setOpen}>
+                <AlertDialogTrigger
+                  render={
+                    <Button variant="destructive" size="sm">
+                      <RotateCcw className="w-4 h-4" />
+                      还原
+                    </Button>
+                  }
+                />
+                <AlertDialogContent size="sm">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>您确定要还原所有配置吗？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      您还原后，您的实例将会保留，但是所有个性化配置将全部丢失，并且需要重新进行激活
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      disabled={!canConfirm}
+                      onClick={handleConfirm}
+                    >
+                      {countdown > 0 ? `确认还原 (${countdown}s)` : "确认还原"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </SettingRow>
           </SettingCard>
         </div>

@@ -18,14 +18,14 @@ import { rewriteToMirror } from './installer';
 
 // ==================== BMCLAPI 镜像源配置 ====================
 // 版本清单（@xmcl/installer 的 getVersionList 通过 remote 参数覆盖）
-const BMCLAPI_VERSION_MANIFEST = 'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json';
+export const BMCLAPI_VERSION_MANIFEST = 'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json';
 // Maven 仓库镜像（Libraries / Forge / NeoForge / Fabric 构件）
-const BMCLAPI_MAVEN = 'https://bmclapi2.bangbang93.com/maven';
+export const BMCLAPI_MAVEN = 'https://bmclapi2.bangbang93.com/maven';
 // 资源文件镜像（assets）
-const BMCLAPI_ASSETS = 'https://bmclapi2.bangbang93.com/assets';
+export const BMCLAPI_ASSETS = 'https://bmclapi2.bangbang93.com/assets';
 
 // 供 @xmcl/installer FetchOptions 使用的镜像 fetch（meta.fabricmc.net 等元数据接口走镜像）
-const mirrorFetch: typeof fetch = (url, init) => fetch(rewriteToMirror(String(url)), init);
+export const mirrorFetch: typeof fetch = (url, init) => fetch(rewriteToMirror(String(url)), init);
 
 export interface InstanceRuntime {
   minecraft: string;
@@ -427,6 +427,33 @@ export interface ScannedVersion {
   hasJar: boolean;
   /** JSON 文件是否存在 */
   hasJson: boolean;
+  /** 检测到的 mod 加载器 */
+  loaders: string[];
+  /** 是否健康（JSON + JAR 都存在） */
+  healthy: boolean;
+}
+
+// 从版本 JSON 中检测 mod 加载器
+function detectLoaders(jsonPath: string): string[] {
+  const loaders: string[] = [];
+  try {
+    const raw = fs.readFileSync(jsonPath, 'utf-8');
+    const json = JSON.parse(raw);
+    const libs: { name?: string }[] = json.libraries || [];
+    for (const lib of libs) {
+      const name = lib.name || "";
+      if (name.startsWith("net.minecraftforge:forge:") || name.startsWith("net.neoforged:")) {
+        if (!loaders.includes("forge")) loaders.push("forge");
+      } else if (name.startsWith("net.fabricmc:yarn:") || name.startsWith("net.fabricmc:fabric-loader:")) {
+        if (!loaders.includes("fabric")) loaders.push("fabric");
+      } else if (name.startsWith("org.quiltmc:quilt-loader:")) {
+        if (!loaders.includes("quilt")) loaders.push("quilt");
+      } else if (name.startsWith("optifine:OptiFine:")) {
+        if (!loaders.includes("optifine")) loaders.push("optifine");
+      }
+    }
+  } catch {}
+  return loaders;
 }
 
 // 扫描指定目录，返回 versions 子目录中所有已安装版本的详细信息
@@ -447,7 +474,6 @@ export function scanGameDirectories(gamePath: string): ScannedVersion[] {
         let type = "unknown";
         let releaseTime: string | undefined;
 
-        // 尝试读取 version JSON 获取类型和时间
         if (hasJson) {
           try {
             const raw = fs.readFileSync(jsonPath, 'utf-8');
@@ -457,9 +483,119 @@ export function scanGameDirectories(gamePath: string): ScannedVersion[] {
           } catch {}
         }
 
-        return { id, type, releaseTime, hasJar, hasJson };
+        const loaders = hasJson ? detectLoaders(jsonPath) : [];
+        const healthy = hasJson && hasJar;
+
+        return { id, type, releaseTime, hasJar, hasJson, loaders, healthy };
       });
   } catch {
     return [];
   }
+}
+
+// 从已安装版本导入实例（不下载，直接复制版本文件）
+export async function importExistingInstance(
+  name: string,
+  gamePath: string,
+  versionId: string,
+  options?: {
+    description?: string;
+    java?: string;
+    minMemory?: number;
+    maxMemory?: number;
+  }
+): Promise<InstanceInfo> {
+  const instancePath = path.join(gamePath, 'instances', name);
+  if (fs.existsSync(instancePath)) {
+    throw new Error(`Instance already exists: ${name}`);
+  }
+
+  // 检查源版本目录是否存在
+  const srcVersionDir = path.join(gamePath, 'versions', versionId);
+  if (!fs.existsSync(srcVersionDir)) {
+    throw new Error(`Version directory not found: ${versionId}`);
+  }
+
+  // 读取源版本 JSON 获取类型信息
+  const srcJsonPath = path.join(srcVersionDir, `${versionId}.json`);
+  if (!fs.existsSync(srcJsonPath)) {
+    throw new Error(`Version JSON not found: ${versionId}`);
+  }
+
+  let type = "release";
+  let releaseTime: string | undefined;
+  try {
+    const raw = fs.readFileSync(srcJsonPath, 'utf-8');
+    const json = JSON.parse(raw);
+    type = json.type || "release";
+    releaseTime = json.releaseTime;
+  } catch {}
+
+  // 构建 InstanceRuntime
+  const runtime: InstanceRuntime = {
+    minecraft: versionId,
+  };
+
+  // 从 JSON 中检测加载器并填充 runtime
+  try {
+    const raw = fs.readFileSync(srcJsonPath, 'utf-8');
+    const json = JSON.parse(raw);
+    const libs: { name?: string }[] = json.libraries || [];
+    for (const lib of libs) {
+      const name = lib.name || "";
+      // Forge: net.minecraftforge:forge:1.20.1-47.2.0
+      const forgeMatch = name.match(/^net\.minecraftforge:forge:([\d.]+(?:-\d+(?:\.\d+)*)?)/);
+      if (forgeMatch) { runtime.forge = forgeMatch[1]; continue; }
+      // NeoForge: net.neoforged:neoforge:21.0.0
+      const neoMatch = name.match(/^net\.neoforged:neoforge:([\d.]+)/);
+      if (neoMatch) { runtime.neoForged = neoMatch[1]; continue; }
+      // Fabric: net.fabricmc:fabric-loader:0.15.11
+      const fabricMatch = name.match(/^net\.fabricmc:fabric-loader:([\d.]+)/);
+      if (fabricMatch) { runtime.fabricLoader = fabricMatch[1]; continue; }
+      // Quilt: org.quiltmc:quilt-loader:0.26.0
+      const quiltMatch = name.match(/^org\.quiltmc:quilt-loader:([\d.]+)/);
+      if (quiltMatch) { runtime.quiltLoader = quiltMatch[1]; continue; }
+    }
+  } catch {}
+
+  // 创建实例目录结构
+  fs.mkdirSync(instancePath, { recursive: true });
+
+  const now = Date.now();
+  const config: InstanceConfig = {
+    name,
+    author: '',
+    description: options?.description || `Imported from version ${versionId}`,
+    runtime,
+    java: options?.java,
+    minMemory: options?.minMemory,
+    maxMemory: options?.maxMemory,
+    creationDate: now,
+    lastAccessDate: now,
+    lastPlayedDate: 0,
+    playtime: 0,
+  };
+
+  fs.writeFileSync(getInstanceConfigPath(instancePath), JSON.stringify(config, null, 2), 'utf-8');
+
+  // 创建标准子目录
+  for (const dir of ['mods', 'config', 'resourcepacks', 'shaderpacks', 'saves', 'screenshots', 'logs']) {
+    fs.mkdirSync(path.join(instancePath, dir), { recursive: true });
+  }
+
+  // 复制版本文件到实例目录
+  const destVersionDir = path.join(instancePath, 'versions', versionId);
+  fs.mkdirSync(destVersionDir, { recursive: true });
+
+  // 复制所有版本文件
+  const files = fs.readdirSync(srcVersionDir);
+  for (const file of files) {
+    const srcFile = path.join(srcVersionDir, file);
+    const destFile = path.join(destVersionDir, file);
+    if (fs.statSync(srcFile).isFile()) {
+      fs.copyFileSync(srcFile, destFile);
+    }
+  }
+
+  return getInstanceInfo(name, gamePath);
 }

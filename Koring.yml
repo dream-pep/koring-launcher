@@ -1,3 +1,5 @@
 oobe: false
+theme:
+  darkMode: light
 game:
   gameDirs: []

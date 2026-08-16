@@ -62,6 +62,7 @@ function listenToSidecarEvents(taskId: string) {
             status: "running",
             startedAt: Date.now(),
             xmclPath: data.xmclPath as string,
+            xmclState: "running",
           });
           break;
 
@@ -72,6 +73,7 @@ function listenToSidecarEvents(taskId: string) {
               total: data.total as number,
               stage: data.stage as string,
             },
+            xmclPath: (data.xmclPath as string) || undefined,
           });
           break;
 
@@ -84,9 +86,38 @@ function listenToSidecarEvents(taskId: string) {
           break;
         }
 
+        case "task:paused":
+          updateTask(taskId, {
+            status: "paused",
+            xmclState: "paused",
+          });
+          break;
+
+        case "task:resumed":
+          updateTask(taskId, {
+            status: "running",
+            xmclState: "running",
+          });
+          break;
+
+        case "task:cancelled":
+          updateTask(taskId, {
+            status: "cancelled",
+            xmclState: "cancelled",
+            finishedAt: Date.now(),
+          });
+          eventListeners.get(taskId)?.();
+          eventListeners.delete(taskId);
+          setTimeout(() => {
+            const state = useTaskStore.getState();
+            saveHistory(state.tasks);
+          }, 0);
+          break;
+
         case "task:completed":
           updateTask(taskId, {
             status: "completed",
+            xmclState: "succeed",
             finishedAt: Date.now(),
           });
           eventListeners.get(taskId)?.();
@@ -102,6 +133,7 @@ function listenToSidecarEvents(taskId: string) {
           const cur = useTaskStore.getState().tasks.find((t) => t.id === taskId);
           updateTask(taskId, {
             status: "failed",
+            xmclState: "failed",
             finishedAt: Date.now(),
             logs: cur ? [...cur.logs, errLog] : [errLog],
           });
@@ -140,6 +172,9 @@ interface TaskState {
 
   // Common actions
   cancelTask: (id: string) => void;
+  // @xmcl/task 原生暂停 / 恢复
+  pauseTask: (id: string) => void;
+  resumeTask: (id: string) => void;
   removeTask: (id: string) => void;
   clearHistory: () => void;
   retryTask: (id: string) => void;
@@ -278,6 +313,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
     eventListeners.get(id)?.();
     eventListeners.delete(id);
+  },
+
+  // 暂停任务：主进程调用 @xmcl/task 的 pause()
+  pauseTask: (id) => {
+    const { tasks } = get();
+    const task = tasks.find((t) => t.id === id);
+    // 仅允许暂停运行中的 IPC 任务（本地任务不支持暂停）
+    if (task && task.status === "running" && !get().abortControllers.has(id)) {
+      ipcInvoke("task:pause", { taskId: id }).catch(() => {});
+    }
+  },
+
+  // 恢复任务：主进程调用 @xmcl/task 的 resume()
+  resumeTask: (id) => {
+    const { tasks } = get();
+    const task = tasks.find((t) => t.id === id);
+    if (task && task.status === "paused") {
+      ipcInvoke("task:resume", { taskId: id }).catch(() => {});
+    }
   },
 
   removeTask: (id) => {

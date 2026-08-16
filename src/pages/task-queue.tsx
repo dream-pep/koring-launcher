@@ -10,6 +10,7 @@ export function TaskQueue() {
   const activeTasks = tasks.filter(
     (t) => t.status === "pending" || t.status === "running",
   );
+  const pausedTasks = tasks.filter((t) => t.status === "paused");
   const completedTasks = tasks.filter(
     (t) =>
       t.status === "completed" ||
@@ -17,6 +18,7 @@ export function TaskQueue() {
       t.status === "cancelled",
   );
   const hasCompleted = completedTasks.length > 0;
+  const activeCount = activeTasks.length + pausedTasks.length;
 
   return (
     <div className="h-full overflow-y-auto px-6 py-5">
@@ -27,9 +29,9 @@ export function TaskQueue() {
             <h1 className="text-xl font-semibold text-foreground">
               任务队列
             </h1>
-            {activeTasks.length > 0 && (
+            {activeCount > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium tabular-nums">
-                {activeTasks.length} 进行中
+                {activeCount} 进行中
               </span>
             )}
           </div>
@@ -62,6 +64,19 @@ export function TaskQueue() {
                 </h3>
                 <div className="space-y-2.5">
                   {activeTasks.map((t) => (
+                    <TaskCard key={t.id} task={t} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {pausedTasks.length > 0 && (
+              <div>
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-amber-500/70 mb-2.5">
+                  已暂停
+                </h3>
+                <div className="space-y-2.5">
+                  {pausedTasks.map((t) => (
                     <TaskCard key={t.id} task={t} />
                   ))}
                 </div>

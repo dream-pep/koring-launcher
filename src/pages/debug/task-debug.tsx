@@ -15,6 +15,7 @@ import {
   Check,
   Ban,
   Server,
+  Pause,
 } from "lucide-react";
 
 const taskTypes: { type: TaskType; label: string; icon: typeof Download; color: string; bg: string }[] = [
@@ -68,6 +69,7 @@ function simulateSidecarTask(
 const statusIcons = {
   pending: RefreshCw,
   running: RefreshCw,
+  paused: Pause,
   completed: Check,
   failed: AlertCircle,
   cancelled: Ban,
@@ -139,6 +141,37 @@ export function TaskDebug() {
               </button>
             </div>
           </GlassCard>
+          <GlassCard>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">暂停 / 恢复测试</p>
+                <p className="text-[13px] text-muted-foreground mt-0.5">运行 5s 计时任务，3 秒后自动暂停，验证 @xmcl/task 的 Paused 状态</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const id = simulateSidecarTask("custom", "暂停/恢复测试 (5s)", "sleep", { duration: 5000 });
+                    // 3 秒后自动暂停，验证 Paused 状态
+                    setTimeout(() => useTaskStore.getState().pauseTask(id), 3000);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-[12px] font-medium transition-colors"
+                >
+                  <Pause className="w-3.5 h-3.5" />
+                  运行并暂停
+                </button>
+                <button
+                  onClick={() => {
+                    const paused = useTaskStore.getState().tasks.find((t) => t.status === "paused");
+                    if (paused) useTaskStore.getState().resumeTask(paused.id);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-[12px] font-medium transition-colors"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  恢复
+                </button>
+              </div>
+            </div>
+          </GlassCard>
         </div>
       </div>
 
@@ -203,7 +236,7 @@ export function TaskDebug() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => simulateSidecarTask("install", "Sidecar Install", "install", { steps: 10 })}
+                  onClick={() => simulateSidecarTask("install", "Sidecar Install", "install-sim", { steps: 10 })}
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-foreground/[0.06] hover:bg-foreground/[0.1] text-[12px] font-medium transition-colors"
                 >
                   运行
@@ -311,6 +344,8 @@ export function TaskDebug() {
                       className={`w-4 h-4 shrink-0 ${
                         t.status === "running"
                           ? "animate-spin text-blue-500"
+                          : t.status === "paused"
+                          ? "text-amber-500"
                           : t.status === "completed"
                           ? "text-green-500"
                           : t.status === "failed"
@@ -322,7 +357,8 @@ export function TaskDebug() {
                       <p className="text-sm font-medium text-foreground truncate">{t.title}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {t.type} · {t.status} · {t.logs.length} 条日志
-                        {t.xmclPath && <span className="ml-1 text-primary/60">@xmcl</span>}
+                        {t.xmclState && <span className="ml-1 text-primary/60">@{t.xmclState}</span>}
+                        {t.xmclPath && <span className="ml-1 text-primary/60">xmcl:{t.xmclPath}</span>}
                       </p>
                     </div>
                     <button
