@@ -147,11 +147,36 @@ async function downloadWithRetry(downloadUrl, headers) {
 /**
  * electron-builder 自定义签名入口。
  * configuration.path 为待签名文件绝对路径；无 token 时跳过（本地开发构建）。
+ *
+ * SIGNPATH_SKIP_ON_QUOTA=true（内部测试用）：
+ *  SignPath 年度配额耗尽时跳过签名并继续构建（产物为未签名），
+ *  首次命中配额错误后记住状态，后续文件不再尝试提交。
+ *  正式发布请移除该开关并升级 SignPath 套餐。
  */
+let quotaExhausted = false;
+
 module.exports = async function signPathSign(configuration) {
   if (!process.env.SIGNPATH_API_TOKEN || !process.env.SIGNPATH_ORG_ID) {
     console.log(`[signpath-sign] no SignPath credentials, skip signing: ${configuration.name}`);
     return;
   }
-  await signWithSignPath(configuration.path);
+  if (quotaExhausted) {
+    console.warn(`[signpath-sign] quota exhausted — SKIP signing (UNSIGNED): ${configuration.name}`);
+    return;
+  }
+  // 配额省用模式：只签最终安装包（isNsis=true），跳过内部 exe / 卸载器
+  if (process.env.SIGNPATH_ONLY_INSTALLER === 'true' && !configuration.isNsis) {
+    console.log(`[signpath-sign] SIGNPATH_ONLY_INSTALLER, skip inner file: ${configuration.name}`);
+    return;
+  }
+  try {
+    await signWithSignPath(configuration.path);
+  } catch (err) {
+    if (process.env.SIGNPATH_SKIP_ON_QUOTA === 'true' && /quota/i.test(err.message)) {
+      quotaExhausted = true;
+      console.warn(`[signpath-sign] SignPath quota exceeded — skip remaining files, artifact will be UNSIGNED: ${err.message}`);
+      return;
+    }
+    throw err;
+  }
 };

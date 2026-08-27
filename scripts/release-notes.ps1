@@ -15,6 +15,7 @@ param(
   [Parameter(Mandatory = $true)][string] $BaseVersion,
   [Parameter(Mandatory = $true)][string] $FullVersion,
   [Parameter(Mandatory = $true)][string] $Mode,
+  [string] $SigningStatus = "已签名",
   [string] $OutputPath = "release-notes.md"
 )
 
@@ -66,6 +67,7 @@ $content = @"
 ## 版本信息
 当前版本 $FullVersion
 编译状态：$status
+签名状态：$SigningStatus
 
 ## 更新了什么内容
 $commitsSection

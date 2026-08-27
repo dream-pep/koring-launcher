@@ -269,10 +269,21 @@ src/
   SigningPolicySlug / ArtifactConfigurationSlug? / Description / 文件部件 **Artifact**）→
   响应 **Location 头** = 请求 URL → 轮询 `status`/`isFinalStatus` → 完成后取 **signedArtifactLink** 下载；
   认证 `Authorization: Bearer <token>`。
-- ✅ 98.3MB setup.exe 提交成功（无大小限制问题）；自动批准生效（InProgress → Completed 无人工介入）
+- ✅ 98.3MB setup.exe 提交成功；自动批准生效（InProgress → Completed 无人工介入）
 - ✅ 小文件端到端签名成功，`signtool verify` 显示签名链 **Issued to: Lingke Network**
 - ⚠️ 本机到 SignPath 下载 100MB+ 产物极慢（20min+），CI（GitHub Actions）网络环境不受影响；
   模块已加下载重试（3 次）+ 临时文件替换
+
+**2026-08-28 CI 首跑教训（配额）**：
+- ⚠️ **SignPath 年度配额 ≈ 500MB**（"Yearly quota for artifact size has been exceeded"），
+  一次全量签名构建（sha1+sha256 双签）即消耗 ~458MB，直接耗尽配额，发布失败。
+- 修复（已落地）：`win.signtoolOptions.signingHashAlgorithms: [sha256]` —— 只按 SHA256 单签，
+  每个文件只签一次，配额减半（全量构建 ~278MB）；
+  可选 `SIGNPATH_ONLY_INSTALLER=true` 只签 setup.exe（~97MB/构建）。
+- **内部测试策略（已落地）**：workflow 设置 `SIGNPATH_SKIP_ON_QUOTA=true` —— 配额耗尽时
+  跳过签名、照常发布（产物未签名，electron-updater 发布者校验自动跳过）；首次命中后记住状态，
+  后续文件不再重复提交。⚠️ 正式发布务必移除该开关。
+- **治本仍需升级 SignPath 套餐**或等待年度配额重置；正式发布（run）建议全量签名 + 生产证书。
 
 **验证点（首次 CI 运行）**：确认 SignPath 请求全部 Completed、`latest.yml` 的 sha512
 与上传的 signed setup.exe 一致、签名链显示 "Lingke Network"。

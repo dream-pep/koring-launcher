@@ -19,7 +19,12 @@ win:
   requestedExecutionLevel: asInvoker
   # SignPath 远程签名：scripts/signpath-sign.js
   # 无 SIGNPATH_API_TOKEN 时自动跳过（本地构建不受影响）
-  sign: scripts/signpath-sign.js
+  # signingHashAlgorithms 只保留 sha256：避免 electron-builder 对每个文件
+  # 按 sha1+sha256 双算法各签一次（远程签名会重复消耗 SignPath 配额）
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    sign: scripts/signpath-sign.js
 mac:
   target: dmg
   icon: build/icon.png
