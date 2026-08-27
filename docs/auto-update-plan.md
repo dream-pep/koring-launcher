@@ -257,7 +257,8 @@ src/
 
 **新增/改动文件**：
 - `scripts/signpath-sign.js` — 签名模块（无 token 自动跳过，本地构建不受影响）
-- `.github/workflows/release.yml` — 推送 tag `v*`（或手动填版本）→ 构建 → 签名 → `electron-builder --publish always` 发布 GitHub Releases
+- `.github/workflows/release.yml` — 手动触发：选择 beta/run → 构建 → 签名 → 发布 GitHub Release（见 §13）
+- `scripts/release-notes.ps1` — 中文 Release 发布说明生成器
 - `electron-builder.yml` — `win.sign` 挂载
 
 **CI Secrets**：仅 `SIGNPATH_API_TOKEN`（必填）+ `SIGNPATH_ARTIFACT_CONFIG_SLUG`（可选）；
@@ -275,3 +276,25 @@ src/
 
 **验证点（首次 CI 运行）**：确认 SignPath 请求全部 Completed、`latest.yml` 的 sha512
 与上传的 signed setup.exe 一致、签名链显示 "Lingke Network"。
+
+## 13. 发布流水线（手动触发 / BUILD ID / 中文 Release）
+
+**触发方式**：Actions 页面 → Run workflow，仅手动触发（不再使用 tag 触发）。
+- `mode`：`beta`（测试，发布为 GitHub prerelease）/ `run`（正式，发布为普通 release）
+- `version`：基础版本号（如 `1.2.0`）
+
+**版本号与 BUILD ID**：
+- BUILD ID = Action 运行的 **UTC 时刻**，格式 `YYMMDDHHMM`（如 `2608280224`）
+- 最终版本 = `{version}-{BUILD ID}`（如 `1.2.0-2608280224`），tag = `v{version}-{BUILD ID}`，
+  electron-builder 产物 = `koring-launcher-{version}-{BUILD ID}-setup.exe`，`latest.yml` 同步更新
+
+**发布内容**（`gh release create`，中文正文由 `scripts/release-notes.ps1` 生成）：
+- `# Koring Launcher Releases {version}` + 版本信息（当前版本 / 编译状态 BETA/RUN）
+- `## 更新了什么内容`：自上个 `v*` tag 以来的提交记录，每条默认折叠
+  （`<details><summary>·Commit 1cf906d</summary>…</details>`）
+- 上传产物：setup.exe + latest.yml（electron-updater 更新清单）
+
+**⚠️ 版本语义注意（electron-updater）**：
+- `{version}-{BUILD ID}` 属 semver prerelease：同格式版本之间可正常升级（BUILD ID 更大者胜）
+- 若未来发布**不带** BUILD ID 的稳定版本（如 `1.2.0`），稳定版用户不会自动升级到带 BUILD ID 的构建
+- 同一分钟内重复触发会产生相同 BUILD ID → tag 冲突，`gh release create` 会失败，稍候重试即可

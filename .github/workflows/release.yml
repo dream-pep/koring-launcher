@@ -1,14 +1,20 @@
-# Koring Launcher Windows 发布流水线：构建 → SignPath 签名 → 发布 GitHub Releases
+# Koring Launcher 构建 & 发布流水线（手动触发）：构建 → SignPath 签名 → 发布 GitHub Release
 #
-# 触发方式：
-#  1) 推送 tag v*（推荐）：先本地升版（node scripts/version.js 1.2.1）并打 tag v1.2.1，
-#     推送后本流水线构建、签名并把产物发布到该 tag 对应的 GitHub Release。
-#  2) 手动触发 workflow_dispatch：填版本号，构建产物发布到 v<版本号> Release。
+# 手动触发（Actions 页面 -> Run workflow）：
+#   mode    选择构建模式：beta（测试）或 run（正式）
+#   version 基础版本号，如 1.2.0
+# 自动生成 BUILD ID（Action 运行的 UTC 时刻，格式 YYMMDDHHMM，如 2608280224），
+# 最终版本号 = {version}-{BUILD ID}（如 1.2.0-2608280224），tag = v{version}-{BUILD ID}。
 #
-# 需要的仓库 Secrets（Settings -> Secrets and variables -> Actions）：
-#  SIGNPATH_API_TOKEN              SignPath API Token（必填；放在 Environment "BUILDER" 的环境 Secrets 中，
-#                                  本 job 声明 environment: BUILDER 后才能读取）
-#  SIGNPATH_ARTIFACT_CONFIG_SLUG   产物配置 slug（项目只有一个配置时可留空；仓库级 Secret）
+# 发布行为：
+#   - beta：创建 GitHub prerelease（不占用 "Latest" 位）
+#   - run ：创建正式 release
+#   - Release 正文为中文：版本信息（当前版本 / 编译状态）+ 自上个 release tag 以来的提交记录（默认折叠）
+#   - 上传产物：koring-launcher-{version}-{BUILD ID}-setup.exe + latest.yml（electron-updater 更新清单）
+#
+# Secrets：
+#  SIGNPATH_API_TOKEN    SignPath API Token（必填；放在 Environment "BUILDER" 的环境 Secrets 中）
+#  SIGNPATH_ARTIFACT_CONFIG_SLUG  产物配置 slug（项目只有一个配置时可留空；仓库级 Secret）
 #
 # 组织 ID / slug 非密钥，直接写在下方 env（SignPath 后台确认值）：
 #   OrganizationId           31ecd033-d59e-492b-a70b-b00a54bbc7c2
@@ -17,26 +23,29 @@
 #
 # ⚠️ 签名策略说明：
 #  - 审批流程：SignPath 后台已关闭人工审批（自动批准），CI 可全自动。
-#  - 证书：当前策略 Purpose 为 Release signing（测试证书），用户机器默认不信任
-#    （SmartScreen / 杀软警告），正式对外发布需生产证书（OV/EV）+ 对应生产签名策略，
-#    届时只需更换下方 SIGNPATH_SIGNING_POLICY_SLUG。
+#  - 证书：当前策略为测试证书，用户机器默认不信任（SmartScreen / 杀软警告），
+#    正式对外发布需生产证书（OV/EV）+ 对应生产签名策略，届时只换 SIGNPATH_SIGNING_POLICY_SLUG。
 #
-# 说明：
-#  - electron-builder 的 win.sign 会调用 scripts/signpath-sign.js 逐个文件远程签名，
-#    签名后自动生成的 latest.yml / blockmap 哈希即对应签名后的安装包。
-#  - 发布使用 GITHUB_TOKEN（自动注入，需 contents: write 权限创建/更新 Release）。
+# ⚠️ 版本号注意（electron-updater 语义）：
+#  - {version}-{BUILD ID} 属于 semver prerelease；已安装同格式版本的用户可正常收到更高 BUILD ID 的更新。
+#  - 若未来发布不带 BUILD ID 的稳定版本（如 1.2.0），稳定版用户不会自动升级到带 BUILD ID 的构建。
 
-name: Release Windows (SignPath)
+name: BUILD & Release (SignPath)
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to build and publish (e.g. 1.2.1)'
+      mode:
+        description: '构建模式：beta（测试）/ run（正式）'
         required: true
+        type: choice
+        options:
+          - beta
+          - run
+      version:
+        description: '基础版本号，如 1.2.0'
+        required: true
+        default: '1.2.0'
 
 permissions:
   contents: write
@@ -54,6 +63,9 @@ jobs:
       SIGNPATH_ARTIFACT_CONFIG_SLUG: ${{ secrets.SIGNPATH_ARTIFACT_CONFIG_SLUG }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 需要完整历史：生成中文提交记录（自上个 release tag 以来）
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -67,19 +79,52 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # 手动触发时按输入升版（tag 触发时版本已在 package.json）
-      - name: Set version (manual runs only)
-        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
-        run: node scripts/version.js ${{ inputs.version }}
+      # BUILD ID = Action 运行时刻（UTC, YYMMDDHHMM），如 2608280224
+      - name: Generate BUILD ID & set version
+        id: version
+        shell: pwsh
+        run: |
+          $buildId = [DateTime]::UtcNow.ToString('yyMMddHHmm')
+          $full = "${{ inputs.version }}-$buildId"
+          node scripts/version.js $full
+          "build_id=$buildId" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "full=$full" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "BUILD ID: $buildId  ->  version: $full"
 
-      - name: Build renderer + main (production)
-        run: pnpm build:run
-
-      - name: Switch production icons
-        run: pnpm icon:run
+      - name: Build renderer + main (${{ inputs.mode }})
+        shell: pwsh
+        run: |
+          if ("${{ inputs.mode }}" -eq "beta") {
+            pnpm build:beta
+            pnpm icon:beta
+          } else {
+            pnpm build:run
+            pnpm icon:run
+          }
 
       # 关键步骤：win.sign 自定义签名（SignPath）在打包过程中逐个签名内部 exe 与 setup.exe
-      - name: Package, sign and publish to GitHub Releases
-        run: pnpm exec electron-builder --win --publish always
+      - name: Package & sign (SignPath)
+        run: pnpm exec electron-builder --win --publish never
+
+      - name: Generate Chinese release notes
+        shell: pwsh
+        run: |
+          ./scripts/release-notes.ps1 `
+            -BaseVersion "${{ inputs.version }}" `
+            -FullVersion "${{ steps.version.outputs.full }}" `
+            -Mode "${{ inputs.mode }}" `
+            -OutputPath release-notes.md
+
+      - name: Publish GitHub Release
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "v${{ steps.version.outputs.full }}"
+          $prerelease = if ("${{ inputs.mode }}" -eq "beta") { "--prerelease" } else { "" }
+          gh release create $tag `
+            "dist-electron/koring-launcher-${{ steps.version.outputs.full }}-setup.exe" `
+            "dist-electron/latest.yml" `
+            --title "Koring Launcher Releases ${{ inputs.version }}" `
+            --notes-file release-notes.md `
+            $prerelease
