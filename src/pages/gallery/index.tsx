@@ -15,28 +15,28 @@ import { toast } from "sonner";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useConfigStore } from "@/stores/configStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useLaunchStore } from "@/stores/launchStore";
 import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
 import { useRouteStore } from "@/stores/routeStore";
-import { onLaunchComplete, onLaunchError } from "@/api/instance";
 import { openPath } from "@/api/system";
 import { InstanceList } from "./InstanceList";
 import { InstanceDetail } from "./InstanceDetail";
 import { EditDialog } from "./EditDialog";
 
 export function Gallery() {
-  const { instances, loading, fetchInstances, remove, launch } = useInstanceStore();
+  const { instances, loading, fetchInstances, remove } = useInstanceStore();
   const gameConfig = useConfigStore((s) => s.config.game);
-  const javaConfig = useConfigStore((s) => s.config.java);
   const configInstances = useConfigStore((s) => s.config.instances);
   const setInstances = useConfigStore((s) => s.setInstances);
   const user = useAuthStore((s) => s.user);
   const openConfirm = useConfirmDialogStore((s) => s.openDialog);
   const navigate = useRouteStore((s) => s.navigate);
   const setStoreSection = useRouteStore((s) => s.setStoreSection);
+  const launch = useLaunchStore((s) => s.launch);
+  const launching = useLaunchStore((s) => s.launching);
 
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [launching, setLaunching] = useState(false);
 
   // 跳转到资源中心"原版游戏"分类创建实例
   const goCreateInstance = useCallback(() => {
@@ -63,41 +63,24 @@ export function Gallery() {
     }
   }, [instances, selectedName]);
 
-  // 监听启动结果
-  useEffect(() => {
-    const offComplete = onLaunchComplete(() => {
-      setLaunching(false);
-      toast.success("游戏启动成功");
-    });
-    const offError = onLaunchError(({ error }) => {
-      setLaunching(false);
-      toast.error(`启动失败: ${error}`);
-    });
-    return () => {
-      offComplete();
-      offError();
-    };
-  }, []);
-
   const selected = instances.find((i) => i.name === selectedName) ?? null;
 
-  // 启动游戏
+  // 启动游戏（统一接口：主进程自动应用权威配置）
   const handlePlay = async () => {
     if (!selected) return;
     if (!user?.username || !user?.uuid) {
       toast.warning("请先在设置中登录账号");
       return;
     }
-    setLaunching(true);
     try {
-      await launch(selected.name, gameConfig.gameDir, {
-        username: user.username,
-        uuid: user.uuid,
-        accessToken: user.accessToken,
-        javaPath: javaConfig.javaPath || undefined,
-      });
+      await launch(selected.name, gameConfig.gameDir);
+      const error = useLaunchStore.getState().error;
+      if (error) {
+        toast.error(`启动失败: ${error}`);
+      } else {
+        toast.success("游戏已启动");
+      }
     } catch (e: any) {
-      setLaunching(false);
       toast.error(`启动失败: ${e.message || e}`);
     }
   };

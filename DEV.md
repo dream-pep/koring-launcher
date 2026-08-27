@@ -98,6 +98,15 @@ koring-launcher/
 │   │   │   ├── TaskButton.tsx         # 标题栏任务指示器
 │   │   │   └── TaskCard.tsx           # 单个任务卡片
 │   │   ├── ui/                        # shadcn/ui 组件
+│   │   ├── setting/                   # 设置页原语（HeroUI 统一）
+│   │   │   ├── SettingSurface.tsx     # 卡片唯一原语（HeroUI Surface + 磨砂 + 圆角）
+│   │   │   ├── SettingCard.tsx        # 设置卡片（SettingSurface + 标准 padding）
+│   │   │   ├── SettingRow.tsx         # 设置行（label/desc + 控件）
+│   │   │   ├── SettingBadge.tsx       # 统一徽章（neutral/primary/success/warning/info/error/violet）
+│   │   │   ├── SettingListItem.tsx    # 列表项行（版本行/扫描行，支持选中态）
+│   │   │   ├── SectionTitle.tsx       # PageHeader/SectionTitle（HeroUI Typography）
+│   │   │   ├── controls.tsx           # 设置控件（Select/NumberField/Switch/Radio/TextArea/FilePicker + fieldCls）
+│   │   │   └── Surface.tsx            # Surface 兼容别名（旧 API，样式与卡片统一）
 │   │   ├── VersionCard.tsx            # 版本/更新卡片
 │   │   ├── UnderConstruction.tsx      # "装修中" 占位组件
 │   │   └── StartupPopup.tsx           # 启动弹窗
@@ -117,11 +126,12 @@ koring-launcher/
 │   │   └── devStore.ts        # 开发者调试
 │   ├── api/
 │   │   ├── ipc.ts             # 核心 IPC 工具 (invoke, onIpcEvent)
-│   │   ├── config.ts          # AppConfig 读写
+│   │   ├── config.ts          # AppConfig 读写 + updateConfig(section, patch)
 │   │   ├── auth.ts            # 登录 API
 │   │   ├── background.ts      # 背景控制
 │   │   ├── install.ts         # Minecraft 安装
-│   │   ├── launch.ts          # 游戏启动
+│   │   ├── launch.ts          # 统一游戏启动 (launchGame / onGameEvent)
+│   │   ├── java.ts            # Java 检测 (scanJava / resolveJava)
 │   │   ├── mods.ts            # Mod 搜索
 │   │   ├── instance.ts        # 实例 API
 │   │   └── update.ts          # 应用更新
@@ -142,15 +152,18 @@ koring-launcher/
 │   │   ├── auth.ts              # Microsoft OAuth, Xbox Live, MC auth
 │   │   ├── installer.ts         # @xmcl/installer
 │   │   ├── launcher.ts          # @xmcl/core 游戏启动
+│   │   ├── launch-options.ts    # 配置→LaunchOption 映射 (parseArgs/buildLaunchOptions/resolveJavaPath)
+│   │   ├── paths.ts             # 相对 gameDir 归一化 (resolveGamePath)
 │   │   ├── modrinth.ts          # Modrinth/CurseForge API
-│   │   └── instance.ts          # 实例管理
+│   │   └── instance.ts          # 实例管理（含 importExistingInstance sourceGamePath）
 │   ├── handlers/                # IPC 处理器
-│   │   ├── config.ts            # 配置读写
+│   │   ├── config.ts            # 配置读写 + config:update/config:changed
 │   │   ├── auth.ts              # 认证操作
 │   │   ├── install.ts           # 安装操作
-│   │   ├── launch.ts            # 游戏启动
+│   │   ├── launch.ts            # 统一游戏启动 + afterLaunch
+│   │   ├── java.ts              # Java 检测 (java:scan / java:resolve)
 │   │   ├── mods.ts              # Mod 操作
-│   │   ├── instance.ts          # 实例操作
+│   │   ├── instance.ts          # 实例操作（gamePath 统一 resolveGamePath）
 │   │   ├── background.ts        # 背景操作
 │   │   ├── task.ts              # 任务系统
 │   │   ├── system.ts            # 系统信息
@@ -185,14 +198,37 @@ koring-launcher/
 
 | 数据类型 | 存储位置 | 格式 | 说明 |
 |---------|---------|------|------|
-| 用户设置 | 程序目录 `Koring.yml` | YAML | 所有可配置项 |
-| 认证数据 | 程序目录 `koring-auth.json` | JSON | token/xboxProfile |
+| 用户设置 | 打包：`app.getPath('userData')/Koring.yml`；开发：项目根 `Koring.yml` | YAML | 所有可配置项 |
+| 认证数据 | 打包：`userData/koring-auth.json`；开发：项目根 | JSON | token/xboxProfile |
+| 崩溃日志 | 打包：`userData/koring-crash.log`；开发：项目根 | JSONL | 崩溃记录，max 1000 行 |
 | 任务历史 | localStorage `koring-task-history` | JSON | 临时，max 50 |
+
+> 打包模式统一使用系统用户数据目录，避免安装到 Program Files 等只读目录时写入失败。
+> 旧版「exe 旁」文件在启动时由 `migrateLegacyFiles()`（`electron/main.ts`）自动复制迁移，复制不删除。
+
+### 主进程权威写入模型（single source of truth）
+
+```
+渲染进程 setX(patch) ──config:update {section, patch}──▶ 主进程 updateConfig()
+                                                          ├─ 深度合并到内存缓存（getConfig()）
+                                                          ├─ 300ms debounce 稀疏写盘（saveConfig）
+                                                          └─ 广播 config:changed（完整配置）
+渲染进程 onConfigChanged ──▶ configStore.applyChanged() 覆盖本地镜像
+```
+
+- 主进程内存缓存（`electron/config.ts` 的 `current`）是唯一权威；**渲染进程不直接写盘**。
+- 启动游戏（`launch:launch`）直接读内存 `getConfig()`，保证永远用最新配置，无磁盘竞争。
+- 退出时 `flushConfig()`（`window-all-closed`）强制写盘。
+- 认证（Koring 账户）同步进配置时同样走 `updateConfig({ koringUser })` / `deleteConfigKey('koringUser')`。
 
 ### Koring.yml 结构
 
 ```yaml
 version: 1
+oobe: true                # 首次启动引导完成标记
+
+app:
+  language: zh-CN         # zh-CN | en-US（语言包开发中，仅保存偏好 + <html lang>）
 
 theme:
   darkMode: auto          # auto | light | dark
@@ -215,6 +251,7 @@ game:
   resourceDir: ""
   savesDir: ""
   instancesDir: .minecraft/instances
+  gameDirs: []            # 已添加的游戏目录列表
 
 java:
   javaPath: ""
@@ -231,6 +268,9 @@ advanced:
   gameArgs: ""
   preLaunchCmd: ""
   debugMode: false
+  server:                 # 快速进入服务器（ip 空则不自动加入）
+    ip: ""
+    port: 25565
 
 download:
   fileSource: mirror      # mirror | official | official-only
@@ -242,15 +282,20 @@ network:
   securityId:
     enabled: false
     authUrl: ""
+
+ui:
+  showInstanceTitle: true # 首页实例标题
+  showTaskButton: true    # 标题栏任务队列按钮
 ```
 
 ### 向上兼容策略
 
 1. **版本号** — `version` 字段，每次结构变更递增
-2. **默认值填充** — 加载时缺失字段自动补全，不丢数据
-3. **迁移函数** — `migrate_v0_to_v1()` 等，按版本链执行
+2. **默认值填充** — 加载时缺失字段自动补全，不丢数据（`loadConfig` 与 `DEFAULTS` 深度合并）
+3. **迁移函数** — 结构变更时在 `migrate()` 中按版本链执行
 4. **未知字段保留** — YAML 解析器保留不认识的字段
-5. **Debounce 写入** — 300ms debounce 避免频繁 IO
+5. **Debounce 写入** — 主进程 300ms debounce 稀疏写盘，避免频繁 IO
+6. **稀疏保存** — `diffValue(config, DEFAULTS)` 只写非默认值；默认值改回后从文件移除
 
 ---
 
@@ -295,33 +340,67 @@ win.mainWindow?.webContents.send('install:progress', data);
 
 | 频道 | 说明 |
 |---|---|
-| `config:get` / `config:save` | 配置读写 |
+| `config:get` / `config:update` / `config:save` | 配置读写；`config:update` 提交 `{section, patch}`，主进程合并 + debounce 写盘 + 广播 `config:changed` |
+| `config:changed`（事件） | 主进程广播完整配置，渲染端 `configStore.applyChanged` 覆盖镜像 |
+| `config:preload`（事件） | 启动时推送初始配置 + isFirstLaunch |
 | `auth:offline-login` / `auth:get` / `auth:save` / `auth:delete` | 认证操作 |
 | `install:minecraft` / `install:mod-loader` / `install:version-list` | 安装操作 |
-| `launch:launch` / `launch:diagnose` | 游戏启动 |
+| `launch:launch` / `launch:diagnose` | 统一游戏启动：`{instanceName, gamePath, profile, server?}`；主进程读权威配置 → `buildLaunchOptions` → `@xmcl/core launch`；事件经 `launch:event` 推送（stdout/stderr/window-ready/exit） |
+| `java:scan` / `java:resolve` | Java 环境检测（JAVA_HOME/PATH/常见目录）/ 路径校验 |
 | `mods:search` / `mods:install` | Mod 操作 |
-| `instance:create` / `instance:list` / `instance:delete` | 实例操作 |
+| `instance:create` / `instance:list` / `instance:delete` / `instance:install` / `instance:import` | 实例操作（启动统一走 `launch:launch`） |
 | `background:set-image` / `background:set-color` / `background:reset` | 背景操作 |
 | `task:progress` / `task:completed` | 任务进度 |
-| `system:info` | 系统信息 |
+| `system:info` / `system:open-path` | 系统信息 / 打开路径 |
 | `window:minimize` / `window:maximize` / `window:close` | 窗口控制 |
 | `window:openSplash` / `window:closeSplash` | Splash 管理 |
-| `dialog:openFile` | 文件选择器 |
+| `dialog:openFile` / `dialog:openFolder` | 文件/文件夹选择器 |
+
+### 游戏启动链路（配置驱动）
+
+```
+launchStore.launch(instanceName, gamePath)
+  → launchGame({instanceName, gamePath, profile, server?})   # src/api/launch.ts
+  → ipc launch:launch                                        # electron/handlers/launch.ts
+      → getConfig()               # 主进程内存权威配置
+      → getInstanceInfo()         # 实例 runtime / path / 健康检查
+      → resolveJavaPath()         # config.javaPath → 系统扫描 → PATH
+      → buildLaunchOptions()      # electron/core/launch-options.ts（配置→LaunchOption 映射）
+      → @xmcl/core launch() + createMinecraftProcessWatcher
+      → 事件 launch:event（stdout/stderr/window-ready/exit）+ playtime 累计
+      → window-ready 时按 advanced.afterLaunch 处理启动器窗口（close/minimize/keep）
+```
+
+**配置 → 启动参数映射**（`buildLaunchOptions`）：
+
+| 配置字段 | 映射 |
+|---|---|
+| `java.memMode=auto` | 实例 minMemory/maxMemory（未设则 1024/4096） |
+| `java.memMode=custom` | `min=min(2,memGB)G`，`max=memGB G` |
+| `java.gc=zgc/g1` | `-XX:+UseZGC` / `-XX:+UseG1GC` |
+| `java.jvmArgs` | 引号感知 `parseArgs` 并入 `extraJVMArgs` |
+| `advanced.gameArgs` | `parseArgs` 并入 `extraMCArgs` |
+| `advanced.winMode` | `resolution`（fullscreen / custom 宽高） |
+| `advanced.preLaunchCmd` | `prependCommand`（Windows 批处理需 `cmd /c` 前缀） |
+| `advanced.debugMode` | `-Dkoring.debugMode=true` + 日志流 |
+| profile / server | `gameProfile`+`accessToken` / `server` |
 
 ---
 
 ## Zustand Stores
 
-### configStore (统一配置中心)
+### configStore (主进程权威模型的渲染端镜像)
 
-所有用户设置的单一数据源。读写通过 IPC 与 `Koring.yml` 同步。
+配置的渲染端镜像。所有 setter 只向主进程提交 `{section, patch}`（`config:update`），不直接写盘；主进程合并后广播 `config:changed`，`applyChanged` 以广播为准覆盖本地。
 
 ```ts
-config: AppConfig       // 完整配置
+config: AppConfig       // 完整配置（镜像）
 loaded: boolean         // 是否已加载
 
-init()                  // 从主进程加载配置
-setTheme(patch)         // 部分更新 + debounce 300ms 写回
+init()                  // 兜底：从主进程加载配置（config:get）
+applyPreloaded()        // 启动预载（config:preload）
+applyChanged()          // 主进程广播覆盖（config:changed）
+setTheme(patch)         // 乐观更新本地 + submit("theme", patch)
 setA11y(patch)
 setBackground(patch)
 setGame(patch)
@@ -329,6 +408,8 @@ setJava(patch)
 setAdvanced(patch)
 setDownload(patch)
 setNetwork(patch)
+setInstances(list)      // 数组整体替换
+setOobe(value)
 ```
 
 ### themeStore (委托 configStore)
@@ -432,3 +513,52 @@ z-200 StartupPopup        启动弹窗 (环境变量控制)
 - AbortController 取消机制
 - localStorage 持久化历史 (max 50)
 - 任务类型: `install` / `download` / `update` / `launch` / `auth` / `sync` / `custom`
+
+### 设置原语与控件规范（HeroUI 3）
+
+所有设置子页面共用 `src/components/setting/` 原语，**一套样式组合**：
+
+| 原语 | 说明 |
+|---|---|
+| `SettingSurface` | 卡片唯一原语（HeroUI Surface + 磨砂 blur + rounded-xl + 统一边框/背景） |
+| `SettingCard` | 设置卡片（= SettingSurface + px-5 py-4） |
+| `SettingRow` | 设置行（label/desc 用 HeroUI Typography + 右侧控件） |
+| `SectionTitle` / `PageHeader` | HeroUI Typography.Heading / Paragraph |
+| `SettingBadge` | 统一徽章：neutral / primary / success / warning / info / error / violet |
+| `SettingListItem` | 列表项行（版本行/扫描行，支持 selected 高亮） |
+| `SettingSelect` / `SettingNumberField` / `SettingSwitch` / `SettingRadioGroup` / `SettingTextArea` / `SettingFilePicker` | HeroUI 控件封装 |
+| `fieldCls` | 输入框统一样式类（见下方注意） |
+
+**HeroUI 3 控件要点（易踩坑）**：
+
+1. **事件用 `onChange` 而非 `onValueChange`**——HeroUI 3 基于 react-aria，`onValueChange` 不存在且静默失效（全项目已统一修复）。
+2. **Radio 必须显式渲染圆点**：`<Radio.Control><Radio.Indicator /></Radio.Control>`，否则无选中指示器。
+3. **field 默认无边框**：HeroUI 默认主题 `--field-border-width: 0px`，Input/TextArea/NumberField/Radio 需叠加 `fieldCls`（或等价边框类）保证视觉完整；Select.Trigger 已内置边框类。
+4. **Select 单选**：`selectedKey` + `onSelectionChange`（回调可能是 `Key | null` 或 `Set<Key>`，控件内已做兼容）。
+5. **NumberField**：Group 内需显式渲染 Increment/Decrement 按钮。
+
+### 游戏目录版本识别（设置页 → 导入）
+
+- 扫描任意目录（主目录 / 已添加目录）→ `instance:scan-dir` → `scanGameDirectories`（读 `versions/` 子目录，检测 JSON/JAR 健康度与 Forge/Fabric/Quilt/OptiFine 加载器）。
+- **导入源 = 当前扫描目录**：`handleImport`/`handleImportAll` 传 `scanTarget` 作为 `sourceGamePath`，实例仍创建在主库 `gameDir/instances/`。
+- **主目录变更自动重扫**（`useEffect([gameDir])`），旧结果先清空。
+- **批量导入幂等**：先取 `listInstances` 名集合，已存在实例跳过并计入「跳过」。
+- **相对 gameDir 归一化**：`electron/core/paths.ts` 的 `resolveGamePath` 在 IPC 边界（instance/launch/task）统一应用，相对路径按 exe 目录（打包）/ 项目根（开发）解析，与 `.minecraft` 创建位置一致。
+
+### 设置子页面状态（参考 PCL2 组织）
+
+| 分组 | 页面 | 状态 | 对接 |
+|---|---|---|---|
+| 通用 | 主页 / Koring 账户 / 关于 / 版权 | 保留 | — |
+| 游戏 | 游戏账户&档案 | 实装 | `auth:offline-login`（离线账号）；微软按钮占位 |
+| 游戏 | Java虚拟机与内存 | 实装 | `java:scan` / `java:resolve` / `java.*` |
+| 游戏 | 游戏目录 | 实装 | `instance:scan-dir` / `instance:import`（sourceGamePath） |
+| 游戏 | 高级设置 | 实装 | `advanced.*`（含快速进入服务器 `advanced.server`） |
+| 个性化 | 主题与背景 | 实装 | `theme.*` / `background.*` |
+| 个性化 | 主界面 | 实装 | `ui.showInstanceTitle` / `ui.showTaskButton`（应用到 InstanceTitle / WindowControls） |
+| 个性化 | 语言 | 实装 | `app.language`（保存 + `<html lang>`；语言包开发中） |
+| 个性化 | 辅助功能 | 实装 | `a11y.*` |
+| 网络 | 下载 | 实装 | `download.*` |
+| 网络 | 安全识别服务 | 实装 | `network.securityId` |
+| 网络 | 以太联机 / 陶瓦联机 | 占位 | 无后端接口 |
+| 其他 | 服务与反馈 / 赞助我们 / 开发者选项 | 保留 | — |

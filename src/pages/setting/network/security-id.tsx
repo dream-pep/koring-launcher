@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useConfigStore } from "@/stores/configStore";
 import { Switch, Input } from "@heroui/react";
 import { ShieldCheck } from "lucide-react";
-import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
+import { SettingCard, SettingRow, PageHeader, SectionTitle, fieldCls } from "@/components/setting";
 
 export function SecurityIdSetting() {
   const enabled = useConfigStore((s) => s.config.network.securityId.enabled);
@@ -30,7 +30,7 @@ export function SecurityIdSetting() {
                 label="启用第三方认证"
                 desc="使用自定义认证服务器替代 Microsoft 认证（适用于离线服务器）"
               >
-                <Switch isSelected={enabled} onValueChange={handleToggle}>
+                <Switch isSelected={enabled} onChange={handleToggle}>
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>
@@ -50,6 +50,7 @@ export function SecurityIdSetting() {
                       onChange={handleUrlChange}
                       placeholder="https://auth.example.com"
                       fullWidth
+                      className={fieldCls}
                     />
                   </div>
                 </div>

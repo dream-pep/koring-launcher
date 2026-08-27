@@ -13,6 +13,9 @@ dist-ssr
 dist-electron
 *.local
 
+# pnpm 11 project-local store
+.pnpm-store/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

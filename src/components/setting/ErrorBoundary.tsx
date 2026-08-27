@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
           <Button
             size="sm"
-            variant="flat"
+            variant="outline"
             onPress={() => this.setState({ hasError: false, errorMsg: "" })}
           >
             重试

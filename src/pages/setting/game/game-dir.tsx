@@ -8,30 +8,30 @@
 // 未经允许的情况下删除此版权头可能会受到民事指控
 // 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button, Skeleton } from "@heroui/react";
 import { RefreshCw, FolderOpen, Trash2, Search, Plus, CircleCheck, CircleAlert, Home, Check, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfigStore } from "@/stores/configStore";
 import { useInstanceStore } from "@/stores/instanceStore";
-import { scanGameDir, selectFolder, importExistingInstance, type ScannedVersion } from "@/api/instance";
-import { SettingCard, PageHeader, SectionTitle } from "@/components/setting";
+import { listInstances, scanGameDir, selectFolder, importExistingInstance, type ScannedVersion } from "@/api/instance";
+import { SettingCard, SettingBadge, SettingListItem, PageHeader, SectionTitle, type SettingBadgeVariant } from "@/components/setting";
 
-// 版本类型标签样式
-const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
-  release: { label: "正式版", cls: "bg-green-500/10 text-green-600 dark:text-green-400" },
-  snapshot: { label: "预览版", cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-  "old_alpha": { label: "Alpha", cls: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
-  "old_beta": { label: "Beta", cls: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" },
-  unknown: { label: "未知", cls: "bg-foreground/[0.06] dark:bg-white/[0.06] text-muted-foreground" },
+// 版本类型标签（统一徽章变体）
+const TYPE_BADGE: Record<string, { label: string; variant: SettingBadgeVariant }> = {
+  release: { label: "正式版", variant: "success" },
+  snapshot: { label: "预览版", variant: "warning" },
+  old_alpha: { label: "Alpha", variant: "violet" },
+  old_beta: { label: "Beta", variant: "info" },
+  unknown: { label: "未知", variant: "neutral" },
 };
 
-// 加载器标签样式
-const LOADER_BADGE: Record<string, { label: string; cls: string }> = {
-  forge: { label: "Forge", cls: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
-  fabric: { label: "Fabric", cls: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
-  quilt: { label: "Quilt", cls: "bg-pink-500/10 text-pink-600 dark:text-pink-400" },
-  optifine: { label: "OptiFine", cls: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
+// 加载器标签（统一徽章变体）
+const LOADER_BADGE: Record<string, { label: string; variant: SettingBadgeVariant }> = {
+  forge: { label: "Forge", variant: "warning" },
+  fabric: { label: "Fabric", variant: "info" },
+  quilt: { label: "Quilt", variant: "violet" },
+  optifine: { label: "OptiFine", variant: "violet" },
 };
 
 function getBadge(type: string) {
@@ -46,10 +46,10 @@ function formatTime(iso?: string): string {
 
 function FileStatus({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] ${ok ? "text-green-600 dark:text-green-400" : "text-red-500/70"}`}>
+    <SettingBadge variant={ok ? "success" : "error"}>
       {ok ? <CircleCheck className="w-3 h-3" /> : <CircleAlert className="w-3 h-3" />}
       {label}
-    </span>
+    </SettingBadge>
   );
 }
 
@@ -90,21 +90,27 @@ export function GameDirSetting() {
   // 组件挂载时自动扫描主目录
   useEffect(() => {
     handleScan(gameDir);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 主目录变化时自动扫描
+  // 主目录变化时自动重扫新目录（跳过首次挂载）
+  const firstRunRef = useRef(true);
   useEffect(() => {
-    if (scanTarget && scanTarget !== gameDir) {
-      // 目录已变化但还没扫描过新目录
+    if (firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
     }
-  }, [gameDir]);
+    handleScan(gameDir);
+  }, [gameDir, handleScan]);
 
-  // 导入单个版本
+  // 导入单个版本（来源 = 当前扫描目录，实例建在主库）
   const handleImport = async (versionId: string) => {
+    const source = scanTarget || gameDir;
     setImporting(versionId);
     try {
       await importExistingInstance(versionId, gameDir, versionId, {
-        description: `Imported from ${gameDir}`,
+        description: `Imported from ${source}`,
+        sourceGamePath: source,
       });
       await fetchInstances(gameDir);
       toast.success(`已导入版本 ${versionId}`);
@@ -114,7 +120,7 @@ export function GameDirSetting() {
     setImporting(null);
   };
 
-  // 批量导入所有健康版本
+  // 批量导入所有健康版本（幂等：已存在实例跳过）
   const handleImportAll = async () => {
     if (!scanResults || scanResults.length === 0) return;
     const healthy = scanResults.filter((v) => v.healthy);
@@ -122,13 +128,26 @@ export function GameDirSetting() {
       toast.info("没有可导入的健康版本");
       return;
     }
+    const source = scanTarget || gameDir;
     setImportingBatch(true);
     let success = 0;
     let failed = 0;
+    let skipped = 0;
+    // 已有实例名集合，避免重复导入全部失败
+    let existing = new Set<string>();
+    try {
+      const list = await listInstances(gameDir);
+      existing = new Set(list.map((i) => i.name));
+    } catch {}
     for (const v of healthy) {
+      if (existing.has(v.id)) {
+        skipped++;
+        continue;
+      }
       try {
         await importExistingInstance(v.id, gameDir, v.id, {
-          description: `Imported from ${gameDir}`,
+          description: `Imported from ${source}`,
+          sourceGamePath: source,
         });
         success++;
       } catch {
@@ -137,10 +156,15 @@ export function GameDirSetting() {
     }
     await fetchInstances(gameDir);
     setImportingBatch(false);
-    if (failed === 0) {
+    const parts = [`成功 ${success}`];
+    if (skipped > 0) parts.push(`跳过 ${skipped}`);
+    if (failed > 0) parts.push(`失败 ${failed}`);
+    if (failed === 0 && skipped === 0) {
       toast.success(`成功导入 ${success} 个版本`);
+    } else if (failed === 0) {
+      toast.success(`导入完成：${parts.join('，')}`);
     } else {
-      toast.warning(`导入完成：${success} 成功，${failed} 失败`);
+      toast.warning(`导入完成：${parts.join('，')}`);
     }
   };
 
@@ -261,29 +285,24 @@ export function GameDirSetting() {
                         const badge = getBadge(v.type);
                         const isImporting = importing === v.id;
                         return (
-                          <div
-                            key={v.id}
-                            className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-foreground/[0.03] dark:bg-white/[0.03] border border-border/20 dark:border-white/[0.04]"
-                          >
+                          <SettingListItem key={v.id}>
                             {/* 版本图标 */}
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${badge.cls}`}>
-                              <Home className="w-3.5 h-3.5" />
+                            <div className="w-7 h-7 rounded-lg bg-foreground/[0.05] dark:bg-white/[0.05] flex items-center justify-center shrink-0">
+                              <Home className="w-3.5 h-3.5 text-muted-foreground/70" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="text-[13px] font-mono font-semibold text-foreground">{v.id}</p>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${badge.cls}`}>
-                                  {badge.label}
-                                </span>
+                                <SettingBadge variant={badge.variant}>{badge.label}</SettingBadge>
                                 {/* 加载器标签 */}
-                                {v.loaders.map((loader) => (
-                                  <span
-                                    key={loader}
-                                    className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${LOADER_BADGE[loader]?.cls ?? ""}`}
-                                  >
-                                    {LOADER_BADGE[loader]?.label ?? loader}
-                                  </span>
-                                ))}
+                                {v.loaders.map((loader) => {
+                                  const lb = LOADER_BADGE[loader];
+                                  return lb ? (
+                                    <SettingBadge key={loader} variant={lb.variant}>
+                                      {lb.label}
+                                    </SettingBadge>
+                                  ) : null;
+                                })}
                                 <span className="text-[11px] text-muted-foreground/60">{formatTime(v.releaseTime)}</span>
                               </div>
                               <div className="flex items-center gap-3 mt-1">
@@ -311,7 +330,7 @@ export function GameDirSetting() {
                               )}
                               导入
                             </Button>
-                          </div>
+                          </SettingListItem>
                         );
                       })}
                     </div>
@@ -390,10 +409,9 @@ export function GameDirSetting() {
                         {scanResults.map((v) => {
                           const badge = getBadge(v.type);
                           return (
-                            <span key={v.id} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-foreground/[0.04] dark:bg-white/[0.04]">
-                              <span className={`w-1.5 h-1.5 rounded-full ${badge.cls.replace(/\/\d+/, "").replace(/\s.*/, "")}`} />
+                            <SettingBadge key={v.id} variant={badge.variant}>
                               {v.id}
-                            </span>
+                            </SettingBadge>
                           );
                         })}
                       </div>

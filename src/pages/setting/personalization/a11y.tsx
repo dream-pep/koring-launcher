@@ -15,7 +15,7 @@ export function A11ySetting() {
           <div className="space-y-3">
             <SettingCard>
               <SettingRow label="减少动画" desc="关闭页面切换动画和背景动效">
-                <Switch isSelected={reduceMotion} onValueChange={setReduceMotion}>
+                <Switch isSelected={reduceMotion} onChange={setReduceMotion}>
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>
@@ -25,7 +25,7 @@ export function A11ySetting() {
 
             <SettingCard>
               <SettingRow label="减少透明度" desc="将磨砂玻璃效果替换为纯色背景，提升可读性">
-                <Switch isSelected={reduceTransparency} onValueChange={setReduceTransparency}>
+                <Switch isSelected={reduceTransparency} onChange={setReduceTransparency}>
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>
@@ -35,7 +35,7 @@ export function A11ySetting() {
 
             <SettingCard>
               <SettingRow label="高对比度" desc="增强文字与背景的对比度，改善可读性">
-                <Switch isSelected={highContrast} onValueChange={setHighContrast}>
+                <Switch isSelected={highContrast} onChange={setHighContrast}>
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>

@@ -70,16 +70,31 @@ function App() {
     // Listen for preloaded config from main process
     const unsub = window.electronAPI?.onConfigPreload((data) => {
       const { config, isFirstLaunch } = data;
-      useConfigStore.getState().applyPreloaded(config as AppConfig, isFirstLaunch);
+      const cfg = config as AppConfig;
+      useConfigStore.getState().applyPreloaded(cfg, isFirstLaunch);
+      // 语言偏好 → <html lang>
+      document.documentElement.lang = (cfg as AppConfig).app?.language ?? "zh-CN";
       syncThemeFromConfig();
       syncA11yFromConfig();
       syncBackgroundFromConfig();
       useAuthStore.getState().initFromRegistry();
       useKoringAuthStore.getState().initFromDisk();
       // Navigate to OOBE on first launch or if oobe not completed
-      if (isFirstLaunch || config.oobe) {
+      if (isFirstLaunch || cfg.oobe) {
         useRouteStore.getState().navigate("oobe");
       }
+    });
+
+    return () => { unsub?.(); };
+  }, []);
+
+  // 主进程权威配置广播 → 覆盖本地镜像并同步派生 store
+  useEffect(() => {
+    const unsub = window.electronAPI?.onConfigChanged((config) => {
+      useConfigStore.getState().applyChanged(config as AppConfig);
+      syncThemeFromConfig();
+      syncA11yFromConfig();
+      syncBackgroundFromConfig();
     });
 
     return () => { unsub?.(); };

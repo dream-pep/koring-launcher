@@ -3,6 +3,10 @@ productName: Koring Launcher
 directories:
   output: dist-electron
   buildResources: build
+publish:
+  provider: github
+  owner: dream-pep
+  repo: koring-launcher
 compression: maximum
 asar: true
 files:
@@ -13,6 +17,9 @@ win:
   icon: build/icon.ico
   artifactName: "koring-launcher-${version}-setup.${ext}"
   requestedExecutionLevel: asInvoker
+  # SignPath 远程签名：scripts/signpath-sign.js
+  # 无 SIGNPATH_API_TOKEN 时自动跳过（本地构建不受影响）
+  sign: scripts/signpath-sign.js
 mac:
   target: dmg
   icon: build/icon.png

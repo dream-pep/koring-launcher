@@ -58,6 +58,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('config:preload', handler);
   },
 
+  // Config changed broadcast (authoritative full config from main process)
+  onConfigChanged: (callback: (config: unknown) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, config: unknown) => callback(config);
+    ipcRenderer.on('config:changed', handler);
+    return () => ipcRenderer.removeListener('config:changed', handler);
+  },
+
   // Background image — pick file, copy to userData, return base64 data URL
   pickBackgroundImage: async (): Promise<string | null> => {
     const result = await ipcRenderer.invoke('dialog:openFile', {

@@ -2,6 +2,8 @@ import electron from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { writeCrashLog, readCrashLog, clearCrashLog, type CrashEntry } from '../core/crash-logger';
+import { configPath } from '../config';
+import { authPath } from '../auth';
 
 const { app, ipcMain, BrowserWindow } = electron;
 
@@ -151,20 +153,16 @@ export function registerCrashHandlers() {
 
   // Factory reset
   ipcMain.handle('crash:factoryReset', () => {
-    const dataPath = app.isPackaged
-      ? path.dirname(app.getPath('exe'))
-      : path.join(__dirname, '../..');
-
-    // Delete config
+    // Delete config（userData / 项目根目录，与 configPath 一致）
     try {
-      const configPath = path.join(dataPath, 'Koring.yml');
-      if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+      const config = configPath();
+      if (fs.existsSync(config)) fs.unlinkSync(config);
     } catch {}
 
-    // Delete auth
+    // Delete auth（userData / 项目根目录，与 authPath 一致）
     try {
-      const authPath = path.join(dataPath, 'koring-auth.json');
-      if (fs.existsSync(authPath)) fs.unlinkSync(authPath);
+      const auth = authPath();
+      if (fs.existsSync(auth)) fs.unlinkSync(auth);
     } catch {}
 
     // Delete background cache in userData

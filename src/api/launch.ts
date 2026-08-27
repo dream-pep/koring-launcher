@@ -1,17 +1,25 @@
 import { ipcInvoke, onIpcEvent } from './ipc';
 
-export interface LaunchOptions {
-  gamePath: string;
-  javaPath: string;
-  version: string;
+/** 启动所需的账户档案（来自 authStore） */
+export interface LaunchProfile {
   username: string;
   uuid: string;
   accessToken?: string;
-  memory?: { min?: string; max?: string };
-  jvmArgs?: string[];
-  gameArgs?: string[];
-  server?: { ip: string; port?: number };
-  detached?: boolean;
+}
+
+/** 快速联机目标服务器 */
+export interface LaunchServer {
+  ip: string;
+  port?: number;
+}
+
+/** 统一启动接口契约：指定实例 + 游戏根目录 + 账户档案（可选快速联机） */
+export interface LaunchGamePayload {
+  instanceName: string;
+  /** 实例父目录（游戏根目录） */
+  gamePath: string;
+  profile: LaunchProfile;
+  server?: LaunchServer;
 }
 
 export interface LaunchResult {
@@ -21,8 +29,12 @@ export interface LaunchResult {
   requestId: string;
 }
 
-export async function launchGame(options: LaunchOptions): Promise<LaunchResult> {
-  return ipcInvoke<LaunchResult>('launch:launch', options);
+/**
+ * 启动游戏。主进程会读取权威配置（Koring.yml 内存缓存）自动应用
+ * Java 路径 / 内存 / GC / JVM 参数 / 游戏参数 / 窗口模式 / 启动前命令等设置。
+ */
+export async function launchGame(payload: LaunchGamePayload): Promise<LaunchResult> {
+  return ipcInvoke<LaunchResult>('launch:launch', payload);
 }
 
 export async function diagnoseVersion(
@@ -32,6 +44,7 @@ export async function diagnoseVersion(
   return ipcInvoke('launch:diagnose', { gamePath, version });
 }
 
+/** 订阅某个启动请求的游戏事件流（stdout / stderr / window-ready / exit） */
 export function onGameEvent(
   requestId: string,
   callback: (event: { event: string; [key: string]: unknown }) => void

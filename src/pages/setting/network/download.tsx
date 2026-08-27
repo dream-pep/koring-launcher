@@ -1,6 +1,6 @@
 import { useConfigStore } from "@/stores/configStore";
 import { Slider, RadioGroup, Radio, Input } from "@heroui/react";
-import { SettingCard, PageHeader, SectionTitle } from "@/components/setting";
+import { SettingCard, PageHeader, SectionTitle, fieldCls } from "@/components/setting";
 
 const downloadSources = [
   { value: "mirror", label: "尽量使用镜像源（推荐国内用户）" },
@@ -26,7 +26,7 @@ export function DownloadSetting() {
                 <p className="text-[13px] text-muted-foreground">游戏文件（jar、lib）的下载来源</p>
                 <RadioGroup
                   value={dl.fileSource}
-                  onValueChange={(v) => setDownload({ fileSource: v })}
+                  onChange={(v) => setDownload({ fileSource: String(v) })}
                   className="mt-2 space-y-2"
                 >
                   {downloadSources.map((opt) => (
@@ -44,7 +44,7 @@ export function DownloadSetting() {
                 <p className="text-[13px] text-muted-foreground">获取可用游戏版本列表的来源</p>
                 <RadioGroup
                   value={dl.versionSource}
-                  onValueChange={(v) => setDownload({ versionSource: v })}
+                  onChange={(v) => setDownload({ versionSource: String(v) })}
                   className="mt-2 space-y-2"
                 >
                   {downloadSources.map((opt) => (
@@ -103,7 +103,7 @@ export function DownloadSetting() {
                     type="number"
                     value={String(dl.speedLimit)}
                     onChange={(e) => setDownload({ speedLimit: Number(e.target.value) })}
-                    className="w-28"
+                    className={`w-28 ${fieldCls}`}
                   />
                   <span className="text-[13px] text-muted-foreground">KB/s</span>
                 </div>

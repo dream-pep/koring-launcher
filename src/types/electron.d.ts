@@ -13,6 +13,8 @@ interface ElectronAPI {
 
   onConfigPreload: (callback: (data: { config: unknown; isFirstLaunch: boolean }) => void) => () => void;
 
+  onConfigChanged: (callback: (config: unknown) => void) => () => void;
+
   openExternal: (url: string) => Promise<void>;
 
   // Crash monitoring

@@ -30,6 +30,7 @@ import {
   mirrorFetch,
   type InstanceRuntime,
 } from './instance';
+import { resolveGamePath } from './paths';
 
 // 任务执行钩子：主进程用它向渲染进程广播日志
 export interface TaskHooks {
@@ -204,7 +205,9 @@ executorRegistry.set('install-sim', (raw, hooks) => {
 // 任务树：install.create → install.minecraft → (forge|neoforge|fabric|quilt) → install.dependencies
 executorRegistry.set('install', (rawParams, hooks) => {
   const p = rawParams as unknown as InstallTaskParams;
-  const { name, gamePath, runtime } = p;
+  const { name, runtime } = p;
+  // 相对 gameDir 归一化（与 runStartupChecks 基准一致）
+  const gamePath = resolveGamePath(p.gamePath);
   const instancePath = path.join(gamePath, 'instances', name);
 
   return task('install', async function () {

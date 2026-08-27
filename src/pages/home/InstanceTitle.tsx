@@ -1,10 +1,14 @@
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useRouteStore } from "@/stores/routeStore";
+import { useConfigStore } from "@/stores/configStore";
 import clsx from "clsx";
 
 export function InstanceTitle() {
   const currentInstance = useInstanceStore((s) => s.currentInstance);
   const navigate = useRouteStore((s) => s.navigate);
+  const showTitle = useConfigStore((s) => s.config.ui?.showInstanceTitle ?? true);
+
+  if (!showTitle) return null;
 
   return (
     <div

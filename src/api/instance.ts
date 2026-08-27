@@ -97,20 +97,6 @@ export async function installInstance(
   return ipcInvoke<{ requestId: string }>('instance:install', { name, gamePath });
 }
 
-export async function launchInstance(
-  name: string,
-  gamePath: string,
-  options: {
-    username: string;
-    uuid: string;
-    accessToken?: string;
-    javaPath?: string;
-    server?: { host: string; port?: number };
-  }
-): Promise<{ requestId: string }> {
-  return ipcInvoke<{ requestId: string }>('instance:launch', { name, gamePath, ...options });
-}
-
 export async function diagnoseInstance(
   name: string,
   gamePath: string
@@ -162,6 +148,8 @@ export async function importExistingInstance(
     java?: string;
     minMemory?: number;
     maxMemory?: number;
+    /** 版本文件来源目录（默认 = gamePath） */
+    sourceGamePath?: string;
   }
 ): Promise<InstanceInfo> {
   return ipcInvoke<InstanceInfo>('instance:import', {
@@ -200,16 +188,4 @@ export function onInstallComplete(callback: (data: { requestId: string; data: In
 
 export function onInstallError(callback: (data: { requestId: string; error: string }) => void) {
   return onIpcEvent('instance:install-error', callback);
-}
-
-export function onLaunchEvent(callback: (data: { requestId: string; event: string; [key: string]: unknown }) => void) {
-  return onIpcEvent('instance:launch-event', callback);
-}
-
-export function onLaunchComplete(callback: (data: { requestId: string; data: { pid: number; version: string; username: string } }) => void) {
-  return onIpcEvent('instance:launch-complete', callback);
-}
-
-export function onLaunchError(callback: (data: { requestId: string; error: string }) => void) {
-  return onIpcEvent('instance:launch-error', callback);
 }

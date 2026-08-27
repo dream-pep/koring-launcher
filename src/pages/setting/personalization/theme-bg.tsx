@@ -12,14 +12,15 @@ function ThemePreviewCard({ mode, selected, onClick }: { mode: DarkMode; selecte
   const label = isAuto ? "跟随系统" : isDark ? "深色模式" : "浅色模式";
 
   return (
-    <button
-      onClick={onClick}
+    <Button
+      variant="ghost"
+      onPress={onClick}
       className={clsx(
-        "relative rounded-md p-1 transition-all duration-200",
+        "relative rounded-md p-1 transition-all duration-200 h-auto min-w-0",
         "border-2",
         selected
-          ? "border-primary ring-2 ring-primary/20"
-          : "border-transparent hover:border-muted-foreground/20",
+          ? "!border-primary ring-2 ring-primary/20"
+          : "!border-transparent hover:!border-muted-foreground/20",
       )}
     >
       <div className="relative w-[140px] h-[96px] rounded overflow-hidden">
@@ -77,7 +78,7 @@ function ThemePreviewCard({ mode, selected, onClick }: { mode: DarkMode; selecte
         )}
       </div>
       <p className="text-[11px] text-center mt-1.5 text-muted-foreground">{label}</p>
-    </button>
+    </Button>
   );
 }
 
@@ -170,7 +171,7 @@ export function ThemeBgSetting() {
 
             <SettingCard>
               <SettingRow label="背景图片视差" desc="背景图片随窗口滚动产生视差位移">
-                <Switch isSelected={parallax} onValueChange={setParallax}>
+                <Switch isSelected={parallax} onChange={setParallax}>
                   <Switch.Control>
                     <Switch.Thumb />
                   </Switch.Control>

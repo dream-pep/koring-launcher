@@ -8,7 +8,7 @@ const MAX_LINES = 1000;
 
 function logPath(): string {
   if (app.isPackaged) {
-    return path.join(path.dirname(app.getPath('exe')), LOG_FILE);
+    return path.join(app.getPath('userData'), LOG_FILE);
   }
   return path.join(__dirname, '..', LOG_FILE);
 }

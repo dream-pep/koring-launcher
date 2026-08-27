@@ -1,0 +1,85 @@
+# Koring Launcher Windows 发布流水线：构建 → SignPath 签名 → 发布 GitHub Releases
+#
+# 触发方式：
+#  1) 推送 tag v*（推荐）：先本地升版（node scripts/version.js 1.2.1）并打 tag v1.2.1，
+#     推送后本流水线构建、签名并把产物发布到该 tag 对应的 GitHub Release。
+#  2) 手动触发 workflow_dispatch：填版本号，构建产物发布到 v<版本号> Release。
+#
+# 需要的仓库 Secrets（Settings -> Secrets and variables -> Actions）：
+#  SIGNPATH_API_TOKEN              SignPath API Token（必填；放在 Environment "BUILDER" 的环境 Secrets 中，
+#                                  本 job 声明 environment: BUILDER 后才能读取）
+#  SIGNPATH_ARTIFACT_CONFIG_SLUG   产物配置 slug（项目只有一个配置时可留空；仓库级 Secret）
+#
+# 组织 ID / slug 非密钥，直接写在下方 env（SignPath 后台确认值）：
+#   OrganizationId           31ecd033-d59e-492b-a70b-b00a54bbc7c2
+#   ProjectSlug              Koring_Launcher
+#   SigningPolicySlug        Koring_Launcher_Dev_builder
+#
+# ⚠️ 签名策略说明：
+#  - 审批流程：SignPath 后台已关闭人工审批（自动批准），CI 可全自动。
+#  - 证书：当前策略 Purpose 为 Release signing（测试证书），用户机器默认不信任
+#    （SmartScreen / 杀软警告），正式对外发布需生产证书（OV/EV）+ 对应生产签名策略，
+#    届时只需更换下方 SIGNPATH_SIGNING_POLICY_SLUG。
+#
+# 说明：
+#  - electron-builder 的 win.sign 会调用 scripts/signpath-sign.js 逐个文件远程签名，
+#    签名后自动生成的 latest.yml / blockmap 哈希即对应签名后的安装包。
+#  - 发布使用 GITHUB_TOKEN（自动注入，需 contents: write 权限创建/更新 Release）。
+
+name: Release Windows (SignPath)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and publish (e.g. 1.2.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-sign-publish:
+    runs-on: windows-latest
+    # 声明使用 Environment "BUILDER"，才能读取其中的环境 Secret SIGNPATH_API_TOKEN
+    environment: BUILDER
+    env:
+      SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+      SIGNPATH_ORG_ID: 31ecd033-d59e-492b-a70b-b00a54bbc7c2
+      SIGNPATH_PROJECT_SLUG: Koring_Launcher
+      SIGNPATH_SIGNING_POLICY_SLUG: Koring_Launcher_Dev_builder
+      SIGNPATH_ARTIFACT_CONFIG_SLUG: ${{ secrets.SIGNPATH_ARTIFACT_CONFIG_SLUG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 手动触发时按输入升版（tag 触发时版本已在 package.json）
+      - name: Set version (manual runs only)
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        run: node scripts/version.js ${{ inputs.version }}
+
+      - name: Build renderer + main (production)
+        run: pnpm build:run
+
+      - name: Switch production icons
+        run: pnpm icon:run
+
+      # 关键步骤：win.sign 自定义签名（SignPath）在打包过程中逐个签名内部 exe 与 setup.exe
+      - name: Package, sign and publish to GitHub Releases
+        run: pnpm exec electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { BUILD_MODE } from "@/lib/mode";
 import { TaskButton } from "@/components/task/TaskButton";
 import { useRouteStore } from "@/stores/routeStore";
+import { useConfigStore } from "@/stores/configStore";
 import { Info } from "lucide-react";
 import clsx from "clsx";
 
@@ -22,6 +23,7 @@ export function WindowControls({
 }: WindowControlsProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const navigate = useRouteStore((s) => s.navigate);
+  const showTaskButton = useConfigStore((s) => s.config.ui?.showTaskButton ?? true);
 
   useEffect(() => {
     window.electronAPI?.isMaximized().then(setIsMaximized);
@@ -42,7 +44,7 @@ export function WindowControls({
   const showBadge = BUILD_MODE !== "run";
   const badgeLabel = BUILD_MODE === "dev" ? "DEV" : "BETA";
 
-  const showTask = !isSub && !isOobe;
+  const showTask = !isSub && !isOobe && showTaskButton;
   const showInfo = isOobe;
 
   return (

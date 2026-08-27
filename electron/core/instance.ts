@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { MinecraftFolder, Version, launch, createMinecraftProcessWatcher, type ResolvedVersion } from '@xmcl/core';
+import { Version, type ResolvedVersion } from '@xmcl/core';
 import {
   install as xmclInstall,
   installForge,
@@ -308,74 +308,6 @@ export async function installInstanceGame(
   return getInstanceInfo(name, gamePath);
 }
 
-export async function launchInstance(
-  name: string,
-  gamePath: string,
-  options: {
-    username: string;
-    uuid: string;
-    accessToken?: string;
-    javaPath?: string;
-    server?: { host: string; port?: number };
-    onEvent?: (event: { event: string; [key: string]: unknown }) => void;
-  }
-): Promise<{ pid: number; version: string; username: string }> {
-  const instance = await getInstanceInfo(name, gamePath);
-  const { runtime } = instance.config;
-
-  const resolved: ResolvedVersion = await Version.parse(instance.path, runtime.minecraft);
-
-  const javaPath = options.javaPath || instance.config.java || 'java';
-
-  const mcProcess = await launch({
-    gameProfile: {
-      id: options.uuid,
-      name: options.username,
-    },
-    javaPath,
-    version: resolved,
-    gamePath: instance.path,
-    minMemory: instance.config.minMemory || 1024,
-    maxMemory: instance.config.maxMemory || 4096,
-    extraExecOption: { detached: true, stdio: 'ignore' },
-    server: options.server ? { ip: options.server.host, port: options.server.port } : undefined,
-  });
-
-  const watcher = createMinecraftProcessWatcher(mcProcess);
-
-  watcher.on('minecraft-window-ready', () => {
-    options.onEvent?.({ event: 'window-ready' });
-  });
-
-  watcher.on('minecraft-exit', ({ code }) => {
-    options.onEvent?.({ event: 'exit', code });
-  });
-
-  // Update playtime tracking
-  const startTime = Date.now();
-  mcProcess.on('exit', async () => {
-    const elapsed = Date.now() - startTime;
-    try {
-      const info = await getInstanceInfo(name, gamePath);
-      await updateInstance(name, gamePath, {
-        lastPlayedDate: Date.now(),
-        playtime: (info.config.playtime || 0) + elapsed,
-      });
-    } catch {
-      // Ignore errors during playtime update
-    }
-  });
-
-  // Update last access date
-  await updateInstance(name, gamePath, { lastAccessDate: Date.now() });
-
-  return {
-    pid: mcProcess.pid || 0,
-    version: runtime.minecraft,
-    username: options.username,
-  };
-}
-
 export async function diagnoseInstance(
   name: string,
   gamePath: string
@@ -503,6 +435,8 @@ export async function importExistingInstance(
     java?: string;
     minMemory?: number;
     maxMemory?: number;
+    /** 版本文件来源目录（默认 = gamePath）；扫描副目录导入时传 scanTarget */
+    sourceGamePath?: string;
   }
 ): Promise<InstanceInfo> {
   const instancePath = path.join(gamePath, 'instances', name);
@@ -510,10 +444,11 @@ export async function importExistingInstance(
     throw new Error(`Instance already exists: ${name}`);
   }
 
-  // 检查源版本目录是否存在
-  const srcVersionDir = path.join(gamePath, 'versions', versionId);
+  // 源版本目录：默认取 gamePath，扫描副目录时取 sourceGamePath
+  const srcGamePath = options?.sourceGamePath || gamePath;
+  const srcVersionDir = path.join(srcGamePath, 'versions', versionId);
   if (!fs.existsSync(srcVersionDir)) {
-    throw new Error(`Version directory not found: ${versionId}`);
+    throw new Error(`Version directory not found: ${versionId}（来源：${srcGamePath}）`);
   }
 
   // 读取源版本 JSON 获取类型信息

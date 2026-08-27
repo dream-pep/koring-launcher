@@ -6,7 +6,6 @@ import {
   deleteInstance,
   updateInstance,
   installInstanceGame,
-  launchInstance,
   diagnoseInstance,
   getMinecraftVersionList,
   getForgeVersionList,
@@ -17,6 +16,7 @@ import {
   type InstanceRuntime,
   type InstanceConfig,
 } from '../core/instance';
+import { resolveGamePath } from '../core/paths';
 
 const { ipcMain } = electron;
 
@@ -38,9 +38,10 @@ export function registerInstanceHandlers(win: WinRef) {
     mcOptions?: string[];
   }) => {
     try {
+      const gamePath = resolveGamePath(payload.gamePath);
       const data = await createInstance(
         payload.name,
-        payload.gamePath,
+        gamePath,
         payload.runtime,
         {
           author: payload.author,
@@ -60,7 +61,7 @@ export function registerInstanceHandlers(win: WinRef) {
 
   ipcMain.handle('instance:list', async (_event, payload: { gamePath: string }) => {
     try {
-      const data = await listInstances(payload.gamePath);
+      const data = await listInstances(resolveGamePath(payload.gamePath));
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
@@ -69,7 +70,7 @@ export function registerInstanceHandlers(win: WinRef) {
 
   ipcMain.handle('instance:info', async (_event, payload: { name: string; gamePath: string }) => {
     try {
-      const data = await getInstanceInfo(payload.name, payload.gamePath);
+      const data = await getInstanceInfo(payload.name, resolveGamePath(payload.gamePath));
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
@@ -78,7 +79,7 @@ export function registerInstanceHandlers(win: WinRef) {
 
   ipcMain.handle('instance:delete', async (_event, payload: { name: string; gamePath: string }) => {
     try {
-      const data = await deleteInstance(payload.name, payload.gamePath);
+      const data = await deleteInstance(payload.name, resolveGamePath(payload.gamePath));
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
@@ -91,7 +92,7 @@ export function registerInstanceHandlers(win: WinRef) {
     patch: Partial<Omit<InstanceConfig, 'name' | 'creationDate'>>;
   }) => {
     try {
-      const data = await updateInstance(payload.name, payload.gamePath, payload.patch);
+      const data = await updateInstance(payload.name, resolveGamePath(payload.gamePath), payload.patch);
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
@@ -101,8 +102,9 @@ export function registerInstanceHandlers(win: WinRef) {
   ipcMain.handle('instance:install', async (_event, payload: { name: string; gamePath: string }) => {
     try {
       const requestId = `install-${Date.now()}`;
+      const gamePath = resolveGamePath(payload.gamePath);
 
-      installInstanceGame(payload.name, payload.gamePath, {
+      installInstanceGame(payload.name, gamePath, {
         onProgress: (progress) => {
           win.mainWindow?.webContents.send('instance:progress', { requestId, ...progress });
         },
@@ -118,42 +120,9 @@ export function registerInstanceHandlers(win: WinRef) {
     }
   });
 
-  ipcMain.handle('instance:launch', async (_event, payload: {
-    name: string;
-    gamePath: string;
-    username: string;
-    uuid: string;
-    accessToken?: string;
-    javaPath?: string;
-    server?: { host: string; port?: number };
-  }) => {
-    try {
-      const requestId = `launch-${Date.now()}`;
-
-      launchInstance(payload.name, payload.gamePath, {
-        username: payload.username,
-        uuid: payload.uuid,
-        accessToken: payload.accessToken,
-        javaPath: payload.javaPath,
-        server: payload.server,
-        onEvent: (event) => {
-          win.mainWindow?.webContents.send('instance:launch-event', { requestId, ...event });
-        },
-      }).then((data) => {
-        win.mainWindow?.webContents.send('instance:launch-complete', { requestId, data });
-      }).catch((err) => {
-        win.mainWindow?.webContents.send('instance:launch-error', { requestId, error: String(err) });
-      });
-
-      return { success: true, data: { requestId }, error: null };
-    } catch (e: unknown) {
-      return { success: false, data: null, error: String(e) };
-    }
-  });
-
   ipcMain.handle('instance:diagnose', async (_event, payload: { name: string; gamePath: string }) => {
     try {
-      const data = await diagnoseInstance(payload.name, payload.gamePath);
+      const data = await diagnoseInstance(payload.name, resolveGamePath(payload.gamePath));
       return { success: true, data, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
@@ -200,7 +169,7 @@ export function registerInstanceHandlers(win: WinRef) {
   // 扫描游戏目录中的已安装版本
   ipcMain.handle('instance:scan-dir', async (_event, payload: { gamePath: string }) => {
     try {
-      const versions = scanGameDirectories(payload.gamePath);
+      const versions = scanGameDirectories(resolveGamePath(payload.gamePath));
       return { success: true, data: { versions }, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
@@ -216,17 +185,20 @@ export function registerInstanceHandlers(win: WinRef) {
     java?: string;
     minMemory?: number;
     maxMemory?: number;
+    /** 版本文件来源目录（扫描副目录导入时传扫描目录） */
+    sourceGamePath?: string;
   }) => {
     try {
       const data = await importExistingInstance(
         payload.name,
-        payload.gamePath,
+        resolveGamePath(payload.gamePath),
         payload.versionId,
         {
           description: payload.description,
           java: payload.java,
           minMemory: payload.minMemory,
           maxMemory: payload.maxMemory,
+          sourceGamePath: payload.sourceGamePath ? resolveGamePath(payload.sourceGamePath) : undefined,
         }
       );
       return { success: true, data, error: null };

@@ -11,15 +11,20 @@ export interface AuthData {
   xboxProfile: string;
 }
 
-const authFile = (): string => {
+/**
+ * 认证文件路径（与配置一致）：
+ * - 打包后 → 系统用户数据目录（userData）
+ * - 开发模式 → 项目根目录
+ */
+export function authPath(): string {
   if (app.isPackaged) {
-    return path.join(path.dirname(app.getPath('exe')), 'koring-auth.json');
+    return path.join(app.getPath('userData'), 'koring-auth.json');
   }
   return path.join(__dirname, '..', 'koring-auth.json');
-};
+}
 
 export function readAuth(): AuthData {
-  const filePath = authFile();
+  const filePath = authPath();
   if (!fs.existsSync(filePath)) {
     return { username: '', uuid: '', accessToken: '', refreshToken: '', xboxProfile: '' };
   }
@@ -32,12 +37,12 @@ export function readAuth(): AuthData {
 }
 
 export function writeAuth(auth: AuthData): void {
-  const filePath = authFile();
+  const filePath = authPath();
   fs.writeFileSync(filePath, JSON.stringify(auth, null, 2), 'utf-8');
 }
 
 export function deleteAuth(): void {
-  const filePath = authFile();
+  const filePath = authPath();
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
   }

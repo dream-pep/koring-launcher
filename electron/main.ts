@@ -13,7 +13,9 @@ import { registerSystemHandlers } from './handlers/system';
 import { registerWindowHandlers } from './handlers/window';
 import { registerCrashHandlers, setupCrashListeners, testCrashDialog } from './handlers/crash-monitor';
 import { registerKoringAuthHandlers } from './handlers/koring-auth';
-import { loadConfig, saveConfig, configExists } from './config';
+import { registerJavaHandlers } from './handlers/java';
+import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
+import { authPath } from './auth';
 
 const { app } = electron;
 
@@ -28,8 +30,30 @@ const win: { mainWindow: electron.BrowserWindow | null; splashWindow: electron.B
   splashWindow: null,
 };
 
+// 迁移旧版「可执行文件旁」存储 → userData（仅打包模式）。
+// 复制而非移动，避免破坏用户已有文件；userData 已有目标文件则跳过。
+function migrateLegacyFiles(): void {
+  if (!app.isPackaged) return;
+  const exeDir = path.dirname(app.getPath('exe'));
+  const pairs: { name: string; dest: string }[] = [
+    { name: 'Koring.yml', dest: configPath() },
+    { name: 'koring-auth.json', dest: authPath() },
+  ];
+  for (const { name, dest } of pairs) {
+    if (fs.existsSync(dest)) continue;
+    const src = path.join(exeDir, name);
+    if (!fs.existsSync(src)) continue;
+    try {
+      fs.copyFileSync(src, dest);
+      console.log(`[migrate] copied ${name} → ${dest}`);
+    } catch (e) {
+      console.error(`[migrate] failed to copy ${name}:`, e);
+    }
+  }
+}
+
 // Startup checks: .minecraft dir + config file + first launch detection
-function runStartupChecks(): { isFirstLaunch: boolean; config: ReturnType<typeof loadConfig> } {
+function runStartupChecks(): { isFirstLaunch: boolean; config: ReturnType<typeof getConfig> } {
   const dataPath = app.isPackaged
     ? path.dirname(app.getPath('exe'))
     : path.join(__dirname, '..');
@@ -44,8 +68,8 @@ function runStartupChecks(): { isFirstLaunch: boolean; config: ReturnType<typeof
   const hasConfig = configExists();
   const isFirstLaunch = !hasConfig;
 
-  // 3. Load (or create) config
-  const config = loadConfig();
+  // 3. Load (or create) config（getConfig 会缓存到主进程内存，成为唯一权威）
+  const config = getConfig();
   if (isFirstLaunch) {
     saveConfig(config);
   }
@@ -130,7 +154,7 @@ function createMainWindow(): electron.BrowserWindow {
 }
 
 function registerAllHandlers() {
-  registerConfigHandlers();
+  registerConfigHandlers(win);
   registerAuthHandlers();
   registerInstallHandlers(win);
   registerLaunchHandlers(win);
@@ -142,10 +166,14 @@ function registerAllHandlers() {
   registerWindowHandlers(win);
   registerCrashHandlers();
   registerKoringAuthHandlers();
+  registerJavaHandlers();
 }
 
 app.whenReady().then(() => {
   registerAllHandlers();
+
+  // Migrate legacy exe-dir config/auth to userData before anything reads them
+  migrateLegacyFiles();
 
   // Run startup checks before creating windows
   const { isFirstLaunch, config } = runStartupChecks();
@@ -194,6 +222,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  flushConfig();
   app.quit();
 });
 

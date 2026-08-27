@@ -1,16 +1,10 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
+import { SettingSurface } from "./SettingSurface";
 
 interface SurfaceProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: "raised" | "flat" | "bordered"
-  frost?: "none" | "sm" | "md" | "lg"
-  padding?: "none" | "sm" | "md" | "lg"
-}
-
-const frostMap = {
-  none: "",
-  sm: "backdrop-blur-[6px]",
-  md: "backdrop-blur-[12px]",
-  lg: "backdrop-blur-[20px]",
+  variant?: "raised" | "flat" | "bordered";
+  frost?: "none" | "sm" | "md" | "lg";
+  padding?: "none" | "sm" | "md" | "lg";
 }
 
 const paddingMap = {
@@ -18,8 +12,9 @@ const paddingMap = {
   sm: "px-3 py-2.5",
   md: "px-5 py-4",
   lg: "px-6 py-5",
-}
+};
 
+// Surface 是 SettingSurface 的兼容别名（保留原 API，样式与设置卡片统一）
 function Surface({
   variant = "raised",
   frost = "none",
@@ -29,24 +24,19 @@ function Surface({
   ...props
 }: SurfaceProps) {
   return (
-    <div
-      data-slot="surface"
+    <SettingSurface
+      variant={variant}
+      frost={frost !== "none"}
       className={cn(
-        "rounded-xl transition-colors duration-200",
-        "bg-white/85 dark:bg-black/45",
-        "border border-black/[0.06] dark:border-white/[0.07]",
-        frostMap[frost],
         paddingMap[padding],
-        variant === "raised" && "shadow-sm",
-        variant === "bordered" && "shadow-none",
-        variant === "flat" && "shadow-none bg-transparent border-0",
+        variant === "flat" && "bg-transparent border-0 backdrop-blur-none",
         className,
       )}
       {...props}
     >
       {children}
-    </div>
-  )
+    </SettingSurface>
+  );
 }
 
 function SurfaceHeader({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -61,7 +51,7 @@ function SurfaceHeader({ className, children, ...props }: React.HTMLAttributes<H
     >
       {children}
     </div>
-  )
+  );
 }
 
 function SurfaceContent({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -69,7 +59,7 @@ function SurfaceContent({ className, children, ...props }: React.HTMLAttributes<
     <div data-slot="surface-content" className={cn("space-y-3", className)} {...props}>
       {children}
     </div>
-  )
+  );
 }
 
 export { Surface, SurfaceHeader, SurfaceContent }

@@ -1,4 +1,4 @@
-import { ipcInvoke } from './ipc';
+import { ipcInvoke, onIpcEvent } from './ipc';
 
 export interface ThemeConfig {
   darkMode: string;
@@ -36,6 +36,11 @@ export interface JavaConfig {
   jvmArgs: string;
 }
 
+export interface ServerConfig {
+  ip: string;
+  port: number;
+}
+
 export interface AdvancedConfig {
   afterLaunch: string;
   winMode: string;
@@ -44,6 +49,20 @@ export interface AdvancedConfig {
   gameArgs: string;
   preLaunchCmd: string;
   debugMode: boolean;
+  /** 快速进入服务器（启动后自动加入；ip 为空则不自动加入） */
+  server: ServerConfig;
+}
+
+export interface AppInfoConfig {
+  /** 界面语言偏好（zh-CN | en-US）；语言包开发中，暂仅保存并设置 <html lang> */
+  language: string;
+}
+
+export interface UiConfig {
+  /** 首页实例标题显示 */
+  showInstanceTitle: boolean;
+  /** 标题栏任务队列按钮显示 */
+  showTaskButton: boolean;
 }
 
 export interface DownloadConfig {
@@ -77,6 +96,7 @@ export interface InstanceMeta {
 export interface AppConfig {
   version: number;
   oobe: boolean;
+  app: AppInfoConfig;
   theme: ThemeConfig;
   a11y: A11yConfig;
   background: BackgroundConfig;
@@ -85,13 +105,8 @@ export interface AppConfig {
   advanced: AdvancedConfig;
   download: DownloadConfig;
   network: NetworkConfig;
+  ui: UiConfig;
   instances: InstanceMeta[];
-}
-
-interface CommandResult {
-  success: boolean;
-  data: unknown;
-  error: string | null;
 }
 
 export async function getConfig(): Promise<AppConfig> {
@@ -101,4 +116,18 @@ export async function getConfig(): Promise<AppConfig> {
 
 export async function saveConfig(config: AppConfig): Promise<void> {
   await ipcInvoke('config:save', config);
+}
+
+/**
+ * 主进程权威更新配置：提交 { section, patch } 补丁，
+ * 主进程深度合并、debounce 稀疏写盘并广播 config:changed。
+ * 返回合并后的完整配置。
+ */
+export async function updateConfig(section: string, patch: unknown): Promise<AppConfig> {
+  return ipcInvoke<AppConfig>('config:update', { section, patch });
+}
+
+/** 监听主进程广播的配置变更（完整配置） */
+export function onConfigChanged(callback: (config: AppConfig) => void): () => void {
+  return onIpcEvent<AppConfig>('config:changed', callback);
 }

@@ -5,7 +5,6 @@ import {
   deleteInstance,
   getInstanceInfo,
   installInstance,
-  launchInstance,
   type InstanceInfo,
   type InstanceRuntime,
 } from "../api/instance";
@@ -32,17 +31,6 @@ interface InstanceState {
   remove: (name: string, gamePath: string) => Promise<void>;
   select: (name: string, gamePath: string) => Promise<void>;
   install: (name: string, gamePath: string) => Promise<string>;
-  launch: (
-    name: string,
-    gamePath: string,
-    options: {
-      username: string;
-      uuid: string;
-      accessToken?: string;
-      javaPath?: string;
-      server?: { host: string; port?: number };
-    }
-  ) => Promise<string>;
   clearError: () => void;
 }
 
@@ -104,18 +92,6 @@ export const useInstanceStore = create<InstanceState>((set) => ({
     set({ loading: true, error: null });
     try {
       const { requestId } = await installInstance(name, gamePath);
-      set({ loading: false });
-      return requestId;
-    } catch (e: any) {
-      set({ error: e.message, loading: false });
-      throw e;
-    }
-  },
-
-  launch: async (name, gamePath, options) => {
-    set({ loading: true, error: null });
-    try {
-      const { requestId } = await launchInstance(name, gamePath, options);
       set({ loading: false });
       return requestId;
     } catch (e: any) {
