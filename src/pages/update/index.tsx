@@ -19,6 +19,7 @@ import {
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { Button, Link } from "@heroui/react";
 import { toast } from "sonner";
+import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -98,6 +99,36 @@ export function UpdatePage() {
   const pct = status?.percent ?? 0;
   const isDownloading = st === "downloading";
   const isPaused = st === "paused";
+
+  // 底部遮罩滚动感知：向下滚动（阅读发布说明）自动收起，向上滚动/回顶恢复。
+  // 下载/暂停/安装/检查等需要常驻进度条的状态下始终显示。
+  const [barVisible, setBarVisible] = useState(true);
+  useEffect(() => {
+    const el = document.getElementById("app-content-scroll");
+    if (!el) return;
+    const busy = st === "downloading" || st === "paused" || st === "installing" || st === "checking";
+    let lastY = el.scrollTop;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = el.scrollTop;
+        const delta = y - lastY;
+        if (busy) {
+          setBarVisible(true);
+        } else if (delta > 16 && y > 160) {
+          setBarVisible(false);
+        } else if (delta < -16 || y < 80) {
+          setBarVisible(true);
+        }
+        lastY = y;
+        ticking = false;
+      });
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [st]);
 
   const handleCheck = async () => {
     try {
@@ -234,9 +265,13 @@ export function UpdatePage() {
         </div>
       </div>
 
-      {/* 底部遮罩：fixed 吸附底部，样式与顶栏一致；驱动整个更新流程 */}
+      {/* 底部遮罩：fixed 吸附底部，样式与顶栏一致；驱动整个更新流程。
+          阅读时向下滚动自动收起（translate-y-full），向上滚动/回顶恢复 */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-20"
+        className={clsx(
+          "fixed bottom-0 left-0 right-0 z-20 transition-transform duration-300",
+          barVisible ? "translate-y-0" : "translate-y-full",
+        )}
         style={{
           background: "var(--titlebar-bg)",
           backdropFilter: "blur(3px)",
