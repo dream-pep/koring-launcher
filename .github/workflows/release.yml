@@ -30,7 +30,10 @@
 #    正式对外发布需生产证书（OV/EV）+ 对应生产签名策略，届时只换 SIGNPATH_SIGNING_POLICY_SLUG。
 #
 # ⚠️ 版本号注意（electron-updater 语义）：
-#  - {base}-{buildId} 属于 semver prerelease；已安装同格式版本的用户可正常收到更高 buildId 的更新。
+#  - {base}-{buildId} 属于 semver prerelease；electron-updater 默认 allowPrerelease=false 会跳过带
+#    prerelease 后缀的新版本，客户端必须在 electron/updater.ts 设置 autoUpdater.allowPrerelease=true
+#    （已落地），否则如 v1.2.1-4 永远检测不到 v1.2.1-5。
+#  - 开启后：已安装同格式版本的用户可正常收到更高 buildId 的更新（buildId 数值比较）。
 #  - 若未来发布不带 buildId 的稳定版本（如 1.2.0），稳定版用户不会自动升级到带 buildId 的构建。
 #  - 切换 BUILD ID 方案（时间 ID → Run Number）时，旧格式数值更大（2608271921 > 12），
 #    老用户不会自动升级 —— 切换时应同时提升 base（如 1.3.0-12 > 1.2.0-2608271921）。

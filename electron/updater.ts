@@ -68,6 +68,27 @@ function getMirrors(): string[] {
 }
 
 /**
+ * 比较两个版本 tag（如 v1.2.1-5 / v1.2.1 / v1.2.0-2608271921），返回 a - b。
+ * 项目版本为 {base}-{buildId}：base 按 X.Y.Z 数值比较，buildId 按数值比较（而非字符串）。
+ * 无 buildId 的稳定版视为大于同 base 的任意 prerelease（与 semver 一致）。
+ */
+function compareVersionTags(a: string, b: string): number {
+  const parse = (t: string): { base: number[]; build: number } => {
+    const s = t.replace(/^v/i, '');
+    const [base, build = ''] = s.split('-');
+    const nums = base.split('.').map((n) => parseInt(n, 10) || 0);
+    while (nums.length < 3) nums.push(0);
+    return { base: nums, build: build === '' ? Number.MAX_SAFE_INTEGER : parseInt(build, 10) || 0 };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  for (let i = 0; i < 3; i++) {
+    if (pa.base[i] !== pb.base[i]) return pa.base[i] - pb.base[i];
+  }
+  return pa.build - pb.build;
+}
+
+/**
  * 更新服务：electron-updater（GitHub provider）+ 加速源兜底。
  * 状态：idle → checking → available → downloading ⇄ paused → downloaded → installing → quitAndInstall
  * 下载控制：CancellationToken 实现暂停（中断）/继续/取消。
@@ -107,6 +128,11 @@ class UpdateService {
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    // 项目版本方案为 {base}-{buildId}（如 1.2.1-5），属 semver prerelease（带 - 后缀）。
+    // electron-updater 默认 allowPrerelease=false：GitHub provider 会过滤 prerelease release，
+    // isUpdateAvailable 也会拒绝带 prerelease 后缀的新版本 → v1.2.1-4 永远检测不到 v1.2.1-5。
+    // 必须显式开启（本项目的每个发布版本都是 prerelease 形式，不存在误升级稳定版的问题）。
+    autoUpdater.allowPrerelease = true;
     autoUpdater.logger = console;
     autoUpdater.on('checking-for-update', () => {
       this.state = 'checking';
@@ -240,7 +266,10 @@ class UpdateService {
         this.emit();
         await autoUpdater.checkForUpdates();
         this.suppressErrors = false;
-        return this.buildPayload();
+        // 镜像若反馈无更新（可能发现的是旧 tag / latest.yml 不匹配），
+        // 不要就此返回 not-available，继续尝试下一个源
+        if (this.state !== 'not-available') return this.buildPayload();
+        console.warn(`[updater] ${mirror} 反馈无可用更新，尝试下一个源`);
       } catch (err) {
         console.warn(`[updater] 加速源 ${mirror} 检查失败: ${String((err as Error)?.message ?? err)}`);
       }
@@ -254,11 +283,15 @@ class UpdateService {
   }
 
   /**
-   * 通过加速源发现最新 release tag（不需要 GitHub API）：
-   * 1) /releases/latest 页面 HTML 中提取 tag（多数下载型加速源可代理该页面）
-   * 2) 少数加速源可代理 api.github.com，作为备选
+   * 通过加速源发现最新 release tag：
+   * 1) /releases/latest 页面 HTML 中提取 tag（多数下载型加速源可代理该页面；
+   *    ⚠️ 该页面只指向最新「非 prerelease」release，本项目所有版本都是 prerelease 形式，结果可能偏旧）
+   * 2) GitHub API（经加速源代理，列表含 prerelease），作为备选
+   * 最终取两种方式候选集中版本最大者（buildId 数值比较），避免旧 tag 覆盖新 prerelease。
    */
   private async discoverLatestTag(mirror: string): Promise<string | null> {
+    const candidates: string[] = [];
+
     // 方式 1：HTML 页面
     try {
       const pageUrl = `${mirror}/https://github.com/${OWNER}/${REPO}/releases/latest`;
@@ -269,7 +302,7 @@ class UpdateService {
       if (res.ok) {
         const html = await res.text();
         const m = html.match(/\/releases\/tag\/(v[^"<]+)/);
-        if (m?.[1]) return m[1];
+        if (m?.[1]) candidates.push(m[1]);
       }
     } catch {
       /* 尝试下一种方式 */
@@ -284,14 +317,21 @@ class UpdateService {
       });
       if (res.ok) {
         const releases: { draft?: boolean; tag_name?: string }[] = await res.json();
-        const release = (releases ?? []).find((r) => !r.draft && !!r.tag_name);
-        if (release?.tag_name) return release.tag_name;
+        for (const r of releases ?? []) {
+          if (!r.draft && r.tag_name) candidates.push(r.tag_name);
+        }
       }
     } catch {
       /* ignore */
     }
 
-    return null;
+    if (candidates.length === 0) return null;
+    candidates.sort(compareVersionTags);
+    const latest = candidates[candidates.length - 1];
+    if (candidates.length > 1) {
+      console.log(`[updater] ${mirror} 候选版本: ${candidates.join(', ')} → 取 ${latest}`);
+    }
+    return latest;
   }
 
   /**

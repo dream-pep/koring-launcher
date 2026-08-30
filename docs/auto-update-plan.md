@@ -310,7 +310,11 @@ src/
 - 上传产物：setup.exe + latest.yml + release-notes.md（electron-updater 更新清单）
 
 **⚠️ 版本语义注意（electron-updater）**：
-- `{base}-{buildId}` 属 semver prerelease：同格式版本之间可正常升级（buildId 更大者胜）
+- `{base}-{buildId}` 属 semver prerelease；**electron-updater 默认 `allowPrerelease=false` 会直接跳过带
+  prerelease 后缀的新版本**（GitHub provider 过滤 prerelease release + isUpdateAvailable 的
+  `semver.prerelease` 校验）——**必须**在 `electron/updater.ts` 设置 `autoUpdater.allowPrerelease = true`，
+  否则如 v1.2.1-4 永远检测不到 v1.2.1-5（该问题已修复并落地）。
+- 开启后：同格式版本之间可正常升级（buildId 更大者胜，数值比较，如 `1.2.1-5 > 1.2.1-4`）
 - 若未来发布**不带** buildId 的稳定版本（如 `1.2.0`），稳定版用户不会自动升级到带 buildId 的构建
 - **迁移注意**：从时间 ID（`2608271921`）切换到 Run Number 后，旧格式数值更大（`2608271921 > 12`），
   老用户不会自动升级到新格式——切换时应同时提升 base（如 `1.3.0-12 > 1.2.0-2608271921`）
