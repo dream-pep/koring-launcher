@@ -17,7 +17,6 @@ import { registerJavaHandlers } from './handlers/java';
 import { registerUpdateHandlers } from './handlers/update';
 import { updateService } from './updater';
 import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
-import { authPath } from './auth';
 
 const { app } = electron;
 
@@ -32,25 +31,20 @@ const win: { mainWindow: electron.BrowserWindow | null; splashWindow: electron.B
   splashWindow: null,
 };
 
-// 迁移旧版「可执行文件旁」存储 → userData（仅打包模式）。
-// 复制而非移动，避免破坏用户已有文件；userData 已有目标文件则跳过。
+// 迁移旧版 userData 存储 → 安装目录（仅打包模式；配置已改回存安装目录）。
+// 复制而非移动，避免破坏用户已有文件；安装目录已有目标文件则跳过。
 function migrateLegacyFiles(): void {
   if (!app.isPackaged) return;
   const exeDir = path.dirname(app.getPath('exe'));
-  const pairs: { name: string; dest: string }[] = [
-    { name: 'Koring.yml', dest: configPath() },
-    { name: 'koring-auth.json', dest: authPath() },
-  ];
-  for (const { name, dest } of pairs) {
-    if (fs.existsSync(dest)) continue;
-    const src = path.join(exeDir, name);
-    if (!fs.existsSync(src)) continue;
-    try {
-      fs.copyFileSync(src, dest);
-      console.log(`[migrate] copied ${name} → ${dest}`);
-    } catch (e) {
-      console.error(`[migrate] failed to copy ${name}:`, e);
-    }
+  const dest = path.join(exeDir, 'Koring.yml');
+  if (fs.existsSync(dest)) return;
+  const src = path.join(app.getPath('userData'), 'Koring.yml');
+  if (!fs.existsSync(src)) return;
+  try {
+    fs.copyFileSync(src, dest);
+    console.log(`[migrate] copied Koring.yml ${src} → ${dest}`);
+  } catch (e) {
+    console.error(`[migrate] failed to copy Koring.yml:`, e);
   }
 }
 
@@ -73,7 +67,8 @@ function runStartupChecks(): { isFirstLaunch: boolean; config: ReturnType<typeof
   // 3. Load (or create) config（getConfig 会缓存到主进程内存，成为唯一权威）
   const config = getConfig();
   if (isFirstLaunch) {
-    saveConfig(config);
+    // 首次启动：全量写入，确保配置文件在安装目录可见（稀疏保存下全默认不落盘）
+    saveConfig(config, true);
   }
 
   return { isFirstLaunch, config };
@@ -175,7 +170,7 @@ function registerAllHandlers() {
 app.whenReady().then(() => {
   registerAllHandlers();
 
-  // Migrate legacy exe-dir config/auth to userData before anything reads them
+  // Migrate legacy userData config to install dir before anything reads them
   migrateLegacyFiles();
 
   // Run startup checks before creating windows

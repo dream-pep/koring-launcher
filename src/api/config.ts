@@ -107,6 +107,8 @@ export interface InstanceMeta {
 
 export interface AppConfig {
   version: number;
+  /** 当前应用版本号（写入配置时由主进程刷新） */
+  appVersion: string;
   oobe: boolean;
   app: AppInfoConfig;
   theme: ThemeConfig;

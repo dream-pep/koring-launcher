@@ -379,6 +379,10 @@ idle → checking → available → downloading → downloaded → quitAndInstal
 - **发布说明切换**：默认显示当前版本；检测到可用更新后自动切到最新版本（`getReleaseNotes(v{version})`），
   退出重进回到当前版本
 - **进度持久化**：每次状态/进度变化写入 `Koring.yml` 的 `update` 段
+- **版本引导（upvp）**：`Koring.yml` 增加 `appVersion` 字段（启动时不自动刷新）。
+  程序版本 ≠ `appVersion` → 进入 `upvp` 引导：更新已完成 → 检查版本
+  （程序版本更大 →「已更新至 X」；更小 → 版本倒退警告）→ 测试版更新需同意
+  Beta 协议（复用 OOBE 协议页）→ 结束页写入 `appVersion = 程序版本` 后进主页
   （state/version/percent/transferred/total/source/error）；应用启动时清理上次的进行中状态
 - 配套改动：发布流水线 `gh release create` 上传 `release-notes.md` 附件
   （旧版本发布的 release 无此附件，页面会显示回退/空态）

@@ -44,10 +44,13 @@ interface ConfigState {
   setUi: (patch: Partial<UiConfig>) => void;
   setInstances: (instances: InstanceMeta[]) => void;
   setOobe: (value: boolean) => void;
+  /** 记录当前应用版本号到配置（升级引导完成后由 upvp 流程写入） */
+  setAppVersion: (version: string) => void;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   version: 1,
+  appVersion: "",
   oobe: true,
   app: { language: "zh-CN" },
   theme: { darkMode: "auto", parallax: true },
@@ -166,5 +169,11 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     const { config } = get();
     set({ config: { ...config, oobe: value } });
     submit("oobe", value);
+  },
+
+  setAppVersion: (version) => {
+    const { config } = get();
+    set({ config: { ...config, appVersion: version } });
+    submit("appVersion", version);
   },
 }));

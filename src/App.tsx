@@ -35,6 +35,12 @@ import { OobeBetaTest } from "./pages/oobe/step-beta-test";
 import { OobeFinish } from "./pages/oobe/step-finish";
 import { OobeLegal } from "./pages/oobe/step-legal";
 import { OobeAboutInfo } from "./pages/oobe/about-info";
+import { UpvpComplete } from "./pages/upvp/step-complete";
+import { UpvpVersion } from "./pages/upvp/step-version";
+import { UpvpCheck } from "./pages/upvp/step-check";
+import { UpvpBetaTest } from "./pages/upvp/step-beta-test";
+import { UpvpFinish } from "./pages/upvp/step-finish";
+import { VERSION } from "./lib/version";
 
 const pageMap = {
   home: Home,
@@ -56,6 +62,12 @@ const pageMap = {
   "oobe/finish": OobeFinish,
   "oobe/about-info": OobeAboutInfo,
   "oobe/legal": OobeLegal,
+  upvp: UpvpComplete,
+  "upvp/complete": UpvpComplete,
+  "upvp/version": UpvpVersion,
+  "upvp/check": UpvpCheck,
+  "upvp/beta-test": UpvpBetaTest,
+  "upvp/finish": UpvpFinish,
   debug: Debug,
   "debug-splash": SplashDebug,
   "debug-display": DisplayDebug,
@@ -83,9 +95,23 @@ function App() {
       syncBackgroundFromConfig();
       useAuthStore.getState().initFromRegistry();
       useKoringAuthStore.getState().initFromDisk();
-      // Navigate to OOBE on first launch or if oobe not completed
+
+      // 首次启动 / 未完成 OOBE → OOBE
       if (isFirstLaunch || cfg.oobe) {
         useRouteStore.getState().navigate("oobe");
+        return;
+      }
+
+      // 配置里没有版本记录 → 补写当前版本（新装/旧配置迁移），直接进主页
+      if (!cfg.appVersion) {
+        useConfigStore.getState().setAppVersion(VERSION);
+        return;
+      }
+
+      // 程序版本 ≠ 配置版本 → 进入更新引导（upvp）：
+      // 升级后 appVersion 仍是旧版本号（主进程不自动刷新），由 upvp 流程完成时写入新版本
+      if (cfg.appVersion !== VERSION) {
+        useRouteStore.getState().navigate("upvp/complete");
       }
     });
 

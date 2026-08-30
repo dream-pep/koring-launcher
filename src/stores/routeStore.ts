@@ -20,6 +20,12 @@ export type RouteKey =
   | "oobe/finish"
   | "oobe/about-info"
   | "oobe/legal"
+  | "upvp"
+  | "upvp/complete"
+  | "upvp/version"
+  | "upvp/check"
+  | "upvp/beta-test"
+  | "upvp/finish"
   | "debug"
   | "debug-splash"
   | "debug-display"
@@ -64,6 +70,12 @@ export const allRoutes: RouteItem[] = [
   { key: "oobe/finish", label: "完成", path: "/oobe/finish", hidden: true },
   { key: "oobe/about-info", label: "关于信息", path: "/oobe/about-info", hidden: true, backable: true },
   { key: "oobe/legal", label: "法律信息", path: "/oobe/legal", hidden: true },
+  { key: "upvp", label: "更新引导", path: "/upvp", hidden: true },
+  { key: "upvp/complete", label: "更新已完成", path: "/upvp/complete", hidden: true },
+  { key: "upvp/version", label: "当前版本", path: "/upvp/version", hidden: true },
+  { key: "upvp/check", label: "检查版本", path: "/upvp/check", hidden: true },
+  { key: "upvp/beta-test", label: "测试协议", path: "/upvp/beta-test", hidden: true },
+  { key: "upvp/finish", label: "完成", path: "/upvp/finish", hidden: true },
   { key: "debug", label: "调试", path: "/debug", hidden: true },
   { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
   { key: "debug-display", label: "显示效果调试", path: "/debug/display", hidden: true },
@@ -75,7 +87,7 @@ export const allRoutes: RouteItem[] = [
 const topLevelKeys = new Set(routes.map((r) => r.key));
 
 function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
-  if (key === "oobe" || key.startsWith("oobe/")) return "oobe";
+  if (key === "oobe" || key.startsWith("oobe/") || key === "upvp" || key.startsWith("upvp/")) return "oobe";
   return topLevelKeys.has(key) ? "default" : "sub";
 }
 

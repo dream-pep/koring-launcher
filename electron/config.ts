@@ -9,12 +9,13 @@ const CURRENT_VERSION = 1;
 
 /**
  * 配置文件路径：
- * - 打包后 → 系统用户数据目录（userData），避免安装到 Program Files 等只读目录时写入失败
+ * - 打包后 → 安装目录（可执行文件旁）。默认 per-user 安装（%LOCALAPPDATA%\Programs）可写；
+ *   若当初选择 per-machine 安装（Program Files）会无写权限，属已知限制
  * - 开发模式 → 项目根目录（与旧行为一致，方便调试）
  */
 export function configPath(): string {
   if (app.isPackaged) {
-    return path.join(app.getPath('userData'), CONFIG_FILE);
+    return path.join(path.dirname(app.getPath('exe')), CONFIG_FILE);
   }
   return path.join(__dirname, '..', CONFIG_FILE);
 }
@@ -130,7 +131,10 @@ export interface UpdateConfig {
 }
 
 export interface AppConfig {
+  /** 配置结构版本（迁移用） */
   version: number;
+  /** 当前应用版本号（app.getVersion()，每次启动刷新；配置文件自述用） */
+  appVersion: string;
   oobe: boolean;
   app: AppInfoConfig;
   theme: ThemeConfig;
@@ -148,6 +152,7 @@ export interface AppConfig {
 
 const DEFAULTS: AppConfig = {
   version: CURRENT_VERSION,
+  appVersion: '',
   oobe: true,
   app: { language: 'zh-CN' },
   theme: { darkMode: 'auto', parallax: true },
@@ -220,12 +225,19 @@ export function loadConfig(): AppConfig {
   }
 }
 
-export function saveConfig(config: AppConfig): void {
+/**
+ * 保存配置（稀疏：仅写与默认值不同的部分）。
+ * - force=true：全量写入（首次启动使用，保证配置文件在安装目录可见）
+ * - 稀疏结果为空时：保留现有文件不删（重置由 config:reset / factoryReset 显式删除）
+ */
+export function saveConfig(config: AppConfig, force = false): void {
   const filePath = configPath();
   const sparse = diffValue(config, DEFAULTS) as Record<string, unknown> | undefined;
 
   if (!sparse || Object.keys(sparse).length === 0) {
-    try { fs.unlinkSync(filePath); } catch {}
+    if (force) {
+      fs.writeFileSync(filePath, yaml.dump(config, { lineWidth: -1 }), 'utf-8');
+    }
     return;
   }
 
@@ -256,6 +268,8 @@ function mergeDeep<T>(base: T, patch: unknown): T {
 export function getConfig(): AppConfig {
   if (!current) {
     current = loadConfig();
+    // 注意：不在此处刷新 appVersion —— 升级后保持旧版本号，
+    // 由渲染端 upvp（版本更新引导）流程完成后写入新版本号
   }
   return current;
 }
