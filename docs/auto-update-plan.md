@@ -299,13 +299,14 @@ src/
 **版本号与 BUILD ID（2026-08-30 起）**：
 - BUILD ID = `github.run_number`（严格递增、无分钟级冲突）
 - **beta**：`{base}-beta.{buildId}`（如 `1.2.1-beta.13`，tag `v1.2.1-beta.13`，GitHub 标记 prerelease）
-- **run**：`{base}`（稳定版，如 `1.2.1`，tag `v1.2.1`）
-- ⚠️ **为什么弃用数字标识**：electron-updater 的 GitHub provider 频道逻辑只认 `alpha`/`beta`
-  字符串频道；`1.2.1-13` 的数字 prerelease 会被当作"自定义频道"导致更新检查
-  `No published versions on GitHub`（无法识别当前/最新版本）。字母标识 `beta` 解决此问题。
+- **run**：`{base}-{buildId}`（如 `1.2.1-13`，tag `v1.2.1-13`，**带构建尾号**，普通 release 不加 `--prerelease`）
+- ⚠️ **数字标识与频道**：数字 prerelease 在 `allowPrerelease=true` 的通道逻辑里会被当作"自定义频道"
+  （`beta`/`alpha` 之外）。但**正式版用户（woker）`allowPrerelease=false`**，走 `/releases/latest`
+  （按 GitHub 的 prerelease **标记**而非 semver）→ 只要 run 发布时不加 `--prerelease`，
+  `1.2.1-13` 就是最新正式版，可正常识别与更新。**run 发布切勿加 `--prerelease`**。
 - **兼容性**（semver 数字 < 字母）：`1.2.1-beta.13 > 1.2.1-12 > 1.2.1-2608271921 > 1.2.1`，
-  所有旧数字版本（含时间 ID 与 Run Number 时代）都能平滑升级到新格式；beta 用户可被正式版（稳定）覆盖
-- beta release 额外上传 `latest-beta.yml`（GitHub provider 频道取件用，避免 404 回退）
+  所有旧数字版本（含时间 ID 与 Run Number 时代）都能平滑升级到新格式；beta 用户可被正式版覆盖
+- beta release 额外上传 `latest-beta.yml`（GitHub provider 频道取件兜底；实际先取 `beta.yml` 404 后回退 `latest.yml`）
 - 构建元数据（commit / buildId）由 `scripts/gen-build-info.js` 写入 `src/lib/buildInfo.ts` →
   打包进渲染层，VersionCard / 关于页显示**构建来源 commit**（`scripts/version.js build ci` 负责统一设版本）
 
@@ -314,17 +315,19 @@ src/
 - `## 更新了什么内容`：自上个 `v*` tag 以来的提交记录，每条默认折叠
   （`<details><summary>·Commit 1cf906d</summary>…</details>`）
 - 上传产物：setup.exe + latest.yml + release-notes.md（electron-updater 更新清单）
-- **Release 标题命名（仅展示名，tag/真实版本号不变）**：run → `{base}`（如 `1.2.1`），
+- **Release 标题命名（仅展示名，tag/真实版本号不变）**：run → `{full}`（如 `1.2.1-13`），
   beta → `BETA {base}`（如 `BETA 1.2.1`）
 
 **⚠️ 版本语义注意（electron-updater，2026-08-30 已修复并落地）**：
 - **根因**：GitHub provider 用 Atom feed + 频道逻辑选版本，频道只认 `alpha`/`beta` 字符串标识。
-  数字 prerelease（`1.2.1-4`）会被当作"自定义频道" → 永远选不出版本（`No published versions on GitHub`），
-  且 `allowPrerelease` 由当前版本自动决定（含 prerelease 即开启）。
-- **修复**：beta 用 `{base}-beta.{buildId}`（频道 `beta`，allowPrerelease 自动开启 → 正常识别）；
-  run 用稳定版 `{base}`（allowPrerelease=false → 走 releases/latest，正常识别）。
-- 同格式升级：`1.2.1-beta.14 > 1.2.1-beta.13`（数值比较）✓；`1.2.1 > 1.2.1-beta.x`（稳定版覆盖 beta）✓
-- **无需手动设置 allowPrerelease**：electron-updater 按当前版本自动判定（见 AppUpdater.js:218）。
+  数字 prerelease（`1.2.1-4`）在 `allowPrerelease=true` 的通道循环里会被当作"自定义频道"跳过，
+  `allowPrerelease` 又由当前版本自动决定（含 prerelease 即开启）。
+- **修复**：beta 用 `{base}-beta.{buildId}`（频道 `beta`，正常识别）；run 用 `{base}-{buildId}`
+  且发布**不带** `--prerelease` → 正式版用户（`allowPrerelease=false`）走 `/releases/latest`
+  按 GitHub 标记取最新正式版，正常识别。
+- 同格式升级：`1.2.1-beta.14 > 1.2.1-beta.13`（数值比较）✓；`1.2.1-14 > 1.2.1-13` ✓
+- 注意：当前版本为 `1.2.1-13`（数字尾号）时切到 runner 通道，通道逻辑会把 "13" 当自定义频道 → 无匹配，
+  属预期边缘情况（数字尾号构建请使用 woker 通道）；`1.2.1-beta.x` 的 runner 用户不受影响。
 - 所有旧数字版本（`1.2.1-12` / `1.2.1-2608271921`）都小于 `1.2.1-beta.13`，平滑升级，无需提升 base
 
 ## 14. M2 主进程更新模块（2026-08-28，UI 待做）

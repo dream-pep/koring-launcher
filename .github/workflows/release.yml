@@ -106,10 +106,11 @@ jobs:
 
       # BUILD ID = GitHub Run Number（严格递增，无分钟级冲突）
       # base 自动读 package.json（版本单一事实源）
-      # 版本格式（electron-updater GitHub provider 的频道逻辑只认 alpha/beta 字符串标识）：
+      # 版本格式（数字标识在 allowPrerelease 的通道逻辑中会被当"自定义频道"，但正式版用户
+      # allowPrerelease=false，走 /releases/latest（按 GitHub 的 prerelease 标记而非 semver）：
+      #   只要发布时不加 --prerelease，{base}-{buildId} 就是最新正式版，可正常识别）：
       #   beta → {base}-beta.{buildId}（如 1.2.1-beta.13，频道 beta）
-      #   run  → {base}（稳定版，如 1.2.1）
-      # 数字标识（如 1.2.1-13）会被当作"自定义频道"导致更新无法识别，故弃用
+      #   run  → {base}-{buildId}（如 1.2.1-13，带构建尾号）
       - name: Generate BUILD ID & set version
         id: version
         shell: pwsh
@@ -119,7 +120,7 @@ jobs:
           if ("${{ inputs.mode }}" -eq "beta") {
             $full = node scripts/version.js build ci "beta.$buildId"
           } else {
-            $full = node scripts/version.js build local
+            $full = node scripts/version.js build ci "$buildId"
           }
           "build_id=$buildId" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "base=$base" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
@@ -174,9 +175,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = "v${{ steps.version.outputs.full }}"
-          # Release 标题命名（仅展示名；tag / 真实版本号仍是 {base}-beta.{id} 或 {base}，更新机制不变）：
-          #   正式/预览版 → "1.2.1"；测试版 → "BETA 1.2.1"
-          $title = if ("${{ inputs.mode }}" -eq "beta") { "BETA ${{ steps.version.outputs.base }}" } else { "${{ steps.version.outputs.base }}" }
+          # Release 标题命名（仅展示名；tag / 真实版本号是 {base}-beta.{id} 或 {base}-{id}）：
+          #   正式/预览版 → "1.2.5-13"（带构建尾号）；测试版 → "BETA 1.2.5"
+          $title = if ("${{ inputs.mode }}" -eq "beta") { "BETA ${{ steps.version.outputs.base }}" } else { "${{ steps.version.outputs.full }}" }
 
           # 资产列表（beta 额外上传 latest-beta.yml：GitHub provider 频道取件（latest-beta）不再 404 回退）
           $assets = @(

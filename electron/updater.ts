@@ -98,17 +98,25 @@ function getMirrors(): string[] {
 }
 
 /**
- * 比较两个版本 tag（如 v1.2.1-5 / v1.2.1 / v1.2.0-2608271921），返回 a - b。
+ * 比较两个版本 tag（如 v1.2.1-13 / v1.2.1-beta.14 / v1.2.0-2608271921），返回 a - b。
  * 项目版本为 {base}-{buildId}：base 按 X.Y.Z 数值比较，buildId 按数值比较（而非字符串）。
- * 无 buildId 的稳定版视为大于同 base 的任意 prerelease（与 semver 一致）。
+ * - beta.N 视为大于同 base 的任意数字 buildId（与 semver 一致：数字 < 字母）
+ * - 无 buildId 的稳定版视为大于同 base 的任意 prerelease（与 semver 一致）
  */
 function compareVersionTags(a: string, b: string): number {
   const parse = (t: string): { base: number[]; build: number } => {
     const s = t.replace(/^v/i, '');
-    const [base, build = ''] = s.split('-');
+    const [base, buildStr = ''] = s.split('-');
     const nums = base.split('.').map((n) => parseInt(n, 10) || 0);
     while (nums.length < 3) nums.push(0);
-    return { base: nums, build: build === '' ? Number.MAX_SAFE_INTEGER : parseInt(build, 10) || 0 };
+    let build: number;
+    if (buildStr === '') {
+      build = Number.MAX_SAFE_INTEGER;
+    } else {
+      const beta = /^beta\.(\d+)$/i.exec(buildStr);
+      build = beta ? 1_000_000 + parseInt(beta[1], 10) : parseInt(buildStr, 10) || 0;
+    }
+    return { base: nums, build };
   };
   const pa = parse(a);
   const pb = parse(b);
