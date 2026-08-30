@@ -11,6 +11,7 @@
 # 发布行为：
 #   - beta：创建 GitHub prerelease（不占用 "Latest" 位）
 #   - run ：创建正式 release
+#   - Release 标题命名（仅展示名，tag/真实版本号不变）：run → "{base}"（如 1.2.1），beta → "BETA {base}"（如 BETA 1.2.1）
 #   - Release 正文为中文：版本信息（当前版本 / 编译状态 / 构建来源 commit）+ 提交记录（默认折叠）
 #   - 上传产物：koring-launcher-{base}-{buildId}-setup.exe + latest.yml（electron-updater 更新清单）
 #   - 构建元数据（commit / buildId）写入 src/lib/buildInfo.ts，打包进渲染层供 UI 显示
@@ -166,10 +167,13 @@ jobs:
         run: |
           $tag = "v${{ steps.version.outputs.full }}"
           $prerelease = if ("${{ inputs.mode }}" -eq "beta") { "--prerelease" } else { "" }
+          # Release 标题命名（仅展示名；tag / 真实版本号仍是 {base}-{buildId}，更新机制不变）：
+          #   正式/预览版 → "1.2.1"；测试版 → "BETA 1.2.1"
+          $title = if ("${{ inputs.mode }}" -eq "beta") { "BETA ${{ steps.version.outputs.base }}" } else { "${{ steps.version.outputs.base }}" }
           gh release create $tag `
             "dist-electron/koring-launcher-${{ steps.version.outputs.full }}-setup.exe" `
             "dist-electron/latest.yml" `
             "release-notes.md" `
-            --title "Koring Launcher Releases ${{ steps.version.outputs.base }}" `
+            --title $title `
             --notes-file release-notes.md `
             $prerelease

@@ -308,6 +308,8 @@ src/
 - `## 更新了什么内容`：自上个 `v*` tag 以来的提交记录，每条默认折叠
   （`<details><summary>·Commit 1cf906d</summary>…</details>`）
 - 上传产物：setup.exe + latest.yml + release-notes.md（electron-updater 更新清单）
+- **Release 标题命名（仅展示名，tag/真实版本号不变）**：run → `{base}`（如 `1.2.1`），
+  beta → `BETA {base}`（如 `BETA 1.2.1`）
 
 **⚠️ 版本语义注意（electron-updater）**：
 - `{base}-{buildId}` 属 semver prerelease；**electron-updater 默认 `allowPrerelease=false` 会直接跳过带
