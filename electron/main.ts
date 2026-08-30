@@ -14,6 +14,8 @@ import { registerWindowHandlers } from './handlers/window';
 import { registerCrashHandlers, setupCrashListeners, testCrashDialog } from './handlers/crash-monitor';
 import { registerKoringAuthHandlers } from './handlers/koring-auth';
 import { registerJavaHandlers } from './handlers/java';
+import { registerUpdateHandlers } from './handlers/update';
+import { updateService } from './updater';
 import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
 import { authPath } from './auth';
 
@@ -167,6 +169,7 @@ function registerAllHandlers() {
   registerCrashHandlers();
   registerKoringAuthHandlers();
   registerJavaHandlers();
+  registerUpdateHandlers();
 }
 
 app.whenReady().then(() => {
@@ -219,6 +222,13 @@ app.whenReady().then(() => {
     splashMinTimeDone = true;
     tryTransition();
   }, 1500);
+
+  // 延迟静默检查更新（避开启动加载，不抢带宽；开发模式在 updater.init 内自动跳过）
+  setTimeout(() => {
+    updateService.check(false).catch((e) => {
+      console.error('[updater] 启动静默检查失败:', e);
+    });
+  }, 12000);
 });
 
 app.on('window-all-closed', () => {

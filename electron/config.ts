@@ -112,6 +112,21 @@ export interface NetworkConfig {
   securityId: SecurityIdConfig;
 }
 
+/** 更新进度持久化（主进程 updater 写入；重启后可恢复/展示） */
+export interface UpdateConfig {
+  /** 状态：idle/checking/available/not-available/downloading/paused/downloaded/installing/error */
+  state: string;
+  /** 目标版本号 */
+  version: string;
+  /** 下载进度百分比 0-100 */
+  percent: number;
+  transferred: number;
+  total: number;
+  /** 更新源：github / 加速源域名 */
+  source: string;
+  error: string;
+}
+
 export interface AppConfig {
   version: number;
   oobe: boolean;
@@ -125,6 +140,7 @@ export interface AppConfig {
   download: DownloadConfig;
   network: NetworkConfig;
   ui: UiConfig;
+  update: UpdateConfig;
   instances: InstanceMeta[];
 }
 
@@ -141,6 +157,7 @@ const DEFAULTS: AppConfig = {
   download: { fileSource: 'mirror', versionSource: 'mirror', threads: 16, speedLimit: 0 },
   network: { securityId: { enabled: false, authUrl: '' } },
   ui: { showInstanceTitle: true, showTaskButton: true },
+  update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', error: '' },
   instances: [],
 };
 

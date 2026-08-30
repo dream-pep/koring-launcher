@@ -1,16 +1,19 @@
 # Koring Launcher 构建 & 发布流水线（手动触发）：构建 → SignPath 签名 → 发布 GitHub Release
 #
 # 手动触发（Actions 页面 -> Run workflow）：
-#   mode    选择构建模式：beta（测试）或 run（正式）
-#   version 基础版本号，如 1.2.0
-# 自动生成 BUILD ID（Action 运行的 UTC 时刻，格式 YYMMDDHHMM，如 2608280224），
-# 最终版本号 = {version}-{BUILD ID}（如 1.2.0-2608280224），tag = v{version}-{BUILD ID}。
+#   mode    构建模式：beta（测试）或 run（正式）
+#   ref     构建来源分支/tag/commit（留空 = 默认分支）
+#   sign    是否使用 SignPath 签名
+# 无 version 输入：base 自动读 package.json（版本单一事实源，消除本地/CI 版本双轨）。
+# BUILD ID = GitHub Run Number（严格递增，无分钟级冲突），
+# 最终版本号 = {base}-{buildId}（如 1.2.0-12），tag = v{base}-{buildId}。
 #
 # 发布行为：
 #   - beta：创建 GitHub prerelease（不占用 "Latest" 位）
 #   - run ：创建正式 release
-#   - Release 正文为中文：版本信息（当前版本 / 编译状态）+ 自上个 release tag 以来的提交记录（默认折叠）
-#   - 上传产物：koring-launcher-{version}-{BUILD ID}-setup.exe + latest.yml（electron-updater 更新清单）
+#   - Release 正文为中文：版本信息（当前版本 / 编译状态 / 构建来源 commit）+ 提交记录（默认折叠）
+#   - 上传产物：koring-launcher-{base}-{buildId}-setup.exe + latest.yml（electron-updater 更新清单）
+#   - 构建元数据（commit / buildId）写入 src/lib/buildInfo.ts，打包进渲染层供 UI 显示
 #
 # Secrets：
 #  SIGNPATH_API_TOKEN    SignPath API Token（必填；放在 Environment "BUILDER" 的环境 Secrets 中）
@@ -27,8 +30,10 @@
 #    正式对外发布需生产证书（OV/EV）+ 对应生产签名策略，届时只换 SIGNPATH_SIGNING_POLICY_SLUG。
 #
 # ⚠️ 版本号注意（electron-updater 语义）：
-#  - {version}-{BUILD ID} 属于 semver prerelease；已安装同格式版本的用户可正常收到更高 BUILD ID 的更新。
-#  - 若未来发布不带 BUILD ID 的稳定版本（如 1.2.0），稳定版用户不会自动升级到带 BUILD ID 的构建。
+#  - {base}-{buildId} 属于 semver prerelease；已安装同格式版本的用户可正常收到更高 buildId 的更新。
+#  - 若未来发布不带 buildId 的稳定版本（如 1.2.0），稳定版用户不会自动升级到带 buildId 的构建。
+#  - 切换 BUILD ID 方案（时间 ID → Run Number）时，旧格式数值更大（2608271921 > 12），
+#    老用户不会自动升级 —— 切换时应同时提升 base（如 1.3.0-12 > 1.2.0-2608271921）。
 
 name: BUILD & Release (SignPath)
 
@@ -42,10 +47,10 @@ on:
         options:
           - beta
           - run
-      version:
-        description: '基础版本号，如 1.2.0'
-        required: true
-        default: '1.2.0'
+      ref:
+        description: '构建来源分支 / tag / commit（留空 = 默认分支）'
+        required: false
+        default: ''
       sign:
         description: '是否使用 SignPath 签名（配额不足时自动跳过）'
         required: true
@@ -75,6 +80,8 @@ jobs:
         with:
           # 需要完整历史：生成中文提交记录（自上个 release tag 以来）
           fetch-depth: 0
+          # 构建来源：默认默认分支，可指定分支/tag/commit
+          ref: ${{ inputs.ref || '' }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -88,17 +95,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # BUILD ID = Action 运行时刻（UTC, YYMMDDHHMM），如 2608280224
+      # BUILD ID = GitHub Run Number（严格递增，无分钟级冲突）
+      # base 自动读 package.json（版本单一事实源，消除本地/CI 版本双轨）
       - name: Generate BUILD ID & set version
         id: version
         shell: pwsh
         run: |
-          $buildId = [DateTime]::UtcNow.ToString('yyMMddHHmm')
-          $full = "${{ inputs.version }}-$buildId"
-          node scripts/version.js $full
+          $buildId = "$env:GITHUB_RUN_NUMBER"
+          $base = node scripts/version.js get
+          $full = node scripts/version.js build ci $buildId
           "build_id=$buildId" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "base=$base" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "full=$full" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          Write-Host "BUILD ID: $buildId  ->  version: $full"
+          Write-Host "BUILD ID: $buildId  ->  version: $full (base: $base)"
+
+      # 生成构建元数据（commit / 编译号）→ 打包进渲染层，UI 显示构建来源
+      - name: Generate build info
+        shell: pwsh
+        run: node scripts/gen-build-info.js ${{ inputs.mode }}
+        env:
+          BUILD_ID: ${{ steps.version.outputs.build_id }}
 
       - name: Build renderer + main (${{ inputs.mode }})
         shell: pwsh
@@ -119,10 +135,11 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/release-notes.ps1 `
-            -BaseVersion "${{ inputs.version }}" `
+            -BaseVersion "${{ steps.version.outputs.base }}" `
             -FullVersion "${{ steps.version.outputs.full }}" `
             -Mode "${{ inputs.mode }}" `
             -SigningStatus "${{ inputs.sign && '已签名' || '未签名' }}" `
+            -Commit "${{ github.sha }}" `
             -OutputPath release-notes.md
 
       - name: Publish GitHub Release
@@ -135,6 +152,7 @@ jobs:
           gh release create $tag `
             "dist-electron/koring-launcher-${{ steps.version.outputs.full }}-setup.exe" `
             "dist-electron/latest.yml" `
-            --title "Koring Launcher Releases ${{ inputs.version }}" `
+            "release-notes.md" `
+            --title "Koring Launcher Releases ${{ steps.version.outputs.base }}" `
             --notes-file release-notes.md `
             $prerelease

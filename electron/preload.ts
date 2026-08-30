@@ -94,4 +94,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Config reset
   resetConfig: () => ipcRenderer.invoke('config:reset'),
+
+  // Auto-update (main process: electron/updater.ts)
+  checkForUpdates: (manual = false) => ipcRenderer.invoke('update:check', { manual }),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  pauseUpdate: () => ipcRenderer.invoke('update:pause'),
+  resumeUpdate: () => ipcRenderer.invoke('update:resume'),
+  cancelUpdate: () => ipcRenderer.invoke('update:cancel'),
+  quitAndInstall: () => ipcRenderer.invoke('update:quitAndInstall'),
+  getUpdateState: () => ipcRenderer.invoke('update:getState'),
+  getReleaseNotes: (tag?: string) => ipcRenderer.invoke('update:getReleaseNotes', { tag }),
+  onUpdateStatus: (callback: (data: unknown) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('update:status', handler);
+    return () => ipcRenderer.removeListener('update:status', handler);
+  },
 });

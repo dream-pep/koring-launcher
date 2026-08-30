@@ -16,10 +16,12 @@ param(
   [Parameter(Mandatory = $true)][string] $FullVersion,
   [Parameter(Mandatory = $true)][string] $Mode,
   [string] $SigningStatus = "已签名",
+  [string] $Commit = "",
   [string] $OutputPath = "release-notes.md"
 )
 
 $status = if ($Mode -eq 'beta') { 'BETA' } else { 'RUN' }
+$commitShort = if ($Commit) { $Commit.Substring(0, [Math]::Min(7, $Commit.Length)) } else { '' }
 
 $rec = [char]0x1e   # 记录分隔符（每个 commit 一条）
 $sep = [char]0x1f   # 字段分隔符（hash / subject / body）
@@ -68,6 +70,7 @@ $content = @"
 当前版本 $FullVersion
 编译状态：$status
 签名状态：$SigningStatus
+$(if ($commitShort) { "构建来源：commit $commitShort" })
 
 ## 更新了什么内容
 $commitsSection

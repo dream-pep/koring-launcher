@@ -23,6 +23,17 @@ interface ElectronAPI {
 
   // Config reset
   resetConfig: () => Promise<void>;
+
+  // Auto-update
+  checkForUpdates: (manual?: boolean) => Promise<unknown>;
+  downloadUpdate: () => Promise<unknown>;
+  pauseUpdate: () => Promise<unknown>;
+  resumeUpdate: () => Promise<unknown>;
+  cancelUpdate: () => Promise<unknown>;
+  quitAndInstall: () => Promise<unknown>;
+  getUpdateState: () => Promise<unknown>;
+  getReleaseNotes: (tag?: string) => Promise<unknown>;
+  onUpdateStatus: (callback: (data: unknown) => void) => () => void;
 }
 
 declare global {

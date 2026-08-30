@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { VersionCard } from "@/components/VersionCard";
 import { BUILD_MODE } from "@/lib/mode";
+import { BUILD_COMMIT, BUILD_ID } from "@/lib/buildInfo";
 import { ExternalLink, GitFork, RotateCcw } from "lucide-react";
 import { Link } from "@heroui/react";
 import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
@@ -68,6 +69,14 @@ export function AboutSetting() {
             <SettingCard>
               <SettingRow label="构建模式">
                 <span className="text-[13px] text-muted-foreground">{modeLabels[BUILD_MODE] ?? BUILD_MODE}</span>
+              </SettingRow>
+            </SettingCard>
+            <SettingCard>
+              <SettingRow label="构建来源" desc="构建所用的 commit 与编译号（CI 构建）">
+                <span className="text-[13px] text-muted-foreground font-mono">
+                  {BUILD_COMMIT ? `commit ${BUILD_COMMIT}` : "本地构建"}
+                  {BUILD_ID !== "local" ? ` · #${BUILD_ID}` : ""}
+                </span>
               </SettingRow>
             </SettingCard>
             <SettingCard>

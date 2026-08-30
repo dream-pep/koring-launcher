@@ -81,6 +81,17 @@ export interface NetworkConfig {
   securityId: SecurityIdConfig;
 }
 
+/** 更新进度持久化（主进程 updater 写入） */
+export interface UpdateConfig {
+  state: string;
+  version: string;
+  percent: number;
+  transferred: number;
+  total: number;
+  source: string;
+  error: string;
+}
+
 export interface InstanceMeta {
   name: string;
   displayName: string;
@@ -106,6 +117,7 @@ export interface AppConfig {
   download: DownloadConfig;
   network: NetworkConfig;
   ui: UiConfig;
+  update: UpdateConfig;
   instances: InstanceMeta[];
 }
 

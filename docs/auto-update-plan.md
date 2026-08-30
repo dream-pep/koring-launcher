@@ -1,11 +1,11 @@
 # Koring Launcher 自动更新方案（v1 规划稿）
 
-> 状态：**M1 已完成（2026-08-28）**；M2 待开始
+> 状态：**M1 完成；M2 主进程更新模块完成（2026-08-28，UI 待做）**
 > 目标平台：**Windows 优先**（NSIS exe 安装包），macOS/Linux 后续复用同一套架构
 > 决策记录：
 > - 安装器模式：**保持 assisted 安装器（`oneClick: false` + 可改安装目录）→ 每次更新整包下载**
 > - 更新托管：**GitHub Releases**
-> - 当前交付：**M1 基础设施已完成**（electron-updater 依赖 + publish 配置 + 1.2.0 打包验证）
+> - 当前交付：**M1 基础设施 + M2 主进程更新模块（GitHub 优先 + 加速源兜底）已完成**
 
 ---
 
@@ -292,20 +292,68 @@ src/
 
 **触发方式**：Actions 页面 → Run workflow，仅手动触发（不再使用 tag 触发）。
 - `mode`：`beta`（测试，发布为 GitHub prerelease）/ `run`（正式，发布为普通 release）
-- `version`：基础版本号（如 `1.2.0`）
+- `ref`：构建来源分支/tag/commit（留空 = 默认分支）
+- `sign`：是否使用 SignPath 签名
+- **无 `version` 输入**：base 自动读 `package.json`（版本单一事实源，消除本地/CI 版本双轨）
 
-**版本号与 BUILD ID**：
-- BUILD ID = Action 运行的 **UTC 时刻**，格式 `YYMMDDHHMM`（如 `2608280224`）
-- 最终版本 = `{version}-{BUILD ID}`（如 `1.2.0-2608280224`），tag = `v{version}-{BUILD ID}`，
-  electron-builder 产物 = `koring-launcher-{version}-{BUILD ID}-setup.exe`，`latest.yml` 同步更新
+**版本号与 BUILD ID（2026-08-30 起改为 GitHub Run Number）**：
+- BUILD ID = `github.run_number`（严格递增、无分钟级冲突）
+- 最终版本 = `{base}-{buildId}`（如 `1.2.0-12`），tag = `v{base}-{buildId}`，
+  electron-builder 产物 = `koring-launcher-{base}-{buildId}-setup.exe`，`latest.yml` 同步更新
+- 构建元数据（commit / buildId）由 `scripts/gen-build-info.js` 写入 `src/lib/buildInfo.ts` →
+  打包进渲染层，VersionCard / 关于页显示**构建来源 commit**（`scripts/version.js build ci` 负责统一设版本）
 
 **发布内容**（`gh release create`，中文正文由 `scripts/release-notes.ps1` 生成）：
-- `# Koring Launcher Releases {version}` + 版本信息（当前版本 / 编译状态 BETA/RUN）
+- `# Koring Launcher Releases {base}` + 版本信息（当前版本 / 编译状态 BETA/RUN / 签名状态 / **构建来源 commit**）
 - `## 更新了什么内容`：自上个 `v*` tag 以来的提交记录，每条默认折叠
   （`<details><summary>·Commit 1cf906d</summary>…</details>`）
-- 上传产物：setup.exe + latest.yml（electron-updater 更新清单）
+- 上传产物：setup.exe + latest.yml + release-notes.md（electron-updater 更新清单）
 
 **⚠️ 版本语义注意（electron-updater）**：
-- `{version}-{BUILD ID}` 属 semver prerelease：同格式版本之间可正常升级（BUILD ID 更大者胜）
-- 若未来发布**不带** BUILD ID 的稳定版本（如 `1.2.0`），稳定版用户不会自动升级到带 BUILD ID 的构建
-- 同一分钟内重复触发会产生相同 BUILD ID → tag 冲突，`gh release create` 会失败，稍候重试即可
+- `{base}-{buildId}` 属 semver prerelease：同格式版本之间可正常升级（buildId 更大者胜）
+- 若未来发布**不带** buildId 的稳定版本（如 `1.2.0`），稳定版用户不会自动升级到带 buildId 的构建
+- **迁移注意**：从时间 ID（`2608271921`）切换到 Run Number 后，旧格式数值更大（`2608271921 > 12`），
+  老用户不会自动升级到新格式——切换时应同时提升 base（如 `1.3.0-12 > 1.2.0-2608271921`）
+
+## 14. M2 主进程更新模块（2026-08-28，UI 待做）
+
+**新增/改动**：
+- `electron/updater.ts` — 更新服务：electron-updater（GitHub provider）优先，失败后加速源兜底；
+  状态机 idle/checking/available/not-available/downloading/downloaded/error，进度事件，`quitAndInstall`
+- `electron/handlers/update.ts` — IPC：`update:check` / `update:download` / `update:quitAndInstall` / `update:getState`，
+  状态变化广播 `update:status` 到所有窗口
+- `electron/main.ts` — 注册 handler + 启动后 12s 延迟静默检查（开发模式自动跳过）
+- `electron/preload.ts` + `src/types/electron.d.ts` — 暴露更新 API（UI 未接，待 M3）
+
+**加速源兜底（实测）**：
+- GitHub 直连在本机网络不可用；`gh.ddlc.top` 已实测可代理 `releases/download`（latest.yml + 102MB 安装包）与 `/releases/latest` 页面
+- 发现机制（无需 GitHub API）：`{镜像}/https://github.com/{owner}/{repo}/releases/latest` 页面 HTML 提取 tag →
+  `autoUpdater.setFeedURL({ provider: 'generic', url: '{镜像}/.../download/{tag}/' })` → 检查/下载
+- 镜像列表可用环境变量 `UPDATE_MIRRORS` 覆盖；后续建议自建 OSS/CDN（generic 直连镜像根目录）
+
+**状态机与 IPC 契约**（前端 M3 实现时使用）：
+```
+idle → checking → available → downloading → downloaded → quitAndInstall()
+        └─not-available→ idle      └─ error → idle(可重试)
+```
+`update:status` payload：`{ state, manual, version?, currentVersion?, percent?, transferred?, total?, bytesPerSecond?, source?, error? }`
+
+## 15. 更新日志独立页面（2026-08-28）
+
+- **独立路由页面** `src/pages/update/index.tsx`（route key `update`），不使用设置页 layout
+- 顶栏（TitleBar）在 sub 模式下**只显示「返回」+ 页面标题「更新日志」**（routeStore 新增 `titleInBar`，
+  其余页面仍显示品牌名）
+- 页面内容：顶部 `VersionCard`，下方 Markdown 渲染当前版本发布说明
+  （主进程 `update:getReleaseNotes`：GitHub 直连优先 + 加速源兜底，读 release 附件 `release-notes.md`；
+  当前版本无发布说明时回退最新版本并标注）
+- **入口**：除 OOBE 与更新日志页本身外，所有 VersionCard 的「检查更新」按钮点击后**跳转到本页**；
+  在本页内点击则直接执行检查
+- **完整下载流程（2026-08-30）**：底部遮罩驱动 —— 检查更新 → 「下载版本更新」→
+  进度条（百分比/已下载/总大小/速度）+ **暂停/继续/取消**（基于 electron-updater CancellationToken）→
+  「安装更新」（先写入 installing 状态并 flush 配置，再 quitAndInstall）
+- **发布说明切换**：默认显示当前版本；检测到可用更新后自动切到最新版本（`getReleaseNotes(v{version})`），
+  退出重进回到当前版本
+- **进度持久化**：每次状态/进度变化写入 `Koring.yml` 的 `update` 段
+  （state/version/percent/transferred/total/source/error）；应用启动时清理上次的进行中状态
+- 配套改动：发布流水线 `gh release create` 上传 `release-notes.md` 附件
+  （旧版本发布的 release 无此附件，页面会显示回退/空态）

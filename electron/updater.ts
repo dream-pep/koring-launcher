@@ -1,0 +1,417 @@
+import { autoUpdater, CancellationToken, type ProgressInfo } from 'electron-updater';
+import electron from 'electron';
+import * as os from 'os';
+import { getConfig, updateConfig, flushConfig } from './config';
+
+const { app } = electron;
+
+export type UpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'paused'
+  | 'downloaded'
+  | 'installing'
+  | 'error';
+
+export interface UpdateStatusPayload {
+  state: UpdateState;
+  /** 是否为手动触发（手动触发时前端不弹提示） */
+  manual: boolean;
+  /** 目标版本号 */
+  version?: string;
+  /** 当前安装版本 */
+  currentVersion?: string;
+  percent?: number;
+  transferred?: number;
+  total?: number;
+  bytesPerSecond?: number;
+  /** 当前使用的更新源（github=官方 / 加速源域名） */
+  source?: string;
+  error?: string;
+}
+
+export interface ReleaseNotesResult {
+  /** release tag，如 v1.2.0-2608271921 */
+  tag: string;
+  /** 版本号（去 v 前缀） */
+  version: string;
+  /** 发布说明原始 Markdown */
+  notes: string;
+  /** 读取来源：github / 加速源域名 */
+  source: string;
+  /** 是否为最新版本的说明（当前版本无发布说明时回退） */
+  isLatest: boolean;
+}
+
+const OWNER = 'dream-pep';
+const REPO = 'koring-launcher';
+const DISCOVER_TIMEOUT_MS = 15000;
+
+/**
+ * 内置加速源（ghproxy 类，代理完整 GitHub URL；latest.yml 的相对路径可解析）。
+ * 实测（2026-08-30）：gh.ddlc.top / gh-proxy.com / ghfast.top 行为正确（按原状转发，404 即 404）；
+ * ghps.cc 已被移除——它对任何请求都返回 200 + HTML 跳转拦截页，会污染 latest.yml / release-notes.md。
+ * 第三方服务稳定性有限，可用环境变量 UPDATE_MIRRORS 覆盖（逗号分隔），
+ * 后续建议换成自建 OSS/CDN 镜像（generic provider 直接指向镜像根目录）。
+ */
+const DEFAULT_MIRRORS: string[] = ['https://gh.ddlc.top', 'https://gh-proxy.com', 'https://ghfast.top'];
+
+function getMirrors(): string[] {
+  const env = process.env.UPDATE_MIRRORS;
+  if (env) {
+    return env.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  return DEFAULT_MIRRORS;
+}
+
+/**
+ * 更新服务：electron-updater（GitHub provider）+ 加速源兜底。
+ * 状态：idle → checking → available → downloading ⇄ paused → downloaded → installing → quitAndInstall
+ * 下载控制：CancellationToken 实现暂停（中断）/继续/取消。
+ * 进度持久化：每次状态/进度变化写入 Koring.yml 的 update 段（下载与安装进度落盘）。
+ */
+class UpdateService {
+  private state: UpdateState = 'idle';
+  private manual = false;
+  private version: string | undefined;
+  private currentVersion = '';
+  private progress: ProgressInfo | null = null;
+  private source = 'github';
+  private error: string | undefined;
+  private listener: ((payload: UpdateStatusPayload) => void) | null = null;
+  private ready = false;
+  /** 检查过程中屏蔽 error 事件（避免 GitHub 失败被当成最终错误） */
+  private suppressErrors = false;
+  /** 当前下载的取消令牌（暂停/取消时 cancel） */
+  private downloadToken: CancellationToken | null = null;
+
+  init(listener: (payload: UpdateStatusPayload) => void): void {
+    this.listener = listener;
+    this.currentVersion = app.getVersion();
+
+    if (!app.isPackaged) {
+      console.log('[updater] 开发模式：跳过自动更新');
+      this.emit();
+      return;
+    }
+
+    // 应用能启动即说明上次安装已完成/已结束，清理持久化的进行中状态
+    const persisted = getConfig().update;
+    if (persisted && persisted.state && persisted.state !== 'idle') {
+      console.log(`[updater] 上次更新状态 ${persisted.state} (v${persisted.version})，已重置`);
+      this.persistIdleConfig();
+    }
+
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.logger = console;
+    autoUpdater.on('checking-for-update', () => {
+      this.state = 'checking';
+      this.emit();
+    });
+    autoUpdater.on('update-available', (info) => {
+      this.state = 'available';
+      this.version = info.version;
+      this.error = undefined;
+      this.emit();
+    });
+    autoUpdater.on('update-not-available', () => {
+      this.state = 'not-available';
+      this.version = undefined;
+      this.emit();
+    });
+    autoUpdater.on('download-progress', (p) => {
+      this.state = 'downloading';
+      this.progress = p;
+      this.emit();
+    });
+    autoUpdater.on('update-downloaded', (info) => {
+      this.state = 'downloaded';
+      this.version = info.version;
+      this.emit();
+    });
+    autoUpdater.on('error', (err: Error) => {
+      const message = String(err?.message ?? err);
+      console.warn(`[updater] electron-updater error: ${message}`);
+      if (this.suppressErrors) return; // 兜底循环内，忽略
+      if (this.downloadToken?.cancelled) return; // 主动暂停/取消，忽略
+      this.state = 'error';
+      this.error = message;
+      this.emit();
+    });
+
+    this.ready = true;
+  }
+
+  private emit(): void {
+    const payload = this.buildPayload();
+    this.listener?.(payload);
+    this.persist(payload);
+  }
+
+  private buildPayload(): UpdateStatusPayload {
+    return {
+      state: this.state,
+      manual: this.manual,
+      version: this.version,
+      currentVersion: this.currentVersion,
+      percent: this.progress?.percent,
+      transferred: this.progress?.transferred,
+      total: this.progress?.total,
+      bytesPerSecond: this.progress?.bytesPerSecond,
+      source: this.source,
+      error: this.error,
+    };
+  }
+
+  /** 将当前状态与下载进度写入配置（下载/安装进度落盘） */
+  private persist(payload: UpdateStatusPayload): void {
+    try {
+      updateConfig({
+        update: {
+          state: payload.state,
+          version: payload.version ?? '',
+          percent: payload.percent ?? 0,
+          transferred: payload.transferred ?? 0,
+          total: payload.total ?? 0,
+          source: payload.source ?? 'github',
+          error: payload.error ?? '',
+        },
+      });
+    } catch (e) {
+      console.warn('[updater] 更新进度写入配置失败:', e);
+    }
+  }
+
+  private persistIdleConfig(): void {
+    try {
+      updateConfig({
+        update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', error: '' },
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  getState(): UpdateStatusPayload {
+    return this.buildPayload();
+  }
+
+  /**
+   * 检查更新：GitHub 官方优先，失败后依次尝试加速源。
+   */
+  async check(manual = false): Promise<UpdateStatusPayload> {
+    if (!this.ready) return this.buildPayload();
+    if (['downloading', 'paused', 'downloaded', 'installing'].includes(this.state)) {
+      return this.buildPayload(); // 已有更新在进行中/已完成
+    }
+
+    this.manual = manual;
+    this.suppressErrors = true;
+
+    // 1) GitHub 官方（app-update.yml 内置 github provider）
+    this.source = 'github';
+    this.state = 'checking';
+    this.emit();
+    try {
+      await autoUpdater.checkForUpdates();
+      this.suppressErrors = false;
+      return this.buildPayload();
+    } catch (err) {
+      console.warn(`[updater] GitHub 官方更新源不可用: ${String((err as Error)?.message ?? err)}`);
+    }
+
+    // 2) 加速源兜底：镜像页面发现最新 tag → generic feed → 检查
+    for (const mirror of getMirrors()) {
+      try {
+        const tag = await this.discoverLatestTag(mirror);
+        if (!tag) {
+          console.warn(`[updater] ${mirror} 无法发现最新版本，跳过`);
+          continue;
+        }
+        const feedUrl = `${mirror}/https://github.com/${OWNER}/${REPO}/releases/download/${tag}/`;
+        console.log(`[updater] 切换加速源: ${mirror} (feed: ${feedUrl})`);
+        autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl });
+        this.source = mirror;
+        this.state = 'checking';
+        this.emit();
+        await autoUpdater.checkForUpdates();
+        this.suppressErrors = false;
+        return this.buildPayload();
+      } catch (err) {
+        console.warn(`[updater] 加速源 ${mirror} 检查失败: ${String((err as Error)?.message ?? err)}`);
+      }
+    }
+
+    this.suppressErrors = false;
+    this.state = 'error';
+    this.error = '无法连接更新服务器（GitHub 与所有加速源均不可用），请稍后重试';
+    this.emit();
+    return this.buildPayload();
+  }
+
+  /**
+   * 通过加速源发现最新 release tag（不需要 GitHub API）：
+   * 1) /releases/latest 页面 HTML 中提取 tag（多数下载型加速源可代理该页面）
+   * 2) 少数加速源可代理 api.github.com，作为备选
+   */
+  private async discoverLatestTag(mirror: string): Promise<string | null> {
+    // 方式 1：HTML 页面
+    try {
+      const pageUrl = `${mirror}/https://github.com/${OWNER}/${REPO}/releases/latest`;
+      const res = await fetch(pageUrl, {
+        headers: { 'User-Agent': 'koring-launcher-updater' },
+        signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        const m = html.match(/\/releases\/tag\/(v[^"<]+)/);
+        if (m?.[1]) return m[1];
+      }
+    } catch {
+      /* 尝试下一种方式 */
+    }
+
+    // 方式 2：GitHub API（经加速源代理）
+    try {
+      const apiUrl = `${mirror}/https://api.github.com/repos/${OWNER}/${REPO}/releases?per_page=20`;
+      const res = await fetch(apiUrl, {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'koring-launcher-updater' },
+        signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
+      });
+      if (res.ok) {
+        const releases: { draft?: boolean; tag_name?: string }[] = await res.json();
+        const release = (releases ?? []).find((r) => !r.draft && !!r.tag_name);
+        if (release?.tag_name) return release.tag_name;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return null;
+  }
+
+  /**
+   * 获取指定版本（默认当前安装版本）的发布说明（release-notes.md 附件，原始 Markdown）。
+   * GitHub 直连优先，失败后依次尝试加速源；当前版本没有发布说明时回退到最新版本。
+   */
+  async getReleaseNotes(requestedTag?: string): Promise<ReleaseNotesResult | null> {
+    const tag = (requestedTag?.trim() || `v${app.getVersion()}`).replace(/^v(?=\d)/, 'v');
+    const found = await this.fetchNotesForTag(tag);
+    if (found) return found;
+
+    // 回退：最新版本（通过 /releases/latest 页面发现 tag）
+    for (const mirror of getMirrors()) {
+      const latestTag = await this.discoverLatestTag(mirror);
+      if (latestTag && latestTag !== tag) {
+        const foundLatest = await this.fetchNotesForTag(latestTag);
+        if (foundLatest) {
+          return { ...foundLatest, isLatest: true };
+        }
+      }
+    }
+    return null;
+  }
+
+  private async fetchNotesForTag(tag: string): Promise<ReleaseNotesResult | null> {
+    const bases: { source: string; base: string }[] = [
+      { source: 'github', base: `https://github.com/${OWNER}/${REPO}` },
+      ...getMirrors().map((m) => ({ source: m, base: `${m}/https://github.com/${OWNER}/${REPO}` })),
+    ];
+    for (const { source, base } of bases) {
+      try {
+        const url = `${base}/releases/download/${tag}/release-notes.md`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'koring-launcher-updater' },
+          signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
+        });
+        if (res.ok) {
+          // 部分加速源对任意 URL 返回 200 + HTML 跳转/拦截页，必须校验内容
+          const contentType = res.headers.get('content-type') ?? '';
+          if (/^text\/html/i.test(contentType)) continue;
+          const notes = await res.text();
+          if (!notes.trim()) continue;
+          if (/^\s*<!doctype html/i.test(notes) || /^\s*<html[\s>]/i.test(notes)) continue;
+          console.log(`[updater] 发布说明来源: ${source} (${tag})`);
+          return { tag, version: tag.replace(/^v/, ''), notes, source, isLatest: false };
+        }
+      } catch {
+        /* 尝试下一个源 */
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 下载更新（触发下载，进度经 update:status 上报并写入配置）。
+   * available → 开始下载；paused → 继续下载。
+   */
+  async download(): Promise<void> {
+    if (!this.ready) return;
+    if (this.state === 'downloading' || this.state === 'downloaded' || this.state === 'installing') return;
+    if (this.state === 'paused') {
+      // 继续下载（可能从断点续传，也可能重新开始，取决于 electron-updater 缓存）
+      console.log('[updater] 继续下载');
+    }
+    this.state = 'downloading';
+    this.progress = null;
+    this.emit();
+
+    const token = new CancellationToken();
+    this.downloadToken = token;
+    try {
+      await autoUpdater.downloadUpdate(token);
+    } catch (err) {
+      if (token.cancelled) return; // 主动暂停/取消，不是错误
+      this.state = 'error';
+      this.error = String((err as Error)?.message ?? err);
+      this.emit();
+    }
+  }
+
+  /** 暂停下载（中断当前请求，保留进度；再次下载即继续） */
+  pause(): void {
+    if (!this.ready || this.state !== 'downloading') return;
+    this.state = 'paused';
+    this.emit();
+    this.downloadToken?.cancel();
+  }
+
+  /** 取消下载：中断并清除进度，回到 available（可重新下载） */
+  cancel(): void {
+    if (!this.ready) return;
+    this.downloadToken?.cancel();
+    this.downloadToken = null;
+    if (this.state === 'downloading' || this.state === 'paused') {
+      this.state = 'available';
+      this.progress = null;
+      this.emit();
+    }
+  }
+
+  /**
+   * 退出并安装（NSIS 静默安装，安装完成自动重启）。
+   * 安装状态先写入配置并立即落盘，避免退出时 debounce 未写盘。
+   */
+  quitAndInstall(): void {
+    if (!this.ready || this.state !== 'downloaded') return;
+    this.state = 'installing';
+    this.emit();
+    try {
+      flushConfig();
+    } catch {
+      /* ignore */
+    }
+    autoUpdater.quitAndInstall();
+  }
+
+  /** 获取系统下载临时目录（用于清理提示，暂未启用） */
+  getCacheDir(): string {
+    return os.tmpdir();
+  }
+}
+
+export const updateService = new UpdateService();

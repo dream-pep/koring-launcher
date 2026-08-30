@@ -17,6 +17,7 @@ import { Setting } from "./pages/setting";
 import { SettingLogin } from "./pages/setting/login";
 import { Gallery } from "./pages/gallery";
 import { TaskQueue } from "./pages/task-queue";
+import { UpdatePage } from "./pages/update";
 import { Debug } from "./pages/debug";
 import { SplashDebug } from "./pages/debug/splash-debug";
 import { DisplayDebug } from "./pages/debug/display-debug";
@@ -43,6 +44,7 @@ const pageMap = {
   "setting/login": SettingLogin,
   gallery: Gallery,
   "task-queue": TaskQueue,
+  update: UpdatePage,
   oobe: Oobe,
   "oobe/language": OobeLanguage,
   "oobe/agreement": OobeAgreement,

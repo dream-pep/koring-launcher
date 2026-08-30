@@ -9,6 +9,7 @@ export type RouteKey =
   | "setting/login"
   | "gallery"
   | "task-queue"
+  | "update"
   | "oobe"
   | "oobe/language"
   | "oobe/agreement"
@@ -51,6 +52,7 @@ export const allRoutes: RouteItem[] = [
   ...routes,
   { key: "setting/login", label: "登录", path: "/setting/login", hidden: true, backable: true },
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
+  { key: "update", label: "更新日志", path: "/update", hidden: true, backable: true },
   { key: "oobe", label: "OOBE", path: "/oobe", hidden: true },
   { key: "oobe/language", label: "语言设置", path: "/oobe/language", hidden: true },
   { key: "oobe/agreement", label: "同意协议", path: "/oobe/agreement", hidden: true },
