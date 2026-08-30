@@ -296,10 +296,16 @@ src/
 - `sign`：是否使用 SignPath 签名
 - **无 `version` 输入**：base 自动读 `package.json`（版本单一事实源，消除本地/CI 版本双轨）
 
-**版本号与 BUILD ID（2026-08-30 起改为 GitHub Run Number）**：
+**版本号与 BUILD ID（2026-08-30 起）**：
 - BUILD ID = `github.run_number`（严格递增、无分钟级冲突）
-- 最终版本 = `{base}-{buildId}`（如 `1.2.0-12`），tag = `v{base}-{buildId}`，
-  electron-builder 产物 = `koring-launcher-{base}-{buildId}-setup.exe`，`latest.yml` 同步更新
+- **beta**：`{base}-beta.{buildId}`（如 `1.2.1-beta.13`，tag `v1.2.1-beta.13`，GitHub 标记 prerelease）
+- **run**：`{base}`（稳定版，如 `1.2.1`，tag `v1.2.1`）
+- ⚠️ **为什么弃用数字标识**：electron-updater 的 GitHub provider 频道逻辑只认 `alpha`/`beta`
+  字符串频道；`1.2.1-13` 的数字 prerelease 会被当作"自定义频道"导致更新检查
+  `No published versions on GitHub`（无法识别当前/最新版本）。字母标识 `beta` 解决此问题。
+- **兼容性**（semver 数字 < 字母）：`1.2.1-beta.13 > 1.2.1-12 > 1.2.1-2608271921 > 1.2.1`，
+  所有旧数字版本（含时间 ID 与 Run Number 时代）都能平滑升级到新格式；beta 用户可被正式版（稳定）覆盖
+- beta release 额外上传 `latest-beta.yml`（GitHub provider 频道取件用，避免 404 回退）
 - 构建元数据（commit / buildId）由 `scripts/gen-build-info.js` 写入 `src/lib/buildInfo.ts` →
   打包进渲染层，VersionCard / 关于页显示**构建来源 commit**（`scripts/version.js build ci` 负责统一设版本）
 
@@ -311,23 +317,27 @@ src/
 - **Release 标题命名（仅展示名，tag/真实版本号不变）**：run → `{base}`（如 `1.2.1`），
   beta → `BETA {base}`（如 `BETA 1.2.1`）
 
-**⚠️ 版本语义注意（electron-updater）**：
-- `{base}-{buildId}` 属 semver prerelease；**electron-updater 默认 `allowPrerelease=false` 会直接跳过带
-  prerelease 后缀的新版本**（GitHub provider 过滤 prerelease release + isUpdateAvailable 的
-  `semver.prerelease` 校验）——**必须**在 `electron/updater.ts` 设置 `autoUpdater.allowPrerelease = true`，
-  否则如 v1.2.1-4 永远检测不到 v1.2.1-5（该问题已修复并落地）。
-- 开启后：同格式版本之间可正常升级（buildId 更大者胜，数值比较，如 `1.2.1-5 > 1.2.1-4`）
-- 若未来发布**不带** buildId 的稳定版本（如 `1.2.0`），稳定版用户不会自动升级到带 buildId 的构建
-- **迁移注意**：从时间 ID（`2608271921`）切换到 Run Number 后，旧格式数值更大（`2608271921 > 12`），
-  老用户不会自动升级到新格式——切换时应同时提升 base（如 `1.3.0-12 > 1.2.0-2608271921`）
+**⚠️ 版本语义注意（electron-updater，2026-08-30 已修复并落地）**：
+- **根因**：GitHub provider 用 Atom feed + 频道逻辑选版本，频道只认 `alpha`/`beta` 字符串标识。
+  数字 prerelease（`1.2.1-4`）会被当作"自定义频道" → 永远选不出版本（`No published versions on GitHub`），
+  且 `allowPrerelease` 由当前版本自动决定（含 prerelease 即开启）。
+- **修复**：beta 用 `{base}-beta.{buildId}`（频道 `beta`，allowPrerelease 自动开启 → 正常识别）；
+  run 用稳定版 `{base}`（allowPrerelease=false → 走 releases/latest，正常识别）。
+- 同格式升级：`1.2.1-beta.14 > 1.2.1-beta.13`（数值比较）✓；`1.2.1 > 1.2.1-beta.x`（稳定版覆盖 beta）✓
+- **无需手动设置 allowPrerelease**：electron-updater 按当前版本自动判定（见 AppUpdater.js:218）。
+- 所有旧数字版本（`1.2.1-12` / `1.2.1-2608271921`）都小于 `1.2.1-beta.13`，平滑升级，无需提升 base
 
 ## 14. M2 主进程更新模块（2026-08-28，UI 待做）
 
 **新增/改动**：
 - `electron/updater.ts` — 更新服务：electron-updater（GitHub provider）优先，失败后加速源兜底；
   状态机 idle/checking/available/not-available/downloading/downloaded/error，进度事件，`quitAndInstall`
-- `electron/handlers/update.ts` — IPC：`update:check` / `update:download` / `update:quitAndInstall` / `update:getState`，
+- `electron/handlers/update.ts` — IPC：`update:check` / `update:download` / `update:pause` / `update:resume` /
+  `update:cancel` / `update:quitAndInstall` / `update:getState` / `update:getReleaseNotes` /
+  `update:getChannels` / `update:setChannel` / `update:setTestVersion` / `update:compareVersions`，
   状态变化广播 `update:status` 到所有窗口
+- 开发者工具：`window:openDevTools`（打开 Chromium DevTools）+ 更新功能测试页
+  （`debug-update`：设置测试版本号 / 检查更新 / 获取发布说明 / 版本识别列表 / 版本比对 / 下载）
 - `electron/main.ts` — 注册 handler + 启动后 12s 延迟静默检查（开发模式自动跳过）
 - `electron/preload.ts` + `src/types/electron.d.ts` — 暴露更新 API（UI 未接，待 M3）
 
@@ -342,7 +352,16 @@ src/
 idle → checking → available → downloading → downloaded → quitAndInstall()
         └─not-available→ idle      └─ error → idle(可重试)
 ```
-`update:status` payload：`{ state, manual, version?, currentVersion?, percent?, transferred?, total?, bytesPerSecond?, source?, error? }`
+`update:status` payload：`{ state, manual, version?, currentVersion?, percent?, transferred?, total?, bytesPerSecond?, source?, channel?, error? }`
+
+## 16. 更新通道（woker / runner，2026-08-30）
+
+- **可扩展通道注册表**（`electron/updater.ts` 的 `UPDATE_CHANNELS`）：新增通道只需追加一项，
+  UI 通过 `update:getChannels` 动态渲染
+- **woker（慢走模式，默认）**：`allowPrerelease=false` → 仅获取正式版（稳定）更新
+- **runner（跑步模式）**：`allowPrerelease=true` → 可获取预览版（测试版）更新
+- 通道持久化在 `Koring.yml` 的 `update.channel`；`update:setChannel` 即时切换，下次检查生效
+- UI：设置 → 关于 → **更新设置**区块的「更新通道」**下拉框**（选项由 `update:getChannels` 动态渲染）
 
 ## 15. 更新日志独立页面（2026-08-28）
 

@@ -1,7 +1,15 @@
 import { useRouteStore } from "@/stores/routeStore";
-import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle } from "lucide-react";
+import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle, RefreshCw, SquareTerminal } from "lucide-react";
 
 const debugPages = [
+  {
+    key: "debug-update" as const,
+    icon: RefreshCw,
+    title: "更新功能测试",
+    desc: "设置测试版本号、检查更新、获取发布说明、版本比对与下载",
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10",
+  },
   {
     key: "debug-crash" as const,
     icon: AlertTriangle,
@@ -66,6 +74,23 @@ export function Debug() {
           <p className="text-sm text-muted-foreground">调试启动器的各项功能与视觉效果</p>
         </div>
       </div>
+
+      {/* 打开浏览器调试工具（DevTools） */}
+      <button
+        onClick={() => window.electronAPI?.openDevTools()}
+        className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-transform cursor-pointer group mb-4"
+      >
+        <div className="flex items-center gap-4">
+          <div className="p-2.5 rounded-xl bg-foreground/[0.08]">
+            <SquareTerminal className="w-5 h-5 text-foreground/60" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">打开开发者工具</p>
+            <p className="text-[13px] text-muted-foreground mt-0.5">打开浏览器调试工具（Chromium DevTools），查看控制台与网络请求</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-foreground/20 group-hover:text-foreground/40 transition-colors shrink-0" />
+        </div>
+      </button>
 
       <div className="space-y-3">
         {debugPages.map((p) => (

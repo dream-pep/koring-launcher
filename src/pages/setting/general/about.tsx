@@ -2,10 +2,18 @@ import { useState, useEffect } from "react";
 import { VersionCard } from "@/components/VersionCard";
 import { BUILD_MODE } from "@/lib/mode";
 import { BUILD_COMMIT, BUILD_ID } from "@/lib/buildInfo";
-import { ExternalLink, GitFork, RotateCcw } from "lucide-react";
-import { Link } from "@heroui/react";
+import { ExternalLink, GitFork, RotateCcw, ChevronDown } from "lucide-react";
+import { Link, Select, ListBox, ListBoxItem } from "@heroui/react";
 import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
 import { Button } from "@/components/ui/button";
+import {
+  getUpdateChannels,
+  getUpdateState,
+  onUpdateStatus,
+  setUpdateChannel,
+  type UpdateChannelDef,
+} from "@/api/update";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -27,10 +35,49 @@ const modeLabels: Record<string, string> = {
 const GITHUB_URL = "https://github.com/lingke-net/koring-launcher";
 const OFFICIAL_URL = "https://koring.space";
 
+/** 兜底通道列表：主进程 update:getChannels 不可用时使用，保证下拉框始终有选项 */
+const FALLBACK_CHANNELS: UpdateChannelDef[] = [
+  { key: "woker", label: "慢走模式", desc: "仅获取正式版更新（稳定）", allowPrerelease: false },
+  { key: "runner", label: "跑步模式", desc: "可获取预览版（测试版）更新", allowPrerelease: true },
+];
+
 export function AboutSetting() {
   const [open, setOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const canConfirm = countdown <= 0;
+
+  // 更新通道（下拉框，选项来自主进程通道注册表）
+  const [channels, setChannels] = useState<UpdateChannelDef[]>([]);
+  const [activeChannel, setActiveChannel] = useState("woker");
+
+  useEffect(() => {
+    getUpdateChannels()
+      .then((list) => setChannels(list.length ? list : FALLBACK_CHANNELS))
+      .catch((e) => {
+        console.error("[update] 获取更新通道失败，使用内置列表:", e);
+        setChannels(FALLBACK_CHANNELS);
+      });
+    const unsub = onUpdateStatus((s) => {
+      if (s.channel) setActiveChannel(s.channel);
+    });
+    getUpdateState()
+      .then((s) => {
+        if (s.channel) setActiveChannel(s.channel);
+      })
+      .catch(() => {});
+    return unsub;
+  }, []);
+
+  const handleChannelChange = async (key: unknown) => {
+    if (typeof key !== "string" || !key || key === activeChannel) return;
+    try {
+      await setUpdateChannel(key);
+      setActiveChannel(key);
+      toast.success("更新通道已切换，下次检查更新生效");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +129,48 @@ export function AboutSetting() {
             <SettingCard>
               <SettingRow label="技术栈" desc="Electron + React 19 + TypeScript + @xmcl">
                 <span className="text-[13px] text-muted-foreground">Node.js</span>
+              </SettingRow>
+            </SettingCard>
+          </div>
+        </div>
+
+        <div>
+          <SectionTitle>更新设置</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              <SettingRow label="更新通道" desc="慢走模式仅获取正式版；跑步模式可获取预览版">
+                <Select.Root
+                  selectedKey={activeChannel}
+                  onSelectionChange={handleChannelChange}
+                  aria-label="更新通道"
+                  className="w-48"
+                >
+                  <Select.Trigger className="h-8 rounded-lg border border-border/40 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 hover:border-primary/30 transition-colors">
+                    <Select.Value className="text-[13px] text-foreground">
+                      {channels.find((c) => c.key === activeChannel)?.label ?? "慢走模式"}
+                    </Select.Value>
+                    <Select.Indicator>
+                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Select.Indicator>
+                  </Select.Trigger>
+                  <Select.Popover className="z-50 rounded-xl border border-border/50 dark:border-white/[0.08] bg-background shadow-xl p-1.5 w-52">
+                    <ListBox className="outline-none">
+                      {channels.map((c) => (
+                        <ListBoxItem
+                          key={c.key}
+                          id={c.key}
+                          textValue={c.label}
+                          className="text-[13px] py-1.5 px-2.5 rounded-lg data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary outline-none cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span>{c.label}</span>
+                            <span className="text-[12px] text-muted-foreground">{c.desc}</span>
+                          </div>
+                        </ListBoxItem>
+                      ))}
+                    </ListBox>
+                  </Select.Popover>
+                </Select.Root>
               </SettingRow>
             </SettingCard>
           </div>

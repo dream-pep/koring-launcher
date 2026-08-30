@@ -1,1 +1,3 @@
 oobe: false
+theme:
+  darkMode: light

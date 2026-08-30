@@ -124,6 +124,8 @@ export interface UpdateConfig {
   total: number;
   /** 更新源：github / 加速源域名 */
   source: string;
+  /** 更新通道：woker（慢走，仅正式版）/ runner（跑步，含预览版） */
+  channel: string;
   error: string;
 }
 
@@ -157,7 +159,7 @@ const DEFAULTS: AppConfig = {
   download: { fileSource: 'mirror', versionSource: 'mirror', threads: 16, speedLimit: 0 },
   network: { securityId: { enabled: false, authUrl: '' } },
   ui: { showInstanceTitle: true, showTaskButton: true },
-  update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', error: '' },
+  update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', channel: 'woker', error: '' },
   instances: [],
 };
 

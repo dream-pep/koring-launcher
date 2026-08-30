@@ -69,6 +69,12 @@ export function registerWindowHandlers(win: WinRef) {
     return (win.mainWindow as any)?.themeSource ?? null;
   });
 
+  // 打开浏览器调试工具（DevTools，开发者工具测试用）
+  ipcMain.handle('window:openDevTools', () => {
+    win.mainWindow?.webContents.openDevTools({ mode: 'detach' });
+    return { success: true };
+  });
+
   // Splash window management
   ipcMain.handle('window:openSplash', () => {
     if (win.splashWindow && !win.splashWindow.isDestroyed()) {

@@ -89,6 +89,7 @@ export interface UpdateConfig {
   transferred: number;
   total: number;
   source: string;
+  channel: string;
   error: string;
 }
 

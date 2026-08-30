@@ -1,6 +1,7 @@
 import { autoUpdater, CancellationToken, type ProgressInfo } from 'electron-updater';
 import electron from 'electron';
 import * as os from 'os';
+import semver from 'semver';
 import { getConfig, updateConfig, flushConfig } from './config';
 
 const { app } = electron;
@@ -30,7 +31,36 @@ export interface UpdateStatusPayload {
   bytesPerSecond?: number;
   /** 当前使用的更新源（github=官方 / 加速源域名） */
   source?: string;
+  /** 当前更新通道（woker / runner） */
+  channel?: string;
   error?: string;
+}
+
+/** 更新通道 key（可扩展：新增通道只需在 UPDATE_CHANNELS 注册） */
+export type UpdateChannelKey = 'woker' | 'runner';
+
+export interface UpdateChannelDef {
+  key: UpdateChannelKey;
+  /** 显示名 */
+  label: string;
+  /** 说明 */
+  desc: string;
+  /** 是否接收预览版（runner 可收 beta；woker 只收正式版） */
+  allowPrerelease: boolean;
+}
+
+/**
+ * 更新通道注册表（后期扩展新通道：在此追加一项即可，UI 通过 update:getChannels 动态渲染）。
+ * - woker（慢走模式，默认）：仅检查/获取正式版（稳定）更新
+ * - runner（跑步模式）：可获取预览版（测试版）更新
+ */
+const UPDATE_CHANNELS: UpdateChannelDef[] = [
+  { key: 'woker', label: '慢走模式', desc: '仅获取正式版更新（稳定）', allowPrerelease: false },
+  { key: 'runner', label: '跑步模式', desc: '可获取预览版（测试版）更新', allowPrerelease: true },
+];
+
+function getChannelDef(key: string): UpdateChannelDef {
+  return UPDATE_CHANNELS.find((c) => c.key === key) ?? UPDATE_CHANNELS[0];
 }
 
 export interface ReleaseNotesResult {
@@ -108,6 +138,8 @@ class UpdateService {
   private suppressErrors = false;
   /** 当前下载的取消令牌（暂停/取消时 cancel） */
   private downloadToken: CancellationToken | null = null;
+  /** 当前更新通道（woker 慢走 / runner 跑步；从配置读取，可运行时切换） */
+  private channelKey: UpdateChannelKey = 'woker';
 
   init(listener: (payload: UpdateStatusPayload) => void): void {
     this.listener = listener;
@@ -119,6 +151,12 @@ class UpdateService {
       return;
     }
 
+    // 恢复持久化的更新通道
+    const persistedChannel = getConfig().update?.channel;
+    if (persistedChannel && UPDATE_CHANNELS.some((c) => c.key === persistedChannel)) {
+      this.channelKey = persistedChannel as UpdateChannelKey;
+    }
+
     // 应用能启动即说明上次安装已完成/已结束，清理持久化的进行中状态
     const persisted = getConfig().update;
     if (persisted && persisted.state && persisted.state !== 'idle') {
@@ -128,11 +166,7 @@ class UpdateService {
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
-    // 项目版本方案为 {base}-{buildId}（如 1.2.1-5），属 semver prerelease（带 - 后缀）。
-    // electron-updater 默认 allowPrerelease=false：GitHub provider 会过滤 prerelease release，
-    // isUpdateAvailable 也会拒绝带 prerelease 后缀的新版本 → v1.2.1-4 永远检测不到 v1.2.1-5。
-    // 必须显式开启（本项目的每个发布版本都是 prerelease 形式，不存在误升级稳定版的问题）。
-    autoUpdater.allowPrerelease = true;
+    this.applyChannel();
     autoUpdater.logger = console;
     autoUpdater.on('checking-for-update', () => {
       this.state = 'checking';
@@ -189,6 +223,7 @@ class UpdateService {
       total: this.progress?.total,
       bytesPerSecond: this.progress?.bytesPerSecond,
       source: this.source,
+      channel: this.channelKey,
       error: this.error,
     };
   }
@@ -204,6 +239,7 @@ class UpdateService {
           transferred: payload.transferred ?? 0,
           total: payload.total ?? 0,
           source: payload.source ?? 'github',
+          channel: this.channelKey,
           error: payload.error ?? '',
         },
       });
@@ -215,15 +251,90 @@ class UpdateService {
   private persistIdleConfig(): void {
     try {
       updateConfig({
-        update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', error: '' },
+        update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', channel: this.channelKey, error: '' },
       });
     } catch {
       /* ignore */
     }
   }
 
+  /** 按当前通道应用 electron-updater 的 allowPrerelease（woker=只收正式版 / runner=可收预览版） */
+  private applyChannel(): void {
+    const def = getChannelDef(this.channelKey);
+    // runner(跑步) 强制开启 allowPrerelease → GitHub provider 走 Atom feed 频道逻辑可收 beta；
+    // woker(慢走) 关闭 → 走 releases/latest 只认稳定版，不被预览版污染。
+    autoUpdater.allowPrerelease = def.allowPrerelease;
+    console.log(`[updater] 更新通道: ${def.label}（${def.key}，allowPrerelease=${def.allowPrerelease}）`);
+  }
+
+  /** 通道定义列表（UI 动态渲染；可扩展） */
+  getChannels(): UpdateChannelDef[] {
+    return UPDATE_CHANNELS;
+  }
+
+  /** 切换更新通道（校验 + 持久化 + 立即生效，下次检查生效） */
+  setChannel(key: string): UpdateStatusPayload {
+    if (!UPDATE_CHANNELS.some((c) => c.key === key)) {
+      console.warn(`[updater] 未知更新通道: ${key}`);
+      return this.buildPayload();
+    }
+    if (this.channelKey === key) return this.buildPayload();
+    this.channelKey = key as UpdateChannelKey;
+    this.applyChannel();
+    try {
+      updateConfig({ update: { channel: key } });
+    } catch (e) {
+      console.warn('[updater] 通道写入配置失败:', e);
+    }
+    this.emit();
+    return this.buildPayload();
+  }
+
   getState(): UpdateStatusPayload {
     return this.buildPayload();
+  }
+
+  /**
+   * 测试用：覆盖当前识别到的版本号（影响 update:getState 与后续更新检查的比对）。
+   * 传入非法版本时忽略并返回当前状态。
+   */
+  setTestVersion(version: string): UpdateStatusPayload {
+    const v = semver.valid(version.trim());
+    if (!v) {
+      console.warn(`[updater] 无效测试版本号: ${version}`);
+      return this.buildPayload();
+    }
+    this.currentVersion = v;
+    try {
+      // currentVersion 在类型声明中为 readonly，但运行时可直接赋值（测试工具用）
+      (autoUpdater as unknown as { currentVersion: unknown }).currentVersion = semver.parse(v);
+    } catch (e) {
+      console.warn('[updater] 设置 autoUpdater.currentVersion 失败:', e);
+    }
+    console.log(`[updater] 测试版本号 → ${v}`);
+    this.emit();
+    return this.buildPayload();
+  }
+
+  /** 版本比对（semver 规则，支持 v 前缀与 prerelease） */
+  compareVersions(a: string, b: string): { a: string; b: string; result: string; detail: string } {
+    const va = semver.valid(a.trim());
+    const vb = semver.valid(b.trim());
+    if (!va || !vb) {
+      return {
+        a: a.trim(),
+        b: b.trim(),
+        result: 'invalid',
+        detail: `无效版本：${!va ? `「${a.trim()}」` : ''}${!va && !vb ? ' / ' : ''}${!vb ? `「${b.trim()}」` : ''}`,
+      };
+    }
+    const c = semver.compare(va, vb);
+    return {
+      a: va,
+      b: vb,
+      result: c > 0 ? 'a>b' : c < 0 ? 'a<b' : 'a==b',
+      detail: `${va} ${c > 0 ? '>' : c < 0 ? '<' : '=='} ${vb}`,
+    };
   }
 
   /**
@@ -268,7 +379,8 @@ class UpdateService {
         this.suppressErrors = false;
         // 镜像若反馈无更新（可能发现的是旧 tag / latest.yml 不匹配），
         // 不要就此返回 not-available，继续尝试下一个源
-        if (this.state !== 'not-available') return this.buildPayload();
+        const mirrorResult = this.buildPayload();
+        if (mirrorResult.state !== 'not-available') return mirrorResult;
         console.warn(`[updater] ${mirror} 反馈无可用更新，尝试下一个源`);
       } catch (err) {
         console.warn(`[updater] 加速源 ${mirror} 检查失败: ${String((err as Error)?.message ?? err)}`);

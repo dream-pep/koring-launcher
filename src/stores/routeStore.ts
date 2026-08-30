@@ -24,6 +24,7 @@ export type RouteKey =
   | "debug-splash"
   | "debug-display"
   | "debug-version-card"
+  | "debug-update"
   | "debug-task"
   | "debug-crash";
 
@@ -67,6 +68,7 @@ export const allRoutes: RouteItem[] = [
   { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
   { key: "debug-display", label: "显示效果调试", path: "/debug/display", hidden: true },
   { key: "debug-version-card", label: "版本卡片调试", path: "/debug/version-card", hidden: true },
+  { key: "debug-update", label: "更新功能测试", path: "/debug/update", hidden: true },
   { key: "debug-task", label: "任务队列调试", path: "/debug/task", hidden: true },
 ];
 

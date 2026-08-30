@@ -22,6 +22,7 @@ import { Debug } from "./pages/debug";
 import { SplashDebug } from "./pages/debug/splash-debug";
 import { DisplayDebug } from "./pages/debug/display-debug";
 import { VersionCardDebug } from "./pages/debug/version-card-debug";
+import { UpdateDebug } from "./pages/debug/update-debug";
 import { TaskDebug } from "./pages/debug/task-debug";
 import { CrashDebug } from "./pages/debug/crash-debug";
 import { Oobe } from "./pages/oobe";
@@ -59,6 +60,7 @@ const pageMap = {
   "debug-splash": SplashDebug,
   "debug-display": DisplayDebug,
   "debug-version-card": VersionCardDebug,
+  "debug-update": UpdateDebug,
   "debug-task": TaskDebug,
   "debug-crash": CrashDebug,
 } as const;

@@ -88,4 +88,43 @@ export function registerUpdateHandlers() {
       return { success: false, data: null, error: String(e) };
     }
   });
+
+  // 更新通道定义列表（woker/runner…，UI 动态渲染）
+  ipcMain.handle('update:getChannels', () => {
+    try {
+      return { success: true, data: updateService.getChannels(), error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 切换更新通道（持久化并立即生效）
+  ipcMain.handle('update:setChannel', (_event, payload?: { channel?: string }) => {
+    try {
+      const state = updateService.setChannel(payload?.channel ?? '');
+      return { success: true, data: state, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 开发者工具：设置测试版本号（覆盖当前识别版本）
+  ipcMain.handle('update:setTestVersion', (_event, payload?: { version?: string }) => {
+    try {
+      const state = updateService.setTestVersion(payload?.version ?? '');
+      return { success: true, data: state, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 开发者工具：版本比对（semver）
+  ipcMain.handle('update:compareVersions', (_event, payload?: { a?: string; b?: string }) => {
+    try {
+      const data = updateService.compareVersions(payload?.a ?? '', payload?.b ?? '');
+      return { success: true, data, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
 }

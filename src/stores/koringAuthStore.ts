@@ -16,7 +16,7 @@ interface KoringAuthState {
   logout: () => Promise<void>;
 }
 
-export const useKoringAuthStore = create<KoringAuthState>((set) => ({
+export const useKoringAuthStore = create<KoringAuthState>((set, get) => ({
   user: null,
   authData: null,
   loading: false,

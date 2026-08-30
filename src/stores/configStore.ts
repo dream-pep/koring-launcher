@@ -59,7 +59,7 @@ const DEFAULT_CONFIG: AppConfig = {
   download: { fileSource: "mirror", versionSource: "mirror", threads: 16, speedLimit: 0 },
   network: { securityId: { enabled: false, authUrl: "" } },
   ui: { showInstanceTitle: true, showTaskButton: true },
-  update: { state: "idle", version: "", percent: 0, transferred: 0, total: 0, source: "github", error: "" },
+  update: { state: "idle", version: "", percent: 0, transferred: 0, total: 0, source: "github", channel: "woker", error: "" },
   instances: [],
 };
 

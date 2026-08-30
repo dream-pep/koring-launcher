@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
   isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  openDevTools: () => ipcRenderer.invoke('window:openDevTools'),
   onResized: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('window:resized', handler);
@@ -104,6 +105,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quitAndInstall: () => ipcRenderer.invoke('update:quitAndInstall'),
   getUpdateState: () => ipcRenderer.invoke('update:getState'),
   getReleaseNotes: (tag?: string) => ipcRenderer.invoke('update:getReleaseNotes', { tag }),
+  getUpdateChannels: () => ipcRenderer.invoke('update:getChannels'),
+  setUpdateChannel: (channel: string) => ipcRenderer.invoke('update:setChannel', { channel }),
+  setTestVersion: (version: string) => ipcRenderer.invoke('update:setTestVersion', { version }),
+  compareVersions: (a: string, b: string) => ipcRenderer.invoke('update:compareVersions', { a, b }),
   onUpdateStatus: (callback: (data: unknown) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
     ipcRenderer.on('update:status', handler);

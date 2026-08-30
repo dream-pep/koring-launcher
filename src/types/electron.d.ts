@@ -7,6 +7,7 @@ interface ElectronAPI {
   maximize: () => Promise<void>;
   close: () => Promise<void>;
   isMaximized: () => Promise<boolean>;
+  openDevTools: () => Promise<unknown>;
   onResized: (callback: () => void) => () => void;
 
   getTheme: () => Promise<'light' | 'dark' | 'system' | null>;
@@ -33,6 +34,10 @@ interface ElectronAPI {
   quitAndInstall: () => Promise<unknown>;
   getUpdateState: () => Promise<unknown>;
   getReleaseNotes: (tag?: string) => Promise<unknown>;
+  getUpdateChannels: () => Promise<unknown>;
+  setUpdateChannel: (channel: string) => Promise<unknown>;
+  setTestVersion: (version: string) => Promise<unknown>;
+  compareVersions: (a: string, b: string) => Promise<unknown>;
   onUpdateStatus: (callback: (data: unknown) => void) => () => void;
 }
 
