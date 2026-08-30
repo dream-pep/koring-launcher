@@ -99,31 +99,42 @@ function getMirrors(): string[] {
 
 /**
  * 比较两个版本 tag（如 v1.2.1-13 / v1.2.1-beta.14 / v1.2.0-2608271921），返回 a - b。
- * 项目版本为 {base}-{buildId}：base 按 X.Y.Z 数值比较，buildId 按数值比较（而非字符串）。
- * - beta.N 视为大于同 base 的任意数字 buildId（与 semver 一致：数字 < 字母）
- * - 无 buildId 的稳定版视为大于同 base 的任意 prerelease（与 semver 一致）
+ * 项目版本为 {base}-{buildId}：base 按 X.Y.Z 数值比较；buildId 按 semver 规则：
+ * - 无 buildId（稳定版）> 任意 prerelease
+ * - 字母标识（beta.N）> 数字标识（N）——与 semver 一致：数字标识永远低于字母标识，
+ *   且不受数字大小影响（任何 beta.N 都大于任何 -N）
+ * - 同标识类型按数值比较
  */
 function compareVersionTags(a: string, b: string): number {
-  const parse = (t: string): { base: number[]; build: number } => {
+  const parse = (t: string): { base: number[]; pre: { kind: 0 | 1; num: number } | null } => {
     const s = t.replace(/^v/i, '');
     const [base, buildStr = ''] = s.split('-');
     const nums = base.split('.').map((n) => parseInt(n, 10) || 0);
     while (nums.length < 3) nums.push(0);
-    let build: number;
-    if (buildStr === '') {
-      build = Number.MAX_SAFE_INTEGER;
-    } else {
+    let pre: { kind: 0 | 1; num: number } | null = null;
+    if (buildStr !== '') {
       const beta = /^beta\.(\d+)$/i.exec(buildStr);
-      build = beta ? 1_000_000 + parseInt(beta[1], 10) : parseInt(buildStr, 10) || 0;
+      // kind: 1 = 字母标识（beta），0 = 数字标识（数字优先级低于字母）
+      pre = beta
+        ? { kind: 1, num: parseInt(beta[1], 10) || 0 }
+        : { kind: 0, num: parseInt(buildStr, 10) || 0 };
     }
-    return { base: nums, build };
+    return { base: nums, pre };
   };
   const pa = parse(a);
   const pb = parse(b);
   for (let i = 0; i < 3; i++) {
     if (pa.base[i] !== pb.base[i]) return pa.base[i] - pb.base[i];
   }
-  return pa.build - pb.build;
+  // 稳定版（无 prerelease）> 任意 prerelease
+  if (pa.pre !== null && pb.pre === null) return -1;
+  if (pa.pre === null && pb.pre !== null) return 1;
+  if (pa.pre === null && pb.pre === null) return 0;
+  // 上面已覆盖全部 null 组合，此处仅用于类型收窄（运行时不可达）
+  if (pa.pre === null || pb.pre === null) return 0;
+  // 字母标识 > 数字标识（与数字大小无关）
+  if (pa.pre.kind !== pb.pre.kind) return pa.pre.kind - pb.pre.kind;
+  return pa.pre.num - pb.pre.num;
 }
 
 /**
