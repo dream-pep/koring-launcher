@@ -277,13 +277,23 @@ class UpdateService {
     }
   }
 
-  /** 按当前通道应用 electron-updater 的 allowPrerelease（woker=只收正式版 / runner=可收预览版） */
+  /** 按当前通道应用 electron-updater 的 allowPrerelease + 频道（woker=只收正式版 / runner=可收预览版） */
   private applyChannel(): void {
     const def = getChannelDef(this.channelKey);
     // runner(跑步) 强制开启 allowPrerelease → GitHub provider 走 Atom feed 频道逻辑可收 beta；
     // woker(慢走) 关闭 → 走 releases/latest 只认稳定版，不被预览版污染。
     autoUpdater.allowPrerelease = def.allowPrerelease;
-    console.log(`[updater] 更新通道: ${def.label}（${def.key}，allowPrerelease=${def.allowPrerelease}）`);
+    if (def.allowPrerelease) {
+      // 关键：runner 显式指定频道 "beta"。否则当当前版本是数字尾号稳定版（如 1.2.5-13）时，
+      // semver.prerelease(currentVersion)[0] = "13" 会被 GitHub provider 当作"自定义频道"，
+      // 通道循环匹配不到任何版本 → "No published versions on GitHub"，
+      // 正式版切跑步模式将无法检测 beta 预览版。
+      autoUpdater.channel = 'beta';
+    } else {
+      // woker 恢复默认 latest 频道（allowPrerelease=false 走 /releases/latest，频道不影响识别）
+      autoUpdater.channel = 'latest';
+    }
+    console.log(`[updater] 更新通道: ${def.label}（${def.key}，allowPrerelease=${def.allowPrerelease}，channel=${autoUpdater.channel}）`);
   }
 
   /** 通道定义列表（UI 动态渲染；可扩展） */
