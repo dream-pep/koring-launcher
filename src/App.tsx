@@ -10,13 +10,12 @@ import { useAuthStore } from "./stores/authStore";
 import { useKoringAuthStore } from "./stores/koringAuthStore";
 import type { AppConfig } from "./api/config";
 import { Home } from "./pages/home";
-import { Store } from "./pages/store";
 import { Today } from "./pages/today";
 import { PlayLink } from "./pages/play-link";
 import { Setting } from "./pages/setting";
 import { SettingLogin } from "./pages/setting/login";
-import { Gallery } from "./pages/gallery";
 import { TaskQueue } from "./pages/task-queue";
+import { GalleryPlaceholder, StorePlaceholder } from "./pages/placeholder";
 import { UpdatePage } from "./pages/update";
 import { Debug } from "./pages/debug";
 import { SplashDebug } from "./pages/debug/splash-debug";
@@ -44,12 +43,12 @@ import { VERSION } from "./lib/version";
 
 const pageMap = {
   home: Home,
-  store: Store,
+  store: StorePlaceholder,
   today: Today,
   "play-link": PlayLink,
   setting: Setting,
   "setting/login": SettingLogin,
-  gallery: Gallery,
+  gallery: GalleryPlaceholder,
   "task-queue": TaskQueue,
   update: UpdatePage,
   oobe: Oobe,
