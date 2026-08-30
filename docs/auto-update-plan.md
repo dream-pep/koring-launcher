@@ -316,7 +316,7 @@ src/
   （`<details><summary>·Commit 1cf906d</summary>…</details>`）
 - 上传产物：setup.exe + latest.yml + release-notes.md（electron-updater 更新清单）
 - **Release 标题命名（仅展示名，tag/真实版本号不变）**：run → `{full}`（如 `1.2.1-13`），
-  beta → `BETA {base}`（如 `BETA 1.2.1`）
+  beta → `BETA {full}`（如 `BETA 1.2.1-beta.13`，带 Run Num）
 
 **⚠️ 版本语义注意（electron-updater，2026-08-30 已修复并落地）**：
 - **根因**：GitHub provider 用 Atom feed + 频道逻辑选版本，频道只认 `alpha`/`beta` 字符串标识。
