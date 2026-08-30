@@ -3,11 +3,10 @@ import { VERSION } from "@/lib/version";
 import { BUILD_COMMIT, BUILD_ID } from "@/lib/buildInfo";
 import { useUpdateStore } from "@/stores/updateStore";
 import { useRouteStore } from "@/stores/routeStore";
-import { relaunchApp } from "@/api/update";
 import Silk from "@/components/silk/Silk";
-import { Button } from "@heroui/react";
 import clsx from "clsx";
-import { type ReactNode, Suspense } from "react";
+import { ChevronRight } from "lucide-react";
+import { Suspense } from "react";
 
 const modeColors: Record<string, string> = {
   dev: "#F59E0B",
@@ -34,8 +33,13 @@ interface VersionCardProps {
   overrideMode?: string | null;
   overrideState?: UpdateState | null;
   simple?: boolean;
-  /** OOBE 模式：不显示 Silk 动画，按钮仅展示样式不做实际操作 */
+  /** OOBE 模式：仅展示样式，不显示「查看更新」入口 */
   oobe?: boolean;
+  /**
+   * 设置页模式（设置主页 / 关于页）：整卡可点击跳转更新页，
+   * 并显示「查看更新」小字提示；其他页面为 false
+   */
+  isSettingPage?: boolean;
 }
 
 export function VersionCard({
@@ -44,39 +48,33 @@ export function VersionCard({
   overrideState,
   simple = false,
   oobe = false,
+  isSettingPage = false,
 }: VersionCardProps) {
   const color = modeColors[overrideMode ?? BUILD_MODE] ?? modeColors.run;
   const gradient = modeGradients[overrideMode ?? BUILD_MODE] ?? modeGradients.run;
   const label = modeLabels[overrideMode ?? BUILD_MODE] ?? modeLabels.run;
 
-  const { checking, downloading, installed, update, check, install } = useUpdateStore();
+  const { update, installed } = useUpdateStore();
 
-  // 检查更新按钮：除 OOBE 与更新日志页本身外，点击跳转到更新日志页
   const current = useRouteStore((s) => s.current);
   const navigate = useRouteStore((s) => s.navigate);
-  const isOnUpdatePage = current === "update";
-  const handleCheck = () => {
-    if (isOnUpdatePage) {
-      check();
-    } else {
-      navigate("update");
-    }
-  };
 
   const effectiveState: UpdateState = overrideState ?? (installed ? "installed" : update ? "hasUpdate" : "latest");
 
-  const Btn = (props: React.ComponentProps<typeof Button>) => (
-    <Button
-      size="sm"
-      variant="ghost"
-      className="text-white/90 hover:text-white hover:bg-white/10 border border-white/20"
-      {...props}
-    />
-  );
+  // 设置页：整卡可点击，跳转检查更新页面（更新日志页自身不触发）
+  const clickable = isSettingPage && !oobe && current !== "update";
+  const handleCardClick = () => {
+    if (clickable) navigate("update");
+  };
 
   return (
     <div
-      className={clsx("relative overflow-hidden rounded-xl border border-white/10 min-h-[200px]", className)}
+      className={clsx(
+        "relative overflow-hidden rounded-xl border border-white/10 min-h-[200px]",
+        clickable && "cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-transform",
+        className,
+      )}
+      onClick={handleCardClick}
       // 共享元素过渡：路由切换时（startViewTransition），新旧页面中同名 view-transition-name
       // 的元素会从上一个位置平滑移动/形变到当前页面的位置
       style={{ viewTransitionName: "version-card" } as React.CSSProperties}
@@ -93,7 +91,7 @@ export function VersionCard({
         </Suspense>
       )}
 
-      {/* 内容（移除颜色遮罩层，保留底部渐变与 Silk 动画渲染） */}
+      {/* 内容 */}
       <div className="relative z-10 flex flex-col items-center justify-center px-6 py-10 gap-4">
         <span className="text-[11px] font-bold tracking-wider text-white/70">{label}</span>
         <img
@@ -113,43 +111,19 @@ export function VersionCard({
           </p>
         )}
 
-        {/* 更新日志页内不显示任何按钮（更新操作由页面底部遮罩负责） */}
-        {!isOnUpdatePage && (
-          <>
-          {/* OOBE 模式：仅显示查看亮点按钮 */}
-          {oobe ? (
-            <div className="flex items-center gap-2 mt-1">
-              <Btn>查看亮点</Btn>
-            </div>
-        ) : (
-          <div className="flex items-center gap-2 mt-1">
-          {effectiveState === "latest" && (
-            <>
-              <Btn onPress={handleCheck} isDisabled={checking}>
-                {checking ? "检查中..." : "检查更新"}
-              </Btn>
-              <Btn>查看亮点</Btn>
-            </>
-          )}
-
-          {effectiveState === "hasUpdate" && (
-            <>
-              <span className="text-[12px] text-white/80 mr-1">有新的版本可用</span>
-              <Btn onPress={install} isDisabled={downloading}>
-                {downloading ? "下载中..." : "下载更新"}
-              </Btn>
-            </>
-          )}
-
-          {effectiveState === "installed" && (
-            <>
-              <span className="text-[12px] text-white/80 mr-1">更新已下载</span>
-              <Btn onPress={relaunchApp}>立即更新</Btn>
-            </>
-          )}
-          </div>
+        {/* 更新状态提示（仅信息，不提供按钮；下载/安装操作在更新页底部完成） */}
+        {effectiveState !== "latest" && (
+          <p className="text-[12px] text-white/80">
+            {effectiveState === "hasUpdate" ? "有新的版本可用" : "更新已下载"}
+          </p>
         )}
-          </>
+
+        {/* 设置页：整卡可点击跳转更新页，显示入口小字 */}
+        {clickable && (
+          <span className="inline-flex items-center gap-0.5 text-[11px] text-white/60 transition-colors group-hover:text-white">
+            查看更新
+            <ChevronRight className="w-3 h-3" />
+          </span>
         )}
       </div>
     </div>

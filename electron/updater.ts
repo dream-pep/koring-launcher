@@ -557,7 +557,8 @@ class UpdateService {
     } catch {
       /* ignore */
     }
-    autoUpdater.quitAndInstall();
+    // 静默安装（/S）+ 安装完成后自动重启（--force-run）
+    autoUpdater.quitAndInstall(true, true);
   }
 
   /** 获取系统下载临时目录（用于清理提示，暂未启用） */

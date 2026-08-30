@@ -103,7 +103,8 @@ export function AboutSetting() {
       <PageHeader title="关于" desc="查看版本信息、更新状态与项目相关链接" />
 
       <div className="space-y-6">
-        <VersionCard />
+        {/* 设置页：整卡可点击跳转更新页，显示「查看更新」 */}
+        <VersionCard isSettingPage />
 
         <div>
           <SectionTitle>项目信息</SectionTitle>

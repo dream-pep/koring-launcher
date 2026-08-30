@@ -50,7 +50,7 @@ function formatMB(bytes?: number): string {
 /**
  * 更新日志（独立页面，不走设置 layout）：
  * - 顶栏由路由切换为「返回 + 更新日志」（routeStore 的 titleInBar）
- * - 顶部 VersionCard（此页面不显示按钮，更新操作由底部遮罩负责）
+ * - 顶部 VersionCard（无按钮；更新操作由页面底部遮罩负责）
  * - 发布说明：默认当前版本；检测到可用更新后自动切到最新版本
  * - 底部遮罩：检查更新 → 下载（进度条 + 暂停/继续/取消）→ 安装更新
  * - 下载/安装进度由主进程写入 Koring.yml（update 段）
@@ -276,7 +276,7 @@ export function UpdatePage() {
               variant="primary"
               fullWidth
               style={BUTTON_STYLE}
-              isDisabled={st === "checking" || st === "installing" || st === "not-available"}
+              isDisabled={st === "checking" || st === "installing"}
               onPress={primaryAction}
             >
               {st === "checking" && (
