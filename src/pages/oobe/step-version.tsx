@@ -9,8 +9,10 @@ export function OobeVersion() {
 
   const isTestBuild = BUILD_MODE === "dev" || BUILD_MODE === "beta";
 
-  // 临时跳过 Koring 账户登录环节：正式版也直接进入用户协议
-  const nextRoute = isTestBuild ? "oobe/beta-test" : "oobe/agreement";
+  // 到达本页前已依次经过 协议(agreement) → 法律(legal) → 欢迎(welcome)，
+  // 因此正式版下一步直接结束；测试版需先同意 Beta 测试协议。
+  // （不要跳回 agreement——那会形成 agreement → legal → welcome → version → agreement 死循环）
+  const nextRoute = isTestBuild ? "oobe/beta-test" : "oobe/finish";
 
   return (
     <OobeLayout>
