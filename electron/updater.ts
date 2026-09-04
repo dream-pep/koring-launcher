@@ -98,43 +98,38 @@ function getMirrors(): string[] {
 }
 
 /**
- * 比较两个版本 tag（如 v1.2.1-13 / v1.2.1-beta.14 / v1.2.0-2608271921），返回 a - b。
- * 项目版本为 {base}-{buildId}：base 按 X.Y.Z 数值比较；buildId 按 semver 规则：
- * - 无 buildId（稳定版）> 任意 prerelease
- * - 字母标识（beta.N）> 数字标识（N）——与 semver 一致：数字标识永远低于字母标识，
- *   且不受数字大小影响（任何 beta.N 都大于任何 -N）
- * - 同标识类型按数值比较
+ * 项目版本序：比较两个版本 tag（如 v1.2.5-17 / v1.2.5-beta.16 / v1.2.0-2608271921），返回 a - b。
+ *
+ * 语义（与 electron-updater 的纯 semver 不同，专为本项目版本方案定制）：
+ * 每个 release = {base, 构建号}。beta.N 与 N 的 **beta/正式只是通道标记，不参与新旧排序**：
+ * - base（X.Y.Z）不同 → 按 base 数值比较（优先）
+ * - base 相同 → 按构建号（数字部分，忽略 beta 前缀）比较
+ * - 无构建号（如 1.2.5，旧版正式格式）→ 构建号视为 -1（同 base 内最旧，可被后续带尾号版本覆盖）
+ * - 构建号相同（如 beta.17 与 17）→ 视为相等（通道标记不参与排序；同号跨通道版本实际不会共存）
+ *
+ * 修复目标：v1.2.5-17（构建 17）不应把 v1.2.5-beta.16（构建 16）当新版本；
+ * 但 v1.2.5-beta.18（构建 18）对 v1.2.5-17 是新版本。
  */
 function compareVersionTags(a: string, b: string): number {
-  const parse = (t: string): { base: number[]; pre: { kind: 0 | 1; num: number } | null } => {
+  const parse = (t: string): { base: number[]; num: number } => {
     const s = t.replace(/^v/i, '');
     const [base, buildStr = ''] = s.split('-');
     const nums = base.split('.').map((n) => parseInt(n, 10) || 0);
     while (nums.length < 3) nums.push(0);
-    let pre: { kind: 0 | 1; num: number } | null = null;
-    if (buildStr !== '') {
-      const beta = /^beta\.(\d+)$/i.exec(buildStr);
-      // kind: 1 = 字母标识（beta），0 = 数字标识（数字优先级低于字母）
-      pre = beta
-        ? { kind: 1, num: parseInt(beta[1], 10) || 0 }
-        : { kind: 0, num: parseInt(buildStr, 10) || 0 };
+    if (buildStr === '') {
+      // 无构建号（旧版正式格式）：同 base 内视为最旧
+      return { base: nums, num: -1 };
     }
-    return { base: nums, pre };
+    const beta = /^beta\.(\d+)$/i.exec(buildStr);
+    const num = parseInt(beta ? beta[1] : buildStr, 10);
+    return { base: nums, num: Number.isFinite(num) ? num : 0 };
   };
   const pa = parse(a);
   const pb = parse(b);
   for (let i = 0; i < 3; i++) {
     if (pa.base[i] !== pb.base[i]) return pa.base[i] - pb.base[i];
   }
-  // 稳定版（无 prerelease）> 任意 prerelease
-  if (pa.pre !== null && pb.pre === null) return -1;
-  if (pa.pre === null && pb.pre !== null) return 1;
-  if (pa.pre === null && pb.pre === null) return 0;
-  // 上面已覆盖全部 null 组合，此处仅用于类型收窄（运行时不可达）
-  if (pa.pre === null || pb.pre === null) return 0;
-  // 字母标识 > 数字标识（与数字大小无关）
-  if (pa.pre.kind !== pb.pre.kind) return pa.pre.kind - pb.pre.kind;
-  return pa.pre.num - pb.pre.num;
+  return pa.num - pb.num;
 }
 
 /**
@@ -345,6 +340,30 @@ class UpdateService {
     return this.buildPayload();
   }
 
+  /**
+   * 项目版本序判定：candidate 是否为 current 的「新版本」。
+   * 见 compareVersionTags 的语义（base 相同 → 比构建号；beta/正式只是通道标记，不参与新旧）。
+   */
+  private isNewerCandidate(current: string, candidate: string): boolean {
+    return compareVersionTags(candidate, current) > 0;
+  }
+
+  /**
+   * 复核 electron-updater 的"新版本"判定并修正状态：
+   * electron-updater 用纯 semver（AppUpdater.isUpdateAvailable → semver.gt），
+   * 而 semver 规定同 base 下字母标识 > 数字标识 → v1.2.5-17 会把 v1.2.5-beta.16
+   * 误判为新版本。按项目版本序复核：候选版本并非更新 → 状态回退为 not-available。
+   */
+  private correctAvailability(): void {
+    if (this.state !== 'available' || !this.version) return;
+    if (this.isNewerCandidate(this.currentVersion, this.version)) return;
+    console.warn(`[updater] ${this.version} 不是 ${this.currentVersion} 的新版本（项目版本序，忽略 beta 通道标记），回退为无更新`);
+    this.state = 'not-available';
+    this.version = undefined;
+    this.error = undefined;
+    this.emit();
+  }
+
   /** 版本比对（semver 规则，支持 v 前缀与 prerelease） */
   compareVersions(a: string, b: string): { a: string; b: string; result: string; detail: string } {
     const va = semver.valid(a.trim());
@@ -385,6 +404,8 @@ class UpdateService {
     try {
       await autoUpdater.checkForUpdates();
       this.suppressErrors = false;
+      // 复核 electron-updater 的纯 semver 判定（v1.2.5-17 误判 v1.2.5-beta.16 为新版本）
+      this.correctAvailability();
       return this.buildPayload();
     } catch (err) {
       console.warn(`[updater] GitHub 官方更新源不可用: ${String((err as Error)?.message ?? err)}`);
@@ -406,6 +427,8 @@ class UpdateService {
         this.emit();
         await autoUpdater.checkForUpdates();
         this.suppressErrors = false;
+        // 复核 electron-updater 的纯 semver 判定
+        this.correctAvailability();
         // 镜像若反馈无更新（可能发现的是旧 tag / latest.yml 不匹配），
         // 不要就此返回 not-available，继续尝试下一个源
         const mirrorResult = this.buildPayload();
@@ -457,9 +480,12 @@ class UpdateService {
         signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
       });
       if (res.ok) {
-        const releases: { draft?: boolean; tag_name?: string }[] = await res.json();
+        const releases: { draft?: boolean; prerelease?: boolean; tag_name?: string }[] = await res.json();
+        const allowPrerelease = getChannelDef(this.channelKey).allowPrerelease;
         for (const r of releases ?? []) {
-          if (!r.draft && r.tag_name) candidates.push(r.tag_name);
+          // draft 一律跳过；woker（只收正式版）跳过 GitHub 标记为 prerelease 的 release
+          if (r.draft || (!allowPrerelease && r.prerelease)) continue;
+          if (r.tag_name) candidates.push(r.tag_name);
         }
       }
     } catch {
@@ -533,6 +559,16 @@ class UpdateService {
   async download(): Promise<void> {
     if (!this.ready) return;
     if (this.state === 'downloading' || this.state === 'downloaded' || this.state === 'installing') return;
+    // 非"可用/已暂停"状态直接忽略（防陈旧 updateInfoAndProvider 被误用）
+    if (this.state !== 'available' && this.state !== 'paused') return;
+    // 复核目标版本确为当前版本的新版本（项目版本序），否则回退为无更新
+    if (this.state === 'available' && this.version && !this.isNewerCandidate(this.currentVersion, this.version)) {
+      console.warn(`[updater] 下载被拒：${this.version} 不是 ${this.currentVersion} 的新版本`);
+      this.state = 'not-available';
+      this.version = undefined;
+      this.emit();
+      return;
+    }
     if (this.state === 'paused') {
       // 继续下载（可能从断点续传，也可能重新开始，取决于 electron-updater 缓存）
       console.log('[updater] 继续下载');

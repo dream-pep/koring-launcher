@@ -329,6 +329,11 @@ src/
 - **runner 通道显式设置 `autoUpdater.channel = "beta"`**：否则当前版本为数字尾号稳定版
   （如 `1.2.1-13`）时，`prerelease[0]="13"` 会被当自定义频道 → 通道循环无匹配，
   正式版切跑步模式检测不到 beta（已修复，见 updater.ts applyChannel）；woker 恢复 `latest`
+- **新旧判定覆盖 electron-updater 的纯 semver（项目版本序）**：semver 认为同 base 下
+  `beta.N > N`（字母标识优先）→ 会把 `1.2.5-beta.16` 误判为 `1.2.5-17` 的新版本。
+  updater.ts `correctAvailability()` 在每次 check 后按**构建号优先**复核：
+  候选构建号（忽略 beta 前缀）不大于当前 → 回退 not-available；download() 同样复核。
+  语义：base 相同比构建号；beta/正式只是通道标记不参与新旧排序；无构建号视为构建 -1
 - 所有旧数字版本（`1.2.1-12` / `1.2.1-2608271921`）都小于 `1.2.1-beta.13`，平滑升级，无需提升 base
 
 ## 14. M2 主进程更新模块（2026-08-28，UI 待做）

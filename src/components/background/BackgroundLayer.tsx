@@ -1,9 +1,11 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useRouteStore } from "@/stores/routeStore";
 import { useDevStore } from "@/stores/devStore";
 import { DEFAULT_BG } from "@/lib/mode";
+import { resourceRegistry } from "@/resources/registry";
+import { estimateDataUrlBytes } from "@/resources/image";
 
 export function BackgroundLayer() {
   const { type, image, blur, opacity } = useBackgroundStore();
@@ -15,15 +17,48 @@ export function BackgroundLayer() {
 
   const bgRef = useRef<HTMLDivElement>(null);
 
+  // 解析最终背景源：内置 URL / 颜色直接用；自定义路径经主进程取优化 dataURL。
+  // 增加代次守卫：防止慢的旧 IPC 结果覆盖用户最新选择（行为不变，仅修竞态）。
   useEffect(() => {
+    let cancelled = false;
     if (image && image !== DEFAULT_BG && !image.startsWith("data:")) {
       (window as any).electronAPI?.getBackgroundDataUrl?.().then((dataUrl: string | null) => {
-        if (dataUrl) setBgImage(dataUrl);
+        if (!cancelled && dataUrl) setBgImage(dataUrl);
       });
-      return;
+    } else {
+      setBgImage(image);
     }
-    setBgImage(image);
+    return () => {
+      cancelled = true;
+    };
   }, [image]);
+
+  // 当前生效的背景登记进资源注册表（估算字节、单持有者语义）：
+  // 背景切换时旧条目被释放丢弃，大 dataURL 字符串不再被缓存层额外持有。
+  const trackedKey = useMemo(() => {
+    if (!bgImage || !bgImage.startsWith("data:")) return null;
+    return `background:current:${bgImage.slice(0, 96)}`;
+  }, [bgImage]);
+
+  useEffect(() => {
+    if (!trackedKey) return;
+    let cancelled = false;
+    resourceRegistry
+      .acquire<string>(trackedKey, "background", {
+        bytes: estimateDataUrlBytes(bgImage),
+        cache: false,
+        load: async () => bgImage,
+      })
+      .then(() => {
+        if (!cancelled) {
+          resourceRegistry.setBytes(trackedKey, estimateDataUrlBytes(bgImage));
+        }
+      });
+    return () => {
+      cancelled = true;
+      resourceRegistry.release(trackedKey);
+    };
+  }, [trackedKey, bgImage]);
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
