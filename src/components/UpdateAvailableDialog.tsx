@@ -5,7 +5,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { onUpdateStatus } from "@/api/update";
+import { onUpdateStatus, getUpdateState } from "@/api/update";
 import { useRouteStore } from "@/stores/routeStore";
 import { useUpdateDialogStore } from "@/stores/updateDialogStore";
 import { BUILD_MODE } from "@/lib/mode";
@@ -57,6 +57,25 @@ export function UpdateAvailableDialog() {
       prevStateRef.current = status.state;
     });
     return unsub;
+  }, [show]);
+
+  // 兜底：挂载时拉一次状态快照 —— 若启动静默检查的 available 广播早于本组件订阅
+  // （渲染慢/竞态）会漏弹，这里补一次判定
+  useEffect(() => {
+    let cancelled = false;
+    getUpdateState()
+      .then((status) => {
+        if (cancelled) return;
+        const alreadyOpen = useUpdateDialogStore.getState().open;
+        if (status.state === "available" && currentRouteRef.current !== "update" && !alreadyOpen) {
+          show(status.version);
+        }
+        prevStateRef.current = status.state;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [show]);
 
   const goUpdate = () => {

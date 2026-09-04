@@ -211,7 +211,7 @@ export function AboutSetting() {
             <SettingCard>
               <SettingSwitch
                 label="调试模式"
-                desc="启用后附加 -Dkoring.debugMode=true 并在控制台输出详细日志（dev 运行时会同步输出到终端），可能影响性能"
+                desc="在控制台输出详细日志，可能影响性能"
                 checked={adv?.debugMode ?? false}
                 onChange={(v) => setAdvanced({ debugMode: v })}
               />
