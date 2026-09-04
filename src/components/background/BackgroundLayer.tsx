@@ -37,7 +37,8 @@ export function BackgroundLayer() {
   // 背景切换时旧条目被释放丢弃，大 dataURL 字符串不再被缓存层额外持有。
   const trackedKey = useMemo(() => {
     if (!bgImage || !bgImage.startsWith("data:")) return null;
-    return `background:current:${bgImage.slice(0, 96)}`;
+    // 只取前缀 + 长度作为 key，避免把整段数 MB 的 dataURL 重复存进 Map key
+    return `background:current:${bgImage.length}:${bgImage.slice(0, 96)}`;
   }, [bgImage]);
 
   useEffect(() => {

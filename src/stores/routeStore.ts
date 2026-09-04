@@ -32,8 +32,8 @@ export type RouteKey =
   | "debug-version-card"
   | "debug-update"
   | "debug-task"
+  | "debug-resource"
   | "debug-crash";
-
 export type TitleBarMode = "default" | "sub" | "window" | "oobe";
 
 export type TransitionDirection = "forward" | "backward";
@@ -82,6 +82,7 @@ export const allRoutes: RouteItem[] = [
   { key: "debug-version-card", label: "版本卡片调试", path: "/debug/version-card", hidden: true },
   { key: "debug-update", label: "更新功能测试", path: "/debug/update", hidden: true },
   { key: "debug-task", label: "任务队列调试", path: "/debug/task", hidden: true },
+  { key: "debug-resource", label: "资源与内存", path: "/debug/resource", hidden: true },
 ];
 
 const topLevelKeys = new Set(routes.map((r) => r.key));

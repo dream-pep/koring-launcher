@@ -23,6 +23,31 @@ function getFileAsDataUrl(filePath: string): string | null {
   }
 }
 
+// 按当前窗口实际像素需求计算背景图长边上限（含高分屏余量），
+// 避免把数 MB～数十 MB 原图原样塞进渲染进程。
+function computeMaxEdge(): number {
+  const dpr = window.devicePixelRatio || 1;
+  const css = Math.max(window.innerWidth || 1280, window.innerHeight || 800);
+  const target = Math.round(Math.max(css, 1920) * dpr * 1.1);
+  return Math.min(4096, Math.max(1920, target));
+}
+
+// 经主进程降采样/重编码后返回 data URL；主进程无法处理时回退到原始文件（行为不变）。
+async function prepareBackgroundDataUrl(filePath: string): Promise<string | null> {
+  try {
+    const result = (await ipcRenderer.invoke('background:prepare', {
+      srcPath: filePath,
+      maxEdge: computeMaxEdge(),
+    })) as { success?: boolean; data?: { dataUrl?: string | null } | null };
+    if (result?.success && typeof result.data?.dataUrl === 'string' && result.data.dataUrl.length > 0) {
+      return result.data.dataUrl;
+    }
+  } catch {
+    // fallthrough to raw
+  }
+  return getFileAsDataUrl(filePath);
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // Generic IPC
   invoke: (channel: string, ...args: unknown[]) =>
@@ -76,14 +101,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Copy to userData via main process
     const destPath = await ipcRenderer.invoke('background:copyToUserData', srcPath, ext);
     if (!destPath) return null;
-    return getFileAsDataUrl(destPath);
+    return prepareBackgroundDataUrl(destPath);
   },
 
-  // Get cached background as base64 data URL
+  // Get cached background as base64 data URL（自动降采样到屏幕所需尺寸）
   getBackgroundDataUrl: async (): Promise<string | null> => {
     const filePath = await ipcRenderer.invoke('background:getCachedPath');
     if (!filePath) return null;
-    return getFileAsDataUrl(filePath);
+    return prepareBackgroundDataUrl(filePath);
   },
 
   // Open external URL in system browser

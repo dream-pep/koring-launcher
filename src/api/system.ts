@@ -21,10 +21,10 @@ export interface ProcessMemoryMetric {
   peakWorkingSetSize: number; // KB
 }
 
-/** process.getProcessMemoryInfo()（主进程）；单位为字节 */
+/** process.getProcessMemoryInfo()（主进程）；单位为 KB */
 export interface MainProcessMemory {
-  workingSetSize: number; // bytes
-  privateBytes: number; // bytes
+  workingSetSize: number; // KB（residentSet）
+  privateBytes: number; // KB（private）
 }
 
 export interface SystemMemorySnapshot {

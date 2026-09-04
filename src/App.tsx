@@ -24,6 +24,7 @@ import { VersionCardDebug } from "./pages/debug/version-card-debug";
 import { UpdateDebug } from "./pages/debug/update-debug";
 import { TaskDebug } from "./pages/debug/task-debug";
 import { CrashDebug } from "./pages/debug/crash-debug";
+import { ResourceDebug } from "./pages/debug/resource-debug";
 import { Oobe } from "./pages/oobe";
 import { OobeLanguage } from "./pages/oobe/step-language";
 import { OobeAgreement } from "./pages/oobe/step-agreement";
@@ -74,6 +75,7 @@ const pageMap = {
   "debug-update": UpdateDebug,
   "debug-task": TaskDebug,
   "debug-crash": CrashDebug,
+  "debug-resource": ResourceDebug,
 } as const;
 
 function App() {

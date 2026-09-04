@@ -99,9 +99,10 @@ class ResourceRegistry {
       payload: null,
       inFlight: null,
       cache: opts.cache ?? true,
-      onRelease: opts.onRelease,
     };
     this.entries.set(key, entry);
+    // 用桥接闭包把调用方的 (payload: T) => void 适配为内部 (payload: unknown) => void
+    entry.onRelease = opts.onRelease ? (payload: unknown): void => opts.onRelease?.(payload as T) : undefined;
 
     const run = async (): Promise<T | null> => {
       let value: T | null = null;

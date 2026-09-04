@@ -1,5 +1,5 @@
 import { useRouteStore } from "@/stores/routeStore";
-import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle, RefreshCw, SquareTerminal } from "lucide-react";
+import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle, RefreshCw, SquareTerminal, MemoryStick } from "lucide-react";
 
 const debugPages = [
   {
@@ -49,6 +49,14 @@ const debugPages = [
     desc: "测试任务调度、进度条、日志与 Sheet 面板",
     color: "text-cyan-500",
     bg: "bg-cyan-500/10",
+  },
+  {
+    key: "debug-resource" as const,
+    icon: MemoryStick,
+    title: "资源与内存",
+    desc: "监控渲染进程 JS 堆、进程工作集与资源注册表占用，验证内存优化",
+    color: "text-violet-500",
+    bg: "bg-violet-500/10",
   },
   {
     key: "oobe" as const,

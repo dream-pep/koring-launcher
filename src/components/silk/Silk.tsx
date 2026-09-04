@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unknown-property */
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { forwardRef, useRef, useMemo, useLayoutEffect } from "react";
+import { forwardRef, useRef, useMemo, useLayoutEffect, useEffect } from "react";
 import { Color, type Mesh, type ShaderMaterial } from "three";
 
 const hexToNormalizedRGB = (hex: string) => {
@@ -83,7 +83,17 @@ const SilkPlane = forwardRef(function SilkPlane({ uniforms }: SilkPlaneProps, re
     invalidate();
   }, [ref, viewport, invalidate]);
 
+  // 窗口隐藏/最小化时停帧（无可见画面，零视觉影响）；恢复可见后立即刷新一帧重启动画
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (!document.hidden) invalidate();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [invalidate]);
+
   useFrame((_, delta) => {
+    if (document.hidden) return; // 不可见时不再推进 uTime / 请求帧，避免 GPU 空转
     if (ref && typeof ref === "object" && ref.current) {
       (ref.current.material as ShaderMaterial).uniforms.uTime.value += 0.1 * delta;
       invalidate();

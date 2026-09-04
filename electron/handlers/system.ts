@@ -81,8 +81,8 @@ export function registerSystemHandlers() {
       try {
         const info = await process.getProcessMemoryInfo();
         mainProcess = {
-          workingSetSize: info.workingSetSize,
-          privateBytes: info.privateBytes,
+          workingSetSize: info.residentSet ?? 0,
+          privateBytes: info.private ?? 0,
         };
       } catch {
         // 个别平台不支持 getProcessMemoryInfo，忽略
