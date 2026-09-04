@@ -482,7 +482,15 @@ class UpdateService {
       this.suppressErrors = false;
       // 复核 electron-updater 的纯 semver 判定（v1.2.5-17 误判 v1.2.5-beta.16 为新版本）
       this.correctAvailability();
-      return this.buildPayload();
+      const githubResult = this.buildPayload();
+      // runner（跑步）beta 无更新 → 探测最新正式版：
+      // 构建号比当前 beta 大（如 beta.24 → 正式 1.2.6-25）也算更新，只是 GitHub beta 频道
+      // 不返回正式版、且纯 semver 认为 beta.N > N，需切 stable 通道再查一次
+      if (githubResult.state === 'not-available' && this.channelKey === 'runner') {
+        const probe = await this.probeLatestStable();
+        if (probe === 'available') return this.buildPayload();
+      }
+      return githubResult;
     } catch (err) {
       log.warn(`[updater] GitHub 官方更新源不可用: ${String((err as Error)?.message ?? err)}`);
     }
@@ -520,6 +528,33 @@ class UpdateService {
     this.error = '无法连接更新服务器（GitHub 与所有加速源均不可用），请稍后重试';
     this.emit();
     return this.buildPayload();
+  }
+
+  /**
+   * runner（跑步）beta 无更新时的"最新正式版"探测：
+   * 临时切 stable 通道（allowPrerelease=false / channel=latest，天然开启 allowDowngrade，
+   * 使 semver 判定接受"看似更低"的正式版），再查一次；命中后按项目版本序复核
+   * （构建号更大 → available；否则还原为无更新）。结束后恢复通道配置。
+   */
+  private async probeLatestStable(): Promise<'available' | 'not-available' | 'failed'> {
+    try {
+      autoUpdater.allowPrerelease = false;
+      autoUpdater.channel = 'latest';
+      this.state = 'checking';
+      this.emit();
+      log.info('[updater] runner beta 无更新，探测最新正式版...');
+      await autoUpdater.checkForUpdates();
+      // 项目版本序复核：构建号大于当前才算更新（beta.24 → 正式 25 是更新；25 → 26 是更新）
+      this.correctAvailability();
+      const probeResult = this.buildPayload();
+      return probeResult.state === 'available' ? 'available' : 'not-available';
+    } catch (e) {
+      log.warn(`[updater] 正式版探测失败: ${String((e as Error)?.message ?? e)}`);
+      return 'failed';
+    } finally {
+      // 还原 runner 通道配置（allowPrerelease=true / channel=beta）
+      this.applyChannel();
+    }
   }
 
   /**
