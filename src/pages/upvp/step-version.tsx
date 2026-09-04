@@ -24,7 +24,7 @@ export function UpvpVersion() {
         )}
       </div>
 
-      <NextButton onClick={() => navigate("upvp/check")} />
+      <NextButton onClick={() => navigate("upvp/about-version")} />
     </UpvpLayout>
   );
 }

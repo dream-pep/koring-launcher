@@ -107,6 +107,9 @@ koring-launcher/
 │   │   │   ├── SectionTitle.tsx       # PageHeader/SectionTitle（HeroUI Typography）
 │   │   │   ├── controls.tsx           # 设置控件（Select/NumberField/Switch/Radio/TextArea/FilePicker + fieldCls）
 │   │   │   └── Surface.tsx            # Surface 兼容别名（旧 API，样式与卡片统一）
+│   │   ├── about-version/              # 版本更新内容展示
+│   │   │   ├── parse.ts                # release-notes 解析（details 切块 + conventional commit 分类）
+│   │   │   └── index.tsx               # AboutVersion 组件（getReleaseNotes → 分类卡片）
 │   │   ├── VersionCard.tsx            # 版本/更新卡片
 │   │   ├── UnderConstruction.tsx      # "装修中" 占位组件
 │   │   └── StartupPopup.tsx           # 启动弹窗
@@ -562,3 +565,9 @@ z-200 StartupPopup        启动弹窗 (环境变量控制)
 | 网络 | 安全识别服务 | 实装 | `network.securityId` |
 | 网络 | 以太联机 / 陶瓦联机 | 占位 | 无后端接口 |
 | 其他 | 服务与反馈 / 赞助我们 / 开发者选项 | 保留 | — |
+
+### 版本更新内容（AboutVersion）
+
+- `src/components/about-version/`：AboutVersion 组件通过 `getReleaseNotes()`（GitHub release-notes.md，主进程自动切加速源、回退最新版）拉取**当前版本**说明，经 `parseReleaseNotes()` 解析后按提交类型分组，每组卡片 + 图标展示（feat 新增 / fix 修复 / perf 优化 / refactor 重构 / docs 文档 / other 其他）。
+- **OOBE / UPvP 流程**：`版本卡片 → 关于此版本 → …`（`oobe/about-version`、`upvp/about-version` 引用 AboutVersion；原 step-version 的下一步分别指向这两个新页）。
+- **Release notes 受控格式约定（与 CI release 模板对齐）**：`## 更新了什么内容` 下每条变更一个 `<details>`（`<summary>·Commit {sha}</summary>`，正文首行为 conventional commit `type(scope): subject`，换行后为说明）；无提交时写 `· 无提交记录`。解析器亦兼容无 details 的列表兜底。

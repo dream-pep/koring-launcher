@@ -182,6 +182,7 @@ import { APP_ICON, DEFAULT_BG, LOGO_SVG, BUILD_MODE, isDev } from "@/lib/mode";
 - **游戏目录导入**：版本从**当前扫描目录**导入（`sourceGamePath`），实例建在主库；主目录变更自动重扫；批量导入幂等（已存在跳过）；相对 `gameDir`（默认 `.minecraft`）由主进程 `resolveGamePath` 按 exe 目录/项目根归一化。
 - **设置页结构（参考 PCL2）**：通用（主页/Koring 账户/关于/版权）与其他（服务与反馈/赞助/开发者）保留；游戏组（账户·离线登录、Java、目录、高级·含快速进入服务器）、个性化组（主题背景/主界面/语言/辅助）、网络组（下载/安全识别）已对接设置接口；以太/陶瓦联机页暂为占位。新增配置段：`app.language`（语言偏好）、`ui.showInstanceTitle/showTaskButton`（主界面元素）、`advanced.server`（快速进入服务器，启动自动加入）。
 - **离线账号登录**：`auth:offline-login` 处理器生成离线 UUID（MD5(OfflinePlayer:用户名)）；微软登录 UI 标注"开发中"。
+- **AboutVersion（关于此版本）**：`src/components/about-version/` 拉取当前版本 GitHub 发布说明，解析后**按提交类型（新增/修复/优化/重构/文档/其他）分类卡片**展示（不渲染原始 Markdown）；OOBE/UPvP 流程步骤为「版本卡片 → 关于此版本」。
 
 ## Tech Stack
 

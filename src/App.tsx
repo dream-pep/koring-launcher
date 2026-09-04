@@ -32,12 +32,14 @@ import { OobeAgreement } from "./pages/oobe/step-agreement";
 import { OobeLogin } from "./pages/oobe/step-login";
 import { OobeWelcome } from "./pages/oobe/step-welcome";
 import { OobeVersion } from "./pages/oobe/step-version";
+import { OobeAboutVersion } from "./pages/oobe/about-version";
 import { OobeBetaTest } from "./pages/oobe/step-beta-test";
 import { OobeFinish } from "./pages/oobe/step-finish";
 import { OobeLegal } from "./pages/oobe/step-legal";
 import { OobeAboutInfo } from "./pages/oobe/about-info";
 import { UpvpComplete } from "./pages/upvp/step-complete";
 import { UpvpVersion } from "./pages/upvp/step-version";
+import { UpvpAboutVersion } from "./pages/upvp/about-version";
 import { UpvpCheck } from "./pages/upvp/step-check";
 import { UpvpBetaTest } from "./pages/upvp/step-beta-test";
 import { UpvpFinish } from "./pages/upvp/step-finish";
@@ -59,6 +61,7 @@ const pageMap = {
   "oobe/login": OobeLogin,
   "oobe/welcome": OobeWelcome,
   "oobe/version": OobeVersion,
+  "oobe/about-version": OobeAboutVersion,
   "oobe/beta-test": OobeBetaTest,
   "oobe/finish": OobeFinish,
   "oobe/about-info": OobeAboutInfo,
@@ -66,6 +69,7 @@ const pageMap = {
   upvp: UpvpComplete,
   "upvp/complete": UpvpComplete,
   "upvp/version": UpvpVersion,
+  "upvp/about-version": UpvpAboutVersion,
   "upvp/check": UpvpCheck,
   "upvp/beta-test": UpvpBetaTest,
   "upvp/finish": UpvpFinish,

@@ -14,6 +14,7 @@ export type RouteKey =
   | "oobe/language"
   | "oobe/agreement"
   | "oobe/version"
+  | "oobe/about-version"
   | "oobe/beta-test"
   | "oobe/login"
   | "oobe/welcome"
@@ -23,6 +24,7 @@ export type RouteKey =
   | "upvp"
   | "upvp/complete"
   | "upvp/version"
+  | "upvp/about-version"
   | "upvp/check"
   | "upvp/beta-test"
   | "upvp/finish"
@@ -65,6 +67,7 @@ export const allRoutes: RouteItem[] = [
   { key: "oobe/language", label: "语言设置", path: "/oobe/language", hidden: true },
   { key: "oobe/agreement", label: "同意协议", path: "/oobe/agreement", hidden: true },
   { key: "oobe/version", label: "当前版本", path: "/oobe/version", hidden: true },
+  { key: "oobe/about-version", label: "关于此版本", path: "/oobe/about-version", hidden: true },
   { key: "oobe/beta-test", label: "测试协议", path: "/oobe/beta-test", hidden: true },
   { key: "oobe/login", label: "登录", path: "/oobe/login", hidden: true },
   { key: "oobe/welcome", label: "欢迎", path: "/oobe/welcome", hidden: true },
@@ -74,6 +77,7 @@ export const allRoutes: RouteItem[] = [
   { key: "upvp", label: "更新引导", path: "/upvp", hidden: true },
   { key: "upvp/complete", label: "更新已完成", path: "/upvp/complete", hidden: true },
   { key: "upvp/version", label: "当前版本", path: "/upvp/version", hidden: true },
+  { key: "upvp/about-version", label: "关于此版本", path: "/upvp/about-version", hidden: true },
   { key: "upvp/check", label: "检查版本", path: "/upvp/check", hidden: true },
   { key: "upvp/beta-test", label: "测试协议", path: "/upvp/beta-test", hidden: true },
   { key: "upvp/finish", label: "完成", path: "/upvp/finish", hidden: true },
