@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { VersionCard } from "@/components/VersionCard";
+import { AboutVersion } from "@/components/about-version";
 import { SectionTitle, SettingCard } from "@/components/setting";
 import { Progress } from "@/components/ui/progress";
 import { BUILD_MODE } from "@/lib/mode";
@@ -208,6 +209,9 @@ export function UpdatePage() {
     <div className="max-w-3xl mx-auto p-6 md:p-8 pb-44">
       <div className="space-y-6">
         <VersionCard />
+
+        {/* 版本卡片下方：当前版本更新内容速览（分类卡片） */}
+        <AboutVersion />
 
         <div>
           <SectionTitle>更新内容</SectionTitle>
