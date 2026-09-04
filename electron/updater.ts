@@ -1,5 +1,7 @@
 import { autoUpdater, CancellationToken, type ProgressInfo } from 'electron-updater';
 import electron from 'electron';
+import * as fs from 'fs';
+import * as crypto from 'crypto';
 import * as os from 'os';
 import semver from 'semver';
 import { getConfig, updateConfig, flushConfig } from './config';
@@ -33,6 +35,8 @@ export interface UpdateStatusPayload {
   source?: string;
   /** 当前更新通道（woker / runner） */
   channel?: string;
+  /** 安装包是否已通过本地核验（sha512 / 大小） */
+  verified?: boolean;
   error?: string;
 }
 
@@ -152,6 +156,12 @@ class UpdateService {
   private suppressErrors = false;
   /** 当前下载的取消令牌（暂停/取消时 cancel） */
   private downloadToken: CancellationToken | null = null;
+  /** 目标安装包是否已通过本地核验（sha512 + 大小），核验通过前不允许安装 */
+  private verified = false;
+  /** update-available 时记录的期望 sha512（来自 latest.yml） */
+  private expectedSha512 = '';
+  /** 期望文件大小（字节） */
+  private expectedSize = 0;
   /** 当前更新通道（woker 慢走 / runner 跑步；从配置读取，可运行时切换） */
   private channelKey: UpdateChannelKey = 'woker';
 
@@ -190,11 +200,19 @@ class UpdateService {
       this.state = 'available';
       this.version = info.version;
       this.error = undefined;
+      this.verified = false;
+      // 记录期望安装包校验值（来自 latest.yml 的 files[0]）
+      const anyInfo = info as unknown as { files?: Array<{ sha512?: string; size?: number }> };
+      const first = Array.isArray(anyInfo?.files) ? anyInfo.files[0] : null;
+      this.expectedSha512 = String(first?.sha512 ?? '');
+      this.expectedSize = Number(first?.size ?? 0);
+      console.log(`[updater] 可用更新 ${info.version}，期望 sha512=${this.expectedSha512.slice(0, 12)}… size=${this.expectedSize}`);
       this.emit();
     });
     autoUpdater.on('update-not-available', () => {
       this.state = 'not-available';
       this.version = undefined;
+      this.verified = false;
       this.emit();
     });
     autoUpdater.on('download-progress', (p) => {
@@ -202,8 +220,22 @@ class UpdateService {
       this.progress = p;
       this.emit();
     });
-    autoUpdater.on('update-downloaded', (info) => {
+    // 下载完成 → 本地核验安装包（sha512 + 大小）通过后才置为"已下载可安装"；
+    // 核验失败 → 进入 error，拒绝安装（防下载损坏 / 篡改）
+    autoUpdater.on('update-downloaded', async (info) => {
+      const errMsg = await this.verifyDownloadedPackage();
+      if (errMsg) {
+        console.error(`[updater] 安装包核验失败: ${errMsg}`);
+        this.state = 'error';
+        this.error = errMsg;
+        this.version = undefined;
+        this.verified = false;
+        this.emit();
+        return;
+      }
+      console.log('[updater] 安装包核验通过（sha512 + 大小）');
       this.state = 'downloaded';
+      this.verified = true;
       this.version = info.version;
       this.emit();
     });
@@ -238,8 +270,44 @@ class UpdateService {
       bytesPerSecond: this.progress?.bytesPerSecond,
       source: this.source,
       channel: this.channelKey,
+      verified: this.verified,
       error: this.error,
     };
+  }
+
+  /**
+   * 本地核验已下载的安装包（在安装前执行）：
+   * 1) 文件存在性；
+   * 2) 大小与 latest.yml 记录一致（有期望值时）；
+   * 3) sha512 与 latest.yml 记录一致（逐块流式计算，防篡改/下载损坏）。
+   * 返回 null = 通过；返回字符串 = 失败原因（调用方进入 error，拒绝安装）。
+   */
+  private async verifyDownloadedPackage(): Promise<string | null> {
+    const helper = (autoUpdater as unknown as { downloadedUpdateHelper?: { file?: string } }).downloadedUpdateHelper;
+    const filePath = helper?.file;
+    if (!filePath) return '未找到已下载的安装包';
+    try {
+      const stat = await fs.promises.stat(filePath);
+      if (this.expectedSize > 0 && stat.size !== this.expectedSize) {
+        return `安装包大小不符（期望 ${this.expectedSize} 字节，实际 ${stat.size} 字节）`;
+      }
+      if (this.expectedSha512) {
+        const hash = crypto.createHash('sha512');
+        await new Promise<void>((resolve, reject) => {
+          const stream = fs.createReadStream(filePath);
+          stream.on('data', (chunk) => hash.update(chunk));
+          stream.on('end', () => resolve());
+          stream.on('error', reject);
+        });
+        const actual = hash.digest('hex').toLowerCase();
+        if (actual !== this.expectedSha512.toLowerCase()) {
+          return '安装包校验和不符（sha512 不匹配），文件可能已损坏或被篡改';
+        }
+      }
+      return null;
+    } catch (e) {
+      return `安装包核验失败：${String((e as Error)?.message ?? e)}`;
+    }
   }
 
   /** 将当前状态与下载进度写入配置（下载/安装进度落盘） */
@@ -615,6 +683,14 @@ class UpdateService {
    */
   quitAndInstall(): void {
     if (!this.ready || this.state !== 'downloaded') return;
+    // 安装前必须已通过本地核验（sha512 + 大小），防损坏/篡改包被安装
+    if (!this.verified) {
+      console.warn('[updater] 安装被拒：安装包未通过核验');
+      this.state = 'error';
+      this.error = '安装包未通过核验，已拒绝安装，请重新检查并下载更新';
+      this.emit();
+      return;
+    }
     this.state = 'installing';
     this.emit();
     try {

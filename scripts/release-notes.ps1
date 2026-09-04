@@ -27,11 +27,21 @@ $rec = [char]0x1e   # 记录分隔符（每个 commit 一条）
 $sep = [char]0x1f   # 字段分隔符（hash / subject / body）
 $format = "%x1f%H%x1f%s%x1f%b%x1e"
 
-# 自上个 release tag（v*）以来的提交；无 tag 则取全部提交
-$lastTag = git tag --sort=-version:refname 2>$null | Where-Object { $_ -match '^v' } | Select-Object -First 1
-if ($lastTag) {
-  Write-Host "Commits since tag: $lastTag"
-  $raw = git log --format=$format "$lastTag..HEAD"
+# 提交范围（base tag）：按 tag 创建时间从新到旧取"上一个 release"。
+#   run（正式版）→ 上一个【正式版】tag：把上一个正式版之后所有 beta 的提交也写进正式版更新内容
+#   beta         → 上一个 release tag（任意通道）
+# 注意用 creatordate 而非 git 版本序：git 对 -beta.N / -N 混排不可靠（会把 beta.16 排到 -17 之前）。
+$tagsNewestFirst = git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags 2>$null |
+  Where-Object { $_ -match '^v' }
+$baseTag = if ($Mode -eq 'run') {
+  ($tagsNewestFirst | Where-Object { $_ -notmatch '-beta\.' } | Select-Object -First 1)
+} else {
+  ($tagsNewestFirst | Select-Object -First 1)
+}
+
+if ($baseTag) {
+  Write-Host "Commits since tag: $baseTag (mode=$Mode)"
+  $raw = git log --format=$format "$baseTag..HEAD"
 } else {
   Write-Host "No release tags found, listing all commits"
   $raw = git log --format=$format "HEAD"

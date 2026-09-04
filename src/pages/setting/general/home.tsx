@@ -1,5 +1,4 @@
 import {
-  UserCircle,
   Gamepad2,
   Palette,
   Download,
@@ -37,7 +36,8 @@ function ShortcutTile({ icon, label, desc, navKey, onClick }: ShortcutItem & { o
 }
 
 const shortcuts: ShortcutItem[] = [
-  { icon: <UserCircle className="w-4 h-4" />, label: "Koring 账户", desc: "同步数据、皮肤与个人配置", navKey: "account" },
+  // Koring 账户（暂时隐藏）
+  // { icon: <UserCircle className="w-4 h-4" />, label: "Koring 账户", desc: "同步数据、皮肤与个人配置", navKey: "account" },
   { icon: <Gamepad2 className="w-4 h-4" />, label: "游戏账户与档案", desc: "管理游戏内账户和档案配置", navKey: "game-account" },
   { icon: <Palette className="w-4 h-4" />, label: "主题与背景", desc: "深色模式、背景图片与视差", navKey: "theme-bg" },
   { icon: <Download className="w-4 h-4" />, label: "下载设置", desc: "下载线程数与存储路径", navKey: "download" },

@@ -37,6 +37,8 @@ export interface UpdateStatusPayload {
   source?: string;
   /** 当前更新通道（woker / runner） */
   channel?: string;
+  /** 安装包是否已通过本地核验（sha512 / 大小；核验通过前不允许安装） */
+  verified?: boolean;
   error?: string;
 }
 

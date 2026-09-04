@@ -195,7 +195,9 @@ export function UpdatePage() {
           : st === "paused"
             ? `下载已暂停（${pct.toFixed(0)}%）`
             : st === "downloaded"
-              ? "更新已下载完成"
+              ? status?.verified
+                ? "更新已下载完成（安装包已核验，点击安装）"
+                : "更新已下载完成"
               : st === "installing"
                 ? "正在安装更新，应用即将重启..."
                 : st === "error"

@@ -1,7 +1,6 @@
 import { useState, useCallback, type ReactNode } from "react";
 import {
   Home,
-  UserCircle,
   Info,
   Copyright,
   Gamepad2,
@@ -23,7 +22,7 @@ import {
 import { useRouteStore } from "@/stores/routeStore";
 
 import { HomeSetting } from "./general/home";
-import { AccountSetting } from "./general/account";
+// import { AccountSetting } from "./general/account";  // Koring 账户（暂时隐藏）
 import { AboutSetting } from "./general/about";
 import { CopyrightSetting } from "./general/copyright";
 import { GameAccountSetting } from "./game/game-account";
@@ -65,7 +64,8 @@ function buildMenuData(
       title: "通用",
       items: [
         { key: "home", label: "主页", icon: <Home className={iconCls} />, component: <HomeSetting onNavigate={switchPage} /> },
-        { key: "account", label: "Koring 账户", icon: <UserCircle className={iconCls} />, component: <AccountSetting /> },
+        // Koring 账户（暂时隐藏）
+        // { key: "account", label: "Koring 账户", icon: <UserCircle className={iconCls} />, component: <AccountSetting /> },
         { key: "about", label: "关于", icon: <Info className={iconCls} />, component: <AboutSetting /> },
         { key: "copyright", label: "版权", icon: <Copyright className={iconCls} />, component: <CopyrightSetting /> },
       ],
