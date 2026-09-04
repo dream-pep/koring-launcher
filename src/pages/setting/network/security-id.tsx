@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useConfigStore } from "@/stores/configStore";
-import { Switch, Input } from "@heroui/react";
+import { Input } from "@heroui/react";
+import { Switch } from "@/components/ui/switch";
 import { ShieldCheck } from "lucide-react";
 import { SettingCard, SettingRow, PageHeader, SectionTitle, fieldCls } from "@/components/setting";
 
@@ -30,11 +31,7 @@ export function SecurityIdSetting() {
                 label="启用第三方认证"
                 desc="使用自定义认证服务器替代 Microsoft 认证（适用于离线服务器）"
               >
-                <Switch isSelected={enabled} onChange={handleToggle}>
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                </Switch>
+                <Switch aria-label="启用第三方认证" checked={enabled} onCheckedChange={handleToggle} />
               </SettingRow>
             </SettingCard>
 

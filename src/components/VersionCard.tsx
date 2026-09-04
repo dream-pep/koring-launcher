@@ -40,6 +40,11 @@ interface VersionCardProps {
    * 并显示「查看更新」小字提示；其他页面为 false
    */
   isSettingPage?: boolean;
+  /**
+   * 关闭共享元素过渡（view-transition-name）：弹窗/浮层里复用 VersionCard 时开启，
+   * 避免与页面上的 VersionCard 重名导致路由切换过渡失效
+   */
+  noViewTransition?: boolean;
 }
 
 export function VersionCard({
@@ -49,6 +54,7 @@ export function VersionCard({
   simple = false,
   oobe = false,
   isSettingPage = false,
+  noViewTransition = false,
 }: VersionCardProps) {
   const color = modeColors[overrideMode ?? BUILD_MODE] ?? modeColors.run;
   const gradient = modeGradients[overrideMode ?? BUILD_MODE] ?? modeGradients.run;
@@ -76,8 +82,13 @@ export function VersionCard({
       )}
       onClick={handleCardClick}
       // 共享元素过渡：路由切换时（startViewTransition），新旧页面中同名 view-transition-name
-      // 的元素会从上一个位置平滑移动/形变到当前页面的位置
-      style={{ viewTransitionName: "version-card" } as React.CSSProperties}
+      // 的元素会从上一个位置平滑移动/形变到当前页面的位置。
+      // 浮层/弹窗复用（noViewTransition）时关闭，避免与页面卡片重名打断过渡。
+      style={
+        noViewTransition
+          ? undefined
+          : ({ viewTransitionName: "version-card" } as React.CSSProperties)
+      }
     >
       {/* 背景层 */}
       <div className="absolute inset-0" style={{ background: gradient }} />

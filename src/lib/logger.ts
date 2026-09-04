@@ -4,7 +4,8 @@
  * 规则（与主进程 electron/core/logger.ts 对齐）：
  * - 默认（非 debug）：error/warn/info 输出到控制台（DevTools），debug 不输出；
  * - 用户开启「调试模式」（config.advanced.debugMode）后：debug 也输出，
- *   并经由 electronAPI.log → 主进程 log:write 桥写入 userData/koring.log。
+ *   并经由 electronAPI.log → 主进程 log:write 桥汇入主进程统一日志：
+ *   dev（未打包）运行下同步输出到启动终端的 stdout/stderr，同时写入 userData/koring.log。
  */
 
 import { useConfigStore } from "@/stores/configStore";

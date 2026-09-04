@@ -5,6 +5,7 @@
  * - 默认（非 debug）：warn/error/info 输出到控制台，debug 不输出；
  * - 用户开启「调试模式」（config.advanced.debugMode，设置→游戏→高级）：
  *   debug 也输出控制台，并把全部级别写入 userData/koring.log（超过 5MB 自动轮转为 .old）；
+ * - 开发（未打包）运行且开启调试模式时：日志额外/直接输出到启动该进程的终端（stdout/stderr）；
  * - 渲染进程经 `log:write`（ipcRenderer.send）汇入同一套格式/文件。
  */
 
@@ -24,6 +25,9 @@ export interface Logger {
 }
 
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
+/** 开发（未打包）运行：直接跑在终端里，日志写 stdout/stderr 用户即可实时看到 */
+const isDevRun = !app.isPackaged;
 
 let debugModeProvider: () => boolean = () => false;
 export function setDebugModeProvider(fn: () => boolean): void {
@@ -109,10 +113,16 @@ function write(scope: string, level: LogLevel, args: unknown[]): void {
   const line = `[${timestamp()}][${scope}][${level.toUpperCase()}] ${msg}`;
 
   const enabled = isDebugMode();
-  // debug 仅在调试模式可见；info/warn/error 始终走控制台
-  const showConsole = level !== 'debug' || enabled;
-  if (showConsole) {
-    if (level === 'error') console.error(line);
+  // debug 仅在调试模式可见；info/warn/error 始终输出
+  const show = level !== 'debug' || enabled;
+  if (show) {
+    if (isDevRun) {
+      // dev（未打包，pnpm dev / electron .）：直接写进程 stdout/stderr，
+      // 让详细日志实时出现在启动它的终端里（不依赖外部控制台捕获）。
+      const text = `${line}\n`;
+      if (level === 'error' || level === 'warn') process.stderr.write(text);
+      else process.stdout.write(text);
+    } else if (level === 'error') console.error(line);
     else if (level === 'warn') console.warn(line);
     else if (level === 'info') console.info(line);
     else console.debug(line);

@@ -18,6 +18,7 @@ import {
   type UpdateStatusPayload,
   type VersionCompareResult,
 } from "@/api/update";
+import { useUpdateDialogStore } from "@/stores/updateDialogStore";
 
 /** 更新功能测试：版本识别 / 检查 / 介绍 / 比对 / 下载 */
 export function UpdateDebug() {
@@ -71,7 +72,27 @@ export function UpdateDebug() {
         </GlassCard>
       </div>
 
-      {/* 2. 设置版本号 */}
+      {/* 2. 新版本弹窗预览（唤起全局"发现新版本"弹窗） */}
+      <div>
+        <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3">
+          新版本弹窗预览
+        </h3>
+        <GlassCard>
+          <div className="flex flex-wrap gap-2 items-center">
+            <Button size="sm" onClick={() => useUpdateDialogStore.getState().show(s?.version || "9.9.9")}>
+              唤起新版本弹窗
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => useUpdateDialogStore.getState().hide()}>
+              关闭弹窗
+            </Button>
+            <span className="text-[12px] text-muted-foreground font-mono ml-1">
+              版本：{s?.version || "9.9.9"}（无可用版本时用 9.9.9 预览）
+            </span>
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* 3. 设置版本号 */}
       <div>
         <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3">
           设置测试版本号

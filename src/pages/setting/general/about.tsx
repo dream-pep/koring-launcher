@@ -4,7 +4,8 @@ import { BUILD_MODE } from "@/lib/mode";
 import { BUILD_COMMIT, BUILD_ID } from "@/lib/buildInfo";
 import { ExternalLink, GitFork, RotateCcw, ChevronDown } from "lucide-react";
 import { Link, Select, ListBox, ListBoxItem } from "@heroui/react";
-import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
+import { useConfigStore } from "@/stores/configStore";
+import { SettingCard, SettingRow, SettingSwitch, PageHeader, SectionTitle } from "@/components/setting";
 import { Button } from "@/components/ui/button";
 import {
   getUpdateChannels,
@@ -46,6 +47,9 @@ export function AboutSetting() {
   const [open, setOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const canConfirm = countdown <= 0;
+
+  const adv = useConfigStore((s) => s.config.advanced);
+  const setAdvanced = useConfigStore((s) => s.setAdvanced);
 
   // 设备识别码（组合指纹：主板/硬盘/BIOS → 回退系统安装标识）
   const [device, setDevice] = useState<DeviceIdentity | null>(null);
@@ -197,6 +201,20 @@ export function AboutSetting() {
                   </Select.Popover>
                 </Select.Root>
               </SettingRow>
+            </SettingCard>
+          </div>
+        </div>
+
+        <div>
+          <SectionTitle>调试</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              <SettingSwitch
+                label="调试模式"
+                desc="启用后附加 -Dkoring.debugMode=true 并在控制台输出详细日志（dev 运行时会同步输出到终端），可能影响性能"
+                checked={adv?.debugMode ?? false}
+                onChange={(v) => setAdvanced({ debugMode: v })}
+              />
             </SettingCard>
           </div>
         </div>

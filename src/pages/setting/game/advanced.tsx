@@ -3,7 +3,6 @@ import { useConfigStore } from "@/stores/configStore";
 import {
   SettingCard,
   SettingSelect,
-  SettingSwitch,
   SettingNumberField,
   SettingFilePicker,
   fieldCls,
@@ -28,7 +27,7 @@ export function AdvancedSetting() {
 
   return (
     <div>
-      <PageHeader title="高级设置" desc="游戏高级启动参数、调试选项与实验性功能" />
+      <PageHeader title="高级设置" desc="游戏高级启动参数与实验性功能" />
 
       <div className="space-y-6">
         {/* 启动行为 */}
@@ -163,20 +162,6 @@ export function AdvancedSetting() {
           </div>
         </div>
 
-        {/* 调试 */}
-        <div>
-          <SectionTitle>调试</SectionTitle>
-          <div className="space-y-3">
-            <SettingCard>
-              <SettingSwitch
-                label="调试模式"
-                desc="启用后附加 -Dkoring.debugMode=true 并在控制台输出详细日志，可能影响性能"
-                checked={adv.debugMode}
-                onChange={(v) => setAdvanced({ debugMode: v })}
-              />
-            </SettingCard>
-          </div>
-        </div>
       </div>
     </div>
   );

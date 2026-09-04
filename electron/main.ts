@@ -25,7 +25,8 @@ const { app } = electron;
 
 const isDev = !app.isPackaged;
 
-// 统一日志：debug 模式（config.advanced.debugMode）→ 控制台 + userData/koring.log；否则仅控制台
+// 统一日志：debug 模式（config.advanced.debugMode）→ 控制台 + userData/koring.log；
+// dev（未打包）运行下直接写进程 stdout/stderr，日志实时输出到启动它的终端；否则仅控制台
 const log = createLogger('main');
 setDebugModeProvider(() => {
   try {

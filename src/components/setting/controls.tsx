@@ -11,11 +11,11 @@ import {
   Radio,
   RadioGroup,
   Select,
-  Switch,
   TextArea,
 } from "@heroui/react";
 import { Check, ChevronDown, FolderOpen, FolderSearch, Loader2 } from "lucide-react";
 import { ipcInvoke } from "@/api/ipc";
+import { Switch } from "@/components/ui/switch";
 import { SettingRow } from "./SettingRow";
 
 export interface SettingOption {
@@ -51,6 +51,7 @@ export function SettingSelect({
   return (
     <SettingRow label={label} desc={desc}>
       <Select.Root
+        aria-label={label}
         selectedKey={selectedKey}
         onSelectionChange={(keys) => {
           // RAC 单选时可能传 Key | null，也可能传 Set<Key>；两种形状都兼容
@@ -119,6 +120,7 @@ export function SettingNumberField({
     <SettingRow label={label} desc={desc}>
       <div className={`flex items-center gap-1.5 ${className ?? ""}`}>
         <NumberField.Root
+          aria-label={label}
           value={value}
           onChange={onChange}
           minValue={min}
@@ -162,12 +164,12 @@ export function SettingSwitch({
 }) {
   return (
     <SettingRow label={label} desc={desc}>
-      {/* 注：HeroUI 3 基于 react-aria，Switch 使用 onChange 而非 onValueChange */}
-      <Switch isSelected={checked} onChange={onChange}>
-        <Switch.Control>
-          <Switch.Thumb />
-        </Switch.Control>
-      </Switch>
+      {/* shadcn Switch（@base-ui/react/switch）：替代 HeroUI 3 Switch（鼠标点击不触发 change） */}
+      <Switch
+        aria-label={label}
+        checked={checked}
+        onCheckedChange={onChange}
+      />
     </SettingRow>
   );
 }

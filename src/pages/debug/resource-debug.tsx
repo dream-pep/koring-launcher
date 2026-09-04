@@ -31,12 +31,61 @@ export function ResourceDebug() {
   const [heap, setHeap] = useState<JsHeapInfo | null>(null);
   const [domNodes, setDomNodes] = useState(0);
   const [logInfo, setLogInfo] = useState<{ filePath: string | null; debugMode: boolean } | null>(null);
+  const [hitInfo, setHitInfo] = useState<string[] | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const snapshot = useResourceStore((s) => s.snapshot);
   const budgets = useResourceStore((s) => s.budgets);
   const clearFree = useResourceStore((s) => s.clearFree);
   const resetCounters = useResourceStore((s) => s.resetCounters);
+
+  /** 诊断「控件无法点击」：找出全屏覆盖且 pointer-events≠none 的元素，并采样几个点位的最上层元素 */
+  const runHitTest = () => {
+    const lines: string[] = [];
+    const all = document.querySelectorAll<HTMLElement>("body *");
+    // 1) 疑似全屏拦截层
+    const seen = new Set<HTMLElement>();
+    all.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      const covers =
+        rect.width >= window.innerWidth * 0.97 && rect.height >= window.innerHeight * 0.97;
+      const clickable = cs.pointerEvents !== "none";
+      if (!covers || !clickable || seen.has(el)) return;
+      seen.add(el);
+      const tag = el.tagName.toLowerCase();
+      lines.push(
+        `[全屏可点] <${tag}${el.id ? `#${el.id}` : ""}> pos=${cs.position} z=${cs.zIndex} class="${String(el.className).slice(0, 120)}"`,
+      );
+    });
+    // 2) 采样几个位置的最上层元素
+    const points: Array<[number, number, string]> = [
+      [0.5, 0.5, "中央"],
+      [0.5, 0.12, "标题栏下沿"],
+      [0.25, 0.6, "内容区"],
+      [0.75, 0.85, "内容区右下"],
+    ];
+    for (const [fx, fy, label] of points) {
+      const el = document.elementFromPoint(Math.floor(innerWidth * fx), Math.floor(innerHeight * fy));
+      if (!el || el === document.body) {
+        lines.push(`[${label}] (${fx},${fy}) → 无元素/body`);
+        continue;
+      }
+      const target = el as HTMLElement;
+      const cs = getComputedStyle(target);
+      const chain: string[] = [];
+      let node: HTMLElement | null = target;
+      for (let i = 0; node && i < 5; i++) {
+        chain.push(
+          `${node.tagName.toLowerCase()}${node.id ? `#${node.id}` : ""}${node.className ? `.${String(node.className).split(/\s+/).filter(Boolean).slice(0, 2).join(".")}` : ""}`,
+        );
+        node = node.parentElement;
+      }
+      lines.push(`[${label}] (${fx},${fy}) → ${chain.join(" < ")} | pe=${cs.pointerEvents}`);
+    }
+    if (lines.length === 0) lines.push("未发现明显拦截层（可再多点几个位置）");
+    setHitInfo(lines);
+  };
 
   const sample = async () => {
     setHeap(readJsHeap());
@@ -137,6 +186,31 @@ export function ResourceDebug() {
                 <p className="text-sm font-medium text-foreground">设置 → 游戏 → 高级 → 调试模式</p>
               </div>
             </div>
+          </GlassCard>
+        </div>
+
+        {/* 点击拦截诊断 */}
+        <div>
+          <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3">
+            点击拦截诊断（控件点了没反应时使用）
+          </h3>
+          <GlassCard>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-[13px] text-muted-foreground">
+                找出「覆盖全屏且可接收指针」的元素，并采样 4 个点位的最上层元素
+              </p>
+              <button
+                onClick={runHitTest}
+                className="inline-flex items-center gap-1 rounded-md border border-foreground/10 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                检测
+              </button>
+            </div>
+            {hitInfo && (
+              <pre className="max-h-56 overflow-auto rounded-md bg-foreground/[0.04] p-3 text-[12px] leading-relaxed font-mono whitespace-pre-wrap text-foreground/80">
+                {hitInfo.join("\n")}
+              </pre>
+            )}
           </GlassCard>
         </div>
 

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useThemeStore, type DarkMode } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
-import { Switch, Button, Slider } from "@heroui/react";
+import { Button, Slider } from "@heroui/react";
+import { Switch } from "@/components/ui/switch";
 import { DEFAULT_BG } from "@/lib/mode";
 import clsx from "clsx";
 import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
@@ -207,11 +208,7 @@ export function ThemeBgSetting() {
 
             <SettingCard>
               <SettingRow label="背景图片视差" desc="背景图片随窗口滚动产生视差位移">
-                <Switch isSelected={parallax} onChange={setParallax}>
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                </Switch>
+                <Switch aria-label="背景图片视差" checked={parallax} onCheckedChange={setParallax} />
               </SettingRow>
             </SettingCard>
 

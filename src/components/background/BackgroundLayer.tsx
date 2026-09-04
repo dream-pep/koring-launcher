@@ -177,6 +177,7 @@ export function BackgroundLayer() {
   const imageLayerStyle = (url: string): React.CSSProperties => ({
     position: "absolute",
     inset: 0,
+    pointerEvents: "none", // 背景层永不接收任何指针事件
     backgroundImage: `url(${url})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
