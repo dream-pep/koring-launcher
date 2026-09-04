@@ -43,7 +43,8 @@ const MIME_TO_EXT: Record<string, string> = {
 
 /**
  * 旧版配置若仍存 BASE64 dataURL 且 userData 里没有原始缓存文件时，
- * 直接把 dataURL 解码落盘为 `background-custom<ext>`，保证配置文件能迁移为「文件路径」存储。
+ * 直接把 dataURL 解码落盘为 `background-custom-<唯一后缀><ext>`，
+ * 保证配置文件能迁移为「文件路径」存储。
  */
 export function recoverBackgroundFromDataUrl(dataUrl: string, userDataDir: string): string | null {
   const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl.trim());
@@ -54,7 +55,7 @@ export function recoverBackgroundFromDataUrl(dataUrl: string, userDataDir: strin
     if (!buffer || buffer.length === 0) return null;
     if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
     clearStaleBackgroundFiles(userDataDir, []);
-    const rawPath = path.join(userDataDir, `background-custom${ext}`);
+    const rawPath = path.join(userDataDir, `background-custom-${uniqueSuffix()}${ext}`);
     fs.writeFileSync(rawPath, buffer);
     return rawPath;
   } catch {
@@ -81,6 +82,11 @@ function statSize(p: string): number {
   }
 }
 
+/** 生成唯一后缀：每次导入的文件名都不同，保证渲染端 URL/配置路径变化以触发实时刷新与渐入动效 */
+function uniqueSuffix(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /** 删除 userData 目录里旧的壁纸缓存文件（保留 keep 中列出的完整路径） */
 export function clearStaleBackgroundFiles(userDataDir: string, keep: string[]): void {
   try {
@@ -105,7 +111,8 @@ export function clearStaleBackgroundFiles(userDataDir: string, keep: string[]): 
  * 对已复制到 userData 的原始壁纸做「按需」降采样，结果直接落盘。
  * - 长边 ≤ maxEdge：不需要优化 → 直接返回原始缓存文件路径（零损耗，视觉 100% 一致）；
  * - 长边 > maxEdge：等比 resize → JPEG(q0.9) 或 PNG(透明/动画不处理) 写为
- *   `background-custom-opt.<ext>`，同时清理旧的其它格式 opt 文件；
+ *   `background-custom-opt-<唯一后缀>.<ext>`（文件名每次不同，便于渲染端感知变化并做渐入），
+ *   同时清理旧的其它格式 opt 文件；
  * - 动画 GIF 或无法解析：原样返回原始路径（不破坏动画/内容）。
  */
 export function optimizeBackgroundFile(rawFilePath: string, maxEdge = 4096): OptimizedBackground {
@@ -174,9 +181,9 @@ export function optimizeBackgroundFile(rawFilePath: string, maxEdge = 4096): Opt
     }
     if (!buffer || buffer.length === 0) return fail(rawFilePath);
 
-    // 先清理旧 opt 文件（其它扩展名/旧尺寸），再原子写入新文件
+    // 先清理旧文件，再原子写入新文件（文件名带唯一后缀，保证每次导入路径都不同）
     clearStaleBackgroundFiles(outDir, [rawFilePath]);
-    const optPath = path.join(outDir, `background-custom-opt${outExt}`);
+    const optPath = path.join(outDir, `background-custom-opt-${uniqueSuffix()}${outExt}`);
     const tmpPath = `${optPath}.${process.pid}.tmp`;
     fs.writeFileSync(tmpPath, buffer);
     try {
@@ -199,8 +206,9 @@ export function optimizeBackgroundFile(rawFilePath: string, maxEdge = 4096): Opt
 }
 
 /**
- * 复制用户选择的图片到 userData（原始缓存，命名 background-custom<ext>），
- * 清理旧的其它扩展名缓存，然后返回优化结果。
+ * 复制用户选择的图片到 userData（原始缓存，命名 background-custom-<唯一后缀><ext>），
+ * 清理旧缓存，然后返回优化结果。每次导入文件名都不同 → 配置里的路径必然变化，
+ * 渲染端据此实时刷新并触发切换渐入动效。
  */
 export function importUserBackground(srcPath: string, maxEdge = 4096): OptimizedBackground | null {
   try {
@@ -209,8 +217,8 @@ export function importUserBackground(srcPath: string, maxEdge = 4096): Optimized
     if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
 
     const ext = path.extname(srcPath).toLowerCase() || '.png';
-    const rawPath = path.join(userDataDir, `background-custom${ext}`);
-    // 删除旧的原始缓存（其它扩展名）
+    const rawPath = path.join(userDataDir, `background-custom-${uniqueSuffix()}${ext}`);
+    // 删除旧的原始缓存
     clearStaleBackgroundFiles(userDataDir, []);
     fs.copyFileSync(srcPath, rawPath);
     return optimizeBackgroundFile(rawPath, maxEdge);
@@ -219,16 +227,29 @@ export function importUserBackground(srcPath: string, maxEdge = 4096): Optimized
   }
 }
 
-/** 找到 userData 中现有的壁纸缓存原始文件（不含 opt 变体） */
+/** 找到 userData 中最近的壁纸缓存原始文件（不含 opt 变体） */
 export function findCachedBackgroundRaw(userDataDir: string): string | null {
   try {
     const entries = fs.readdirSync(userDataDir);
-    const match = entries
-      .filter((n) => n.startsWith('background-custom') && !n.includes('-opt.'))
-      .sort()
+    const files = entries
+      .filter((n) => n.startsWith('background-custom') && !n.includes('-opt'))
       .map((n) => path.join(userDataDir, n))
-      .find((p) => fs.existsSync(p) && fs.statSync(p).isFile());
-    return match ?? null;
+      .filter((p) => {
+        try {
+          return fs.statSync(p).isFile();
+        } catch {
+          return false;
+        }
+      });
+    if (files.length === 0) return null;
+    files.sort((a, b) => {
+      try {
+        return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+      } catch {
+        return 0;
+      }
+    });
+    return files[0];
   } catch {
     return null;
   }

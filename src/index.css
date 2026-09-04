@@ -293,6 +293,17 @@
   animation: none !important;
 }
 
+/* ============================================
+   壁纸切换渐入（BackgroundLayer 双层淡入）
+   ============================================ */
+@keyframes bg-crossfade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.bg-fade-in {
+  animation: bg-crossfade-in 0.6s ease-out both;
+}
+
 .reduce-transparency {
   --titlebar-bg: var(--background);
 }
