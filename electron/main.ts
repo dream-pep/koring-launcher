@@ -19,10 +19,23 @@ import { updateService } from './updater';
 import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
 import { findCachedBackgroundRaw, optimizeBackgroundFile, recoverBackgroundFromDataUrl } from './core/background-image';
 import { registerResourceSchemePrivileges, registerResourceProtocol } from './resource-protocol';
+import { createLogger, setDebugModeProvider, installIpcLogging, registerRendererLogBridge } from './core/logger';
 
 const { app } = electron;
 
 const isDev = !app.isPackaged;
+
+// 统一日志：debug 模式（config.advanced.debugMode）→ 控制台 + userData/koring.log；否则仅控制台
+const log = createLogger('main');
+setDebugModeProvider(() => {
+  try {
+    return getConfig()?.advanced?.debugMode === true;
+  } catch {
+    return false;
+  }
+});
+// 全局包装 ipcMain.handle：所有 IPC 流程自动带 channel/耗时/成败日志（须在 handler 注册前调用）
+installIpcLogging();
 
 // GPU acceleration flags
 app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -51,9 +64,9 @@ function migrateLegacyFiles(): void {
   if (fs.existsSync(dest)) return;
   try {
     fs.copyFileSync(src, dest);
-    console.log(`[migrate] copied Koring.yml ${src} → ${dest}`);
+    log.info(`[migrate] 已复制 Koring.yml ${src} → ${dest}`);
   } catch (e) {
-    console.error(`[migrate] failed to copy Koring.yml:`, e);
+    log.error('[migrate] 复制 Koring.yml 失败:', e);
   }
 }
 
@@ -99,9 +112,9 @@ function migrateBackgroundDataUrlToPath(config: ReturnType<typeof getConfig>): v
     if (!result || !result.filePath) return;
     bg.image = result.filePath;
     saveConfig(config);
-    console.log('[background] 迁移：dataURL → 文件路径', result.filePath);
+    log.info(`[background] 迁移：dataURL → 文件路径 ${result.filePath}`);
   } catch (e) {
-    console.error('[background] 背景配置迁移失败:', e);
+    log.error('[background] 背景配置迁移失败:', e);
   }
 }
 
@@ -207,8 +220,11 @@ function registerAllHandlers() {
 }
 
 app.whenReady().then(() => {
+  log.info('应用就绪，开始初始化主进程');
   registerAllHandlers();
   registerResourceProtocol();
+  registerRendererLogBridge();
+  log.info('IPC handlers / 资源协议 / 渲染日志桥注册完成');
 
   // Migrate legacy install-dir config back to userData before anything reads them
   migrateLegacyFiles();
@@ -216,17 +232,20 @@ app.whenReady().then(() => {
   // Run startup checks before creating windows
   const { isFirstLaunch, config } = runStartupChecks();
   isFirstLaunchFlag = isFirstLaunch;
+  log.info(`启动检查完成 isFirstLaunch=${isFirstLaunch} 配置路径=${configPath()}`);
 
   // 旧配置中 background.image 若是 BASE64 dataURL → 落盘优化并改写为文件路径
   migrateBackgroundDataUrlToPath(config);
 
   // 1. Show splash immediately
   win.splashWindow = createSplashWindow();
+  log.info('Splash 窗口已创建');
 
   // 2. Create main window in background
   //    （config:preload 推送已内置于 createMainWindow 的 did-finish-load 监听，
   //     每次加载/刷新都推送 getConfig() 的最新内存配置）
   win.mainWindow = createMainWindow();
+  log.info('主窗口已创建（后台加载）');
 
   // 3. When main window finishes loading, wait a minimum time then transition
   let mainReady = false;
@@ -237,10 +256,12 @@ app.whenReady().then(() => {
       if (win.mainWindow && !win.mainWindow.isDestroyed()) {
         win.mainWindow.show();
         win.mainWindow.focus();
+        log.info('主窗口已显示，切换完成');
       }
       if (win.splashWindow && !win.splashWindow.isDestroyed()) {
         win.splashWindow.close();
         win.splashWindow = null;
+        log.info('Splash 窗口已关闭');
       }
     }
   };
@@ -261,19 +282,22 @@ app.whenReady().then(() => {
 
   // 延迟静默检查更新（避开启动加载，不抢带宽；开发模式在 updater.init 内自动跳过）
   setTimeout(() => {
+    log.info('触发启动静默更新检查');
     updateService.check(false).catch((e) => {
-      console.error('[updater] 启动静默检查失败:', e);
+      log.error('[updater] 启动静默检查失败:', e);
     });
   }, 12000);
 });
 
 app.on('window-all-closed', () => {
+  log.info('所有窗口已关闭，flush 配置并退出');
   flushConfig();
   app.quit();
 });
 
 app.on('activate', () => {
   if (electron.BrowserWindow.getAllWindows().length === 0) {
+    log.info('activate：重建主窗口');
     win.mainWindow = createMainWindow();
   }
 });

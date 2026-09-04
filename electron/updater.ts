@@ -189,7 +189,9 @@ class UpdateService {
     }
 
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    // 安装一律走我们受控的 quitAndInstall（含核验与确认弹窗），
+    // 禁止 electron-updater 在退出时静默自动安装（否则未核验/核验失败的包可能被直接装上）
+    autoUpdater.autoInstallOnAppQuit = false;
     this.applyChannel();
     autoUpdater.logger = console;
     autoUpdater.on('checking-for-update', () => {
@@ -220,16 +222,18 @@ class UpdateService {
       this.progress = p;
       this.emit();
     });
-    // 下载完成 → 本地核验安装包（sha512 + 大小）通过后才置为"已下载可安装"；
-    // 核验失败 → 进入 error，拒绝安装（防下载损坏 / 篡改）
+    // 下载完成 → 本地核验安装包（sha512 + 大小）。
+    //   · 通过：进入"已下载可安装"（verified=true）
+    //   · 失败：仍进入"已下载"，但 verified=false + 记录原因 —— 点"安装"会弹确认框
+    //     （继续安装 / 取消并删除安装包），绝不静默安装未核验包
     autoUpdater.on('update-downloaded', async (info) => {
       const errMsg = await this.verifyDownloadedPackage();
       if (errMsg) {
         console.error(`[updater] 安装包核验失败: ${errMsg}`);
-        this.state = 'error';
-        this.error = errMsg;
-        this.version = undefined;
+        this.state = 'downloaded';
         this.verified = false;
+        this.version = info.version;
+        this.error = errMsg;
         this.emit();
         return;
       }
@@ -237,6 +241,7 @@ class UpdateService {
       this.state = 'downloaded';
       this.verified = true;
       this.version = info.version;
+      this.error = undefined;
       this.emit();
     });
     autoUpdater.on('error', (err: Error) => {
@@ -680,17 +685,42 @@ class UpdateService {
   /**
    * 退出并安装（NSIS 静默安装，安装完成自动重启）。
    * 安装状态先写入配置并立即落盘，避免退出时 debounce 未写盘。
+   * 安装包未通过核验（verified=false）时先弹确认框：
+   *   继续安装 / 取消并删除安装包 —— 绝不静默安装校验异常的文件。
    */
-  quitAndInstall(): void {
+  async quitAndInstall(): Promise<void> {
     if (!this.ready || this.state !== 'downloaded') return;
-    // 安装前必须已通过本地核验（sha512 + 大小），防损坏/篡改包被安装
+
     if (!this.verified) {
-      console.warn('[updater] 安装被拒：安装包未通过核验');
-      this.state = 'error';
-      this.error = '安装包未通过核验，已拒绝安装，请重新检查并下载更新';
-      this.emit();
-      return;
+      const { dialog, BrowserWindow } = electron;
+      const parent = BrowserWindow.getAllWindows().find((w) => w.isVisible()) ?? null;
+      const opts: electron.MessageBoxOptions = {
+        type: 'warning',
+        title: '版本校验异常',
+        message: '请注意，版本校验异常，可能是文件损坏或者被替换，因此您会看到此弹窗，您可以选择继续安装或取消并删除安装包',
+        detail: this.error ? `核验详情：${this.error}` : '核验详情：sha512 校验和与发布记录不一致',
+        buttons: ['继续安装', '取消并删除安装包'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      };
+      const { response } = parent
+        ? await dialog.showMessageBox(parent, opts)
+        : await dialog.showMessageBox(opts);
+      if (response !== 0) {
+        // 取消并删除安装包
+        console.warn('[updater] 用户取消安装并删除校验异常包');
+        await this.removeDownloadedPackage().catch((e) => console.warn('[updater] 删除安装包失败:', e));
+        this.state = 'idle';
+        this.version = undefined;
+        this.error = undefined;
+        this.verified = false;
+        this.emit();
+        return;
+      }
+      console.warn('[updater] 用户确认继续安装（校验异常但已确认）');
     }
+
     this.state = 'installing';
     this.emit();
     try {
@@ -700,6 +730,17 @@ class UpdateService {
     }
     // 静默安装（/S）+ 安装完成后自动重启（--force-run）
     autoUpdater.quitAndInstall(true, true);
+  }
+
+  /** 删除已下载（校验失败）的安装包 */
+  private async removeDownloadedPackage(): Promise<void> {
+    const helper = (autoUpdater as unknown as { downloadedUpdateHelper?: { file?: string } }).downloadedUpdateHelper;
+    const filePath = helper?.file;
+    if (!filePath) return;
+    if (fs.existsSync(filePath)) {
+      await fs.promises.unlink(filePath);
+      console.log(`[updater] 已删除安装包: ${filePath}`);
+    }
   }
 
   /** 获取系统下载临时目录（用于清理提示，暂未启用） */

@@ -197,7 +197,7 @@ export function UpdatePage() {
             : st === "downloaded"
               ? status?.verified
                 ? "更新已下载完成（安装包已核验，点击安装）"
-                : "更新已下载完成"
+                : "版本校验异常：可能是文件损坏或被替换，点击安装将弹出确认框"
               : st === "installing"
                 ? "正在安装更新，应用即将重启..."
                 : st === "error"

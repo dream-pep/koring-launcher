@@ -62,9 +62,10 @@ export function registerUpdateHandlers() {
     }
   });
 
-  ipcMain.handle('update:quitAndInstall', () => {
+  ipcMain.handle('update:quitAndInstall', async () => {
     try {
-      updateService.quitAndInstall();
+      // 未核验通过时内部会先弹确认框（继续安装 / 取消并删除安装包）
+      await updateService.quitAndInstall();
       return { success: true, data: null, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
