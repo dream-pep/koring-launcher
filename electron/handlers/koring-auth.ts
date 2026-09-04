@@ -9,6 +9,9 @@ import {
   deleteKoringAuth,
 } from '../core/koring-auth';
 import { getConfig, updateConfig, deleteConfigKey } from '../config';
+import { createLogger } from '../core/logger';
+
+const log = createLogger('koring-auth');
 
 export function registerKoringAuthHandlers() {
   ipcMain.handle('koring-auth:request-device-code', async () => {
@@ -39,7 +42,7 @@ export function registerKoringAuthHandlers() {
           },
         });
       } catch (e) {
-        console.error('[koring-auth] failed to save user to config:', e);
+        log.error('[koring-auth] failed to save user to config:', e);
       }
 
       return { success: true, data: { user }, error: null };

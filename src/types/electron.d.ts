@@ -25,6 +25,9 @@ interface ElectronAPI {
   // Config reset
   resetConfig: () => Promise<void>;
 
+  // 渲染端日志 → 主进程统一日志（debug 模式写文件）
+  log: (level: "debug" | "info" | "warn" | "error", scope: string, message: string) => void;
+
   // 壁纸（文件路径存储 → koring-res:// 资源引用，不使用 BASE64）
   pickBackgroundImage: () => Promise<string | null>;
   resolveBackgroundResource: (value: string) => Promise<{ url: string | null; bytes: number }>;

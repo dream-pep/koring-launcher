@@ -16,6 +16,9 @@ import {
   type ResourceEntrySnapshot,
   type ResourceKind,
 } from "./types";
+import { createRendererLogger } from "@/lib/logger";
+
+const log = createRendererLogger("resourceRegistry");
 
 export interface AcquireOptions<T> {
   /** 估算占用字节数（用于预算与面板统计；未提供则记 0） */
@@ -83,12 +86,14 @@ class ResourceRegistry {
       if (existing.settled) {
         this.hits += 1;
         this.emit();
+        log.debug(`acquire 命中 ${kind}:${key} (refs=${existing.refs})`);
         return Promise.resolve(existing.payload as T | null);
       }
       return existing.inFlight as Promise<T | null>;
     }
 
     this.misses += 1;
+    log.debug(`acquire 创建 ${kind}:${key}`);
     const entry: InternalEntry = {
       key,
       kind,
@@ -134,6 +139,7 @@ class ResourceRegistry {
     if (!entry) return;
     entry.refs = Math.max(0, entry.refs - 1);
     entry.lastUsed = Date.now();
+    log.debug(`release ${key} (refs=${entry.refs})`);
     if (!entry.cache && entry.refs === 0) {
       this.drop(entry);
       this.emit();
@@ -160,16 +166,16 @@ class ResourceRegistry {
     }
     this.emit();
   }
-
   /** 释放全部「引用数为 0」的缓存条目（监控面板「释放缓存」按钮） */
   clearFree(): void {
-    let dropped = false;
+    let dropped = 0;
     for (const entry of [...this.entries.values()]) {
       if (entry.refs <= 0 && entry.settled) {
         this.drop(entry);
-        dropped = true;
+        dropped += 1;
       }
     }
+    log.debug(`clearFree 释放缓存条目 ${dropped}`);
     if (dropped) this.emitNow();
   }
 
@@ -188,6 +194,7 @@ class ResourceRegistry {
         bytes -= entry.bytes;
         this.drop(entry);
         this.evictions += 1;
+        log.debug(`LRU 逐出 ${entry.kind}:${entry.key}`);
       }
     }
   }
@@ -238,6 +245,7 @@ class ResourceRegistry {
 
   private drop(entry: InternalEntry): void {
     this.entries.delete(entry.key);
+    log.debug(`释放资源 ${entry.kind}:${entry.key} (${entry.bytes}B, settled=${entry.settled})`);
     if (entry.settled && entry.payload != null) {
       try {
         entry.onRelease?.(entry.payload);

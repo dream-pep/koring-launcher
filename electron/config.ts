@@ -2,7 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import electron from 'electron';
+import { createLogger } from './core/logger';
 const { app } = electron;
+
+const log = createLogger('config');
 
 const CONFIG_FILE = 'Koring.yml';
 const CURRENT_VERSION = 1;
@@ -234,6 +237,7 @@ export function loadConfig(): AppConfig {
 export function saveConfig(config: AppConfig, force = false): void {
   const filePath = configPath();
   const sparse = diffValue(config, DEFAULTS) as Record<string, unknown> | undefined;
+  log.debug(`saveConfig → ${filePath} (force=${force}, 稀疏键=${sparse ? Object.keys(sparse).length : 0})`);
 
   if (!sparse || Object.keys(sparse).length === 0) {
     if (force) {
@@ -292,6 +296,7 @@ export function flushConfig(): void {
     saveTimer = null;
   }
   if (current) {
+    log.debug('flushConfig：内存配置落盘');
     saveConfig(current);
   }
 }
@@ -300,6 +305,7 @@ export function flushConfig(): void {
 export function updateConfig(patch: Record<string, unknown>): AppConfig {
   const base = getConfig();
   current = mergeDeep(base, patch) as AppConfig;
+  log.debug('config:update 补丁顶层键', Object.keys(patch ?? {}));
   scheduleSave();
   return current;
 }
@@ -310,6 +316,7 @@ export function deleteConfigKey(key: string): AppConfig {
   const next = { ...(base as unknown as Record<string, unknown>) };
   delete next[key];
   current = next as unknown as AppConfig;
+  log.debug(`config:delete 顶层键 ${key}`);
   scheduleSave();
   return current;
 }

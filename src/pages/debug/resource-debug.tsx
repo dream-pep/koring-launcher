@@ -30,6 +30,7 @@ export function ResourceDebug() {
   const [proc, setProc] = useState<SystemMemorySnapshot | null>(null);
   const [heap, setHeap] = useState<JsHeapInfo | null>(null);
   const [domNodes, setDomNodes] = useState(0);
+  const [logInfo, setLogInfo] = useState<{ filePath: string | null; debugMode: boolean } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const snapshot = useResourceStore((s) => s.snapshot);
@@ -45,6 +46,14 @@ export function ResourceDebug() {
       setProc(data);
     } catch {
       setProc(null);
+    }
+    try {
+      const info = (await window.electronAPI?.invoke?.("log:getInfo")) as
+        | { filePath: string | null; debugMode: boolean }
+        | undefined;
+      if (info) setLogInfo(info);
+    } catch {
+      // 忽略日志状态查询失败
     }
   };
 
@@ -102,6 +111,33 @@ export function ResourceDebug() {
               </div>
             </GlassCard>
           </div>
+        </div>
+
+        {/* 统一日志状态 */}
+        <div>
+          <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3">
+            统一日志（debug 模式才写文件，否则仅控制台）
+          </h3>
+          <GlassCard>
+            <div className="flex flex-wrap gap-x-8 gap-y-2">
+              <div>
+                <p className="text-[12px] text-muted-foreground">调试模式</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {logInfo?.debugMode ? "开启" : "关闭"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[12px] text-muted-foreground">日志文件</p>
+                <p className="text-sm font-medium text-foreground break-all">
+                  {logInfo?.filePath ?? "（未开启 → 仅输出到控制台）"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[12px] text-muted-foreground">开启入口</p>
+                <p className="text-sm font-medium text-foreground">设置 → 游戏 → 高级 → 调试模式</p>
+              </div>
+            </div>
+          </GlassCard>
         </div>
 
         {/* 进程工作集 */}

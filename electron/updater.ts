@@ -5,8 +5,11 @@ import * as crypto from 'crypto';
 import * as os from 'os';
 import semver from 'semver';
 import { getConfig, updateConfig, flushConfig } from './config';
+import { createLogger } from './core/logger';
 
 const { app } = electron;
+
+const log = createLogger('updater');
 
 export type UpdateState =
   | 'idle'
@@ -170,7 +173,7 @@ class UpdateService {
     this.currentVersion = app.getVersion();
 
     if (!app.isPackaged) {
-      console.log('[updater] 开发模式：跳过自动更新');
+      log.info('[updater] 开发模式：跳过自动更新');
       this.emit();
       return;
     }
@@ -184,7 +187,7 @@ class UpdateService {
     // 应用能启动即说明上次安装已完成/已结束，清理持久化的进行中状态
     const persisted = getConfig().update;
     if (persisted && persisted.state && persisted.state !== 'idle') {
-      console.log(`[updater] 上次更新状态 ${persisted.state} (v${persisted.version})，已重置`);
+      log.info(`[updater] 上次更新状态 ${persisted.state} (v${persisted.version})，已重置`);
       this.persistIdleConfig();
     }
 
@@ -208,7 +211,7 @@ class UpdateService {
       const first = Array.isArray(anyInfo?.files) ? anyInfo.files[0] : null;
       this.expectedSha512 = String(first?.sha512 ?? '');
       this.expectedSize = Number(first?.size ?? 0);
-      console.log(`[updater] 可用更新 ${info.version}，期望 sha512=${this.expectedSha512.slice(0, 12)}… size=${this.expectedSize}`);
+      log.info(`[updater] 可用更新 ${info.version}，期望 sha512=${this.expectedSha512.slice(0, 12)}… size=${this.expectedSize}`);
       this.emit();
     });
     autoUpdater.on('update-not-available', () => {
@@ -229,7 +232,7 @@ class UpdateService {
     autoUpdater.on('update-downloaded', async (info) => {
       const errMsg = await this.verifyDownloadedPackage();
       if (errMsg) {
-        console.error(`[updater] 安装包核验失败: ${errMsg}`);
+        log.error(`[updater] 安装包核验失败: ${errMsg}`);
         this.state = 'downloaded';
         this.verified = false;
         this.version = info.version;
@@ -237,7 +240,7 @@ class UpdateService {
         this.emit();
         return;
       }
-      console.log('[updater] 安装包核验通过（sha512 + 大小）');
+      log.info('[updater] 安装包核验通过（sha512 + 大小）');
       this.state = 'downloaded';
       this.verified = true;
       this.version = info.version;
@@ -246,7 +249,7 @@ class UpdateService {
     });
     autoUpdater.on('error', (err: Error) => {
       const message = String(err?.message ?? err);
-      console.warn(`[updater] electron-updater error: ${message}`);
+      log.warn(`[updater] electron-updater error: ${message}`);
       if (this.suppressErrors) return; // 兜底循环内，忽略
       if (this.downloadToken?.cancelled) return; // 主动暂停/取消，忽略
       this.state = 'error';
@@ -331,7 +334,7 @@ class UpdateService {
         },
       });
     } catch (e) {
-      console.warn('[updater] 更新进度写入配置失败:', e);
+      log.warn('[updater] 更新进度写入配置失败:', e);
     }
   }
 
@@ -361,7 +364,7 @@ class UpdateService {
       // woker 恢复默认 latest 频道（allowPrerelease=false 走 /releases/latest，频道不影响识别）
       autoUpdater.channel = 'latest';
     }
-    console.log(`[updater] 更新通道: ${def.label}（${def.key}，allowPrerelease=${def.allowPrerelease}，channel=${autoUpdater.channel}）`);
+    log.info(`[updater] 更新通道: ${def.label}（${def.key}，allowPrerelease=${def.allowPrerelease}，channel=${autoUpdater.channel}）`);
   }
 
   /** 通道定义列表（UI 动态渲染；可扩展） */
@@ -372,7 +375,7 @@ class UpdateService {
   /** 切换更新通道（校验 + 持久化 + 立即生效，下次检查生效） */
   setChannel(key: string): UpdateStatusPayload {
     if (!UPDATE_CHANNELS.some((c) => c.key === key)) {
-      console.warn(`[updater] 未知更新通道: ${key}`);
+      log.warn(`[updater] 未知更新通道: ${key}`);
       return this.buildPayload();
     }
     if (this.channelKey === key) return this.buildPayload();
@@ -381,7 +384,7 @@ class UpdateService {
     try {
       updateConfig({ update: { channel: key } });
     } catch (e) {
-      console.warn('[updater] 通道写入配置失败:', e);
+      log.warn('[updater] 通道写入配置失败:', e);
     }
     this.emit();
     return this.buildPayload();
@@ -398,7 +401,7 @@ class UpdateService {
   setTestVersion(version: string): UpdateStatusPayload {
     const v = semver.valid(version.trim());
     if (!v) {
-      console.warn(`[updater] 无效测试版本号: ${version}`);
+      log.warn(`[updater] 无效测试版本号: ${version}`);
       return this.buildPayload();
     }
     this.currentVersion = v;
@@ -406,9 +409,9 @@ class UpdateService {
       // currentVersion 在类型声明中为 readonly，但运行时可直接赋值（测试工具用）
       (autoUpdater as unknown as { currentVersion: unknown }).currentVersion = semver.parse(v);
     } catch (e) {
-      console.warn('[updater] 设置 autoUpdater.currentVersion 失败:', e);
+      log.warn('[updater] 设置 autoUpdater.currentVersion 失败:', e);
     }
-    console.log(`[updater] 测试版本号 → ${v}`);
+    log.info(`[updater] 测试版本号 → ${v}`);
     this.emit();
     return this.buildPayload();
   }
@@ -430,7 +433,7 @@ class UpdateService {
   private correctAvailability(): void {
     if (this.state !== 'available' || !this.version) return;
     if (this.isNewerCandidate(this.currentVersion, this.version)) return;
-    console.warn(`[updater] ${this.version} 不是 ${this.currentVersion} 的新版本（项目版本序，忽略 beta 通道标记），回退为无更新`);
+    log.warn(`[updater] ${this.version} 不是 ${this.currentVersion} 的新版本（项目版本序，忽略 beta 通道标记），回退为无更新`);
     this.state = 'not-available';
     this.version = undefined;
     this.error = undefined;
@@ -481,7 +484,7 @@ class UpdateService {
       this.correctAvailability();
       return this.buildPayload();
     } catch (err) {
-      console.warn(`[updater] GitHub 官方更新源不可用: ${String((err as Error)?.message ?? err)}`);
+      log.warn(`[updater] GitHub 官方更新源不可用: ${String((err as Error)?.message ?? err)}`);
     }
 
     // 2) 加速源兜底：镜像页面发现最新 tag → generic feed → 检查
@@ -489,11 +492,11 @@ class UpdateService {
       try {
         const tag = await this.discoverLatestTag(mirror);
         if (!tag) {
-          console.warn(`[updater] ${mirror} 无法发现最新版本，跳过`);
+          log.warn(`[updater] ${mirror} 无法发现最新版本，跳过`);
           continue;
         }
         const feedUrl = `${mirror}/https://github.com/${OWNER}/${REPO}/releases/download/${tag}/`;
-        console.log(`[updater] 切换加速源: ${mirror} (feed: ${feedUrl})`);
+        log.info(`[updater] 切换加速源: ${mirror} (feed: ${feedUrl})`);
         autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl });
         this.source = mirror;
         this.state = 'checking';
@@ -506,9 +509,9 @@ class UpdateService {
         // 不要就此返回 not-available，继续尝试下一个源
         const mirrorResult = this.buildPayload();
         if (mirrorResult.state !== 'not-available') return mirrorResult;
-        console.warn(`[updater] ${mirror} 反馈无可用更新，尝试下一个源`);
+        log.warn(`[updater] ${mirror} 反馈无可用更新，尝试下一个源`);
       } catch (err) {
-        console.warn(`[updater] 加速源 ${mirror} 检查失败: ${String((err as Error)?.message ?? err)}`);
+        log.warn(`[updater] 加速源 ${mirror} 检查失败: ${String((err as Error)?.message ?? err)}`);
       }
     }
 
@@ -569,7 +572,7 @@ class UpdateService {
     candidates.sort(compareVersionTags);
     const latest = candidates[candidates.length - 1];
     if (candidates.length > 1) {
-      console.log(`[updater] ${mirror} 候选版本: ${candidates.join(', ')} → 取 ${latest}`);
+      log.info(`[updater] ${mirror} 候选版本: ${candidates.join(', ')} → 取 ${latest}`);
     }
     return latest;
   }
@@ -615,7 +618,7 @@ class UpdateService {
           const notes = await res.text();
           if (!notes.trim()) continue;
           if (/^\s*<!doctype html/i.test(notes) || /^\s*<html[\s>]/i.test(notes)) continue;
-          console.log(`[updater] 发布说明来源: ${source} (${tag})`);
+          log.info(`[updater] 发布说明来源: ${source} (${tag})`);
           return { tag, version: tag.replace(/^v/, ''), notes, source, isLatest: false };
         }
       } catch {
@@ -636,7 +639,7 @@ class UpdateService {
     if (this.state !== 'available' && this.state !== 'paused') return;
     // 复核目标版本确为当前版本的新版本（项目版本序），否则回退为无更新
     if (this.state === 'available' && this.version && !this.isNewerCandidate(this.currentVersion, this.version)) {
-      console.warn(`[updater] 下载被拒：${this.version} 不是 ${this.currentVersion} 的新版本`);
+      log.warn(`[updater] 下载被拒：${this.version} 不是 ${this.currentVersion} 的新版本`);
       this.state = 'not-available';
       this.version = undefined;
       this.emit();
@@ -644,7 +647,7 @@ class UpdateService {
     }
     if (this.state === 'paused') {
       // 继续下载（可能从断点续传，也可能重新开始，取决于 electron-updater 缓存）
-      console.log('[updater] 继续下载');
+      log.info('[updater] 继续下载');
     }
     this.state = 'downloading';
     this.progress = null;
@@ -709,8 +712,8 @@ class UpdateService {
         : await dialog.showMessageBox(opts);
       if (response !== 0) {
         // 取消并删除安装包
-        console.warn('[updater] 用户取消安装并删除校验异常包');
-        await this.removeDownloadedPackage().catch((e) => console.warn('[updater] 删除安装包失败:', e));
+        log.warn('[updater] 用户取消安装并删除校验异常包');
+        await this.removeDownloadedPackage().catch((e) => log.warn('[updater] 删除安装包失败:', e));
         this.state = 'idle';
         this.version = undefined;
         this.error = undefined;
@@ -718,7 +721,7 @@ class UpdateService {
         this.emit();
         return;
       }
-      console.warn('[updater] 用户确认继续安装（校验异常但已确认）');
+      log.warn('[updater] 用户确认继续安装（校验异常但已确认）');
     }
 
     this.state = 'installing';
@@ -739,7 +742,7 @@ class UpdateService {
     if (!filePath) return;
     if (fs.existsSync(filePath)) {
       await fs.promises.unlink(filePath);
-      console.log(`[updater] 已删除安装包: ${filePath}`);
+      log.info(`[updater] 已删除安装包: ${filePath}`);
     }
   }
 

@@ -86,6 +86,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return { url: null, bytes: 0 };
   },
 
+  // 日志：渲染端经 IPC 汇入主进程统一日志（debug 模式写文件；否则仅控制台）
+  log: (level: 'debug' | 'info' | 'warn' | 'error', scope: string, message: string) => {
+    ipcRenderer.send('log:write', { level, scope, message });
+  },
+
   // Open external URL in system browser
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 

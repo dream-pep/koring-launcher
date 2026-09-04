@@ -4,8 +4,11 @@ import fs from 'fs';
 import { writeCrashLog, readCrashLog, clearCrashLog, type CrashEntry } from '../core/crash-logger';
 import { configPath } from '../config';
 import { authPath } from '../auth';
+import { createLogger } from '../core/logger';
 
 const { app, ipcMain, BrowserWindow } = electron;
+
+const log = createLogger('crash-monitor');
 
 const isDev = !app.isPackaged;
 
@@ -99,14 +102,14 @@ export function setupCrashListeners(mainWindow: electron.BrowserWindow) {
           if (window.__crashToolsLoaded) return;
           window.__crashToolsLoaded = true;
 
-          console.log('%c[崩溃工具] 已加载', 'color: #f59e0b; font-weight: bold; font-size: 14px;');
-          console.log('%c可用命令:', 'color: #3b82f6; font-weight: bold;');
-          console.log('%c  crash.simulate()    %c— 模拟渲染进程崩溃', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
-          console.log('%c  crash.testDialog()  %c— 测试崩溃弹窗', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
-          console.log('%c  crash.readLog()     %c— 读取崩溃日志', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
-          console.log('%c  crash.factoryReset()%c— 强还原配置', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
-          console.log('%c  crash.restart()     %c— 重启应用', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
-          console.log('');
+          log.info('%c[崩溃工具] 已加载', 'color: #f59e0b; font-weight: bold; font-size: 14px;');
+          log.info('%c可用命令:', 'color: #3b82f6; font-weight: bold;');
+          log.info('%c  crash.simulate()    %c— 模拟渲染进程崩溃', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
+          log.info('%c  crash.testDialog()  %c— 测试崩溃弹窗', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
+          log.info('%c  crash.readLog()     %c— 读取崩溃日志', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
+          log.info('%c  crash.factoryReset()%c— 强还原配置', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
+          log.info('%c  crash.restart()     %c— 重启应用', 'color: #ef4444; font-weight: bold;', 'color: inherit;');
+          log.info('');
 
           window.crash = {
             simulate: function() { window.electronAPI?.simulateCrash(); },

@@ -5,6 +5,9 @@ import { Switch, Button, Slider } from "@heroui/react";
 import { DEFAULT_BG } from "@/lib/mode";
 import clsx from "clsx";
 import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
+import { createRendererLogger } from "@/lib/logger";
+
+const log = createRendererLogger("theme-bg");
 
 /** 可直接用于 CSS/`<img>` 的源（data:/http(s):/file:/相对 URL） */
 const isCssSource = (v: string) => /^(data:|https?:|file:|\/|\.\/|\.\.\/)/i.test(v);
@@ -101,7 +104,10 @@ export function ThemeBgSetting() {
       };
     }
     window.electronAPI?.resolveBackgroundResource?.(image).then((res) => {
-      if (!cancelled) setPreviewUrl(res?.url ?? null);
+      if (!cancelled) {
+        setPreviewUrl(res?.url ?? null);
+        log.debug(`预览资源解析 ${image} → ${res?.url ?? "(失败)"}`);
+      }
     });
     return () => {
       cancelled = true;
@@ -112,7 +118,10 @@ export function ThemeBgSetting() {
     // 返回的是 userData 内的文件路径（配置/Store 以路径保存，不使用 BASE64）
     const filePath = await window.electronAPI?.pickBackgroundImage?.();
     if (filePath) {
+      log.info(`选择壁纸完成 → ${filePath}`);
       setImage(filePath);
+    } else {
+      log.warn("选择壁纸未返回路径（取消或导入失败）");
     }
   };
 

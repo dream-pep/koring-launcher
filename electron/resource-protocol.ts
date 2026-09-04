@@ -14,8 +14,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Readable } from 'stream';
 import { isManagedBackgroundFile, isPathInside, mimeForFile } from './core/background-image';
+import { createLogger } from './core/logger';
 
 const { protocol, app } = electron;
+
+const log = createLogger('resource-protocol');
 
 export const RESOURCE_SCHEME = 'koring-res';
 
@@ -41,6 +44,7 @@ export function registerResourceProtocol(): void {
     try {
       const url = new URL(request.url);
       if (url.host !== 'userdata') {
+        log.warn(`拒绝非 userdata 主机: ${url.host}`);
         return new Response('Forbidden', { status: 403 });
       }
 
@@ -53,11 +57,13 @@ export function registerResourceProtocol(): void {
 
       // 路径穿越 / 绝对路径直接拒绝
       if (!relative || relative.includes('..') || path.isAbsolute(relative)) {
+        log.warn(`拒绝非法路径: ${relative}`);
         return new Response('Forbidden', { status: 403 });
       }
 
       const fileName = path.basename(relative);
       if (fileName !== relative || !isManagedBackgroundFile(fileName)) {
+        log.warn(`拒绝白名单外文件: ${fileName}`);
         return new Response('Forbidden', { status: 403 });
       }
 
@@ -65,15 +71,18 @@ export function registerResourceProtocol(): void {
       const target = path.join(userDataDir, fileName);
 
       if (!isPathInside(userDataDir, target)) {
+        log.warn(`拒绝越权文件: ${target}`);
         return new Response('Forbidden', { status: 403 });
       }
 
       const stat = await fs.promises.stat(target);
       if (!stat.isFile()) {
+        log.warn(`文件不存在: ${target}`);
         return new Response('Not Found', { status: 404 });
       }
 
       const body = Readable.toWeb(fs.createReadStream(target)) as unknown as BodyInit;
+      log.debug(`服务资源 ${fileName} (${stat.size}B, ${mimeForFile(target)})`);
       return new Response(body, {
         status: 200,
         headers: {
@@ -82,7 +91,8 @@ export function registerResourceProtocol(): void {
           'cache-control': 'no-store',
         },
       });
-    } catch {
+    } catch (e) {
+      log.error(`协议请求处理失败: ${request.url}`, e);
       return new Response('Not Found', { status: 404 });
     }
   });

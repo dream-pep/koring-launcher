@@ -11,8 +11,11 @@
 import electron from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createLogger } from './logger';
 
 const { nativeImage } = electron;
+
+const log = createLogger('background-image');
 
 export interface OptimizedBackground {
   /** 实际使用的文件路径（优化后文件；无需优化时为原始缓存文件） */
@@ -221,8 +224,13 @@ export function importUserBackground(srcPath: string, maxEdge = 4096): Optimized
     // 删除旧的原始缓存
     clearStaleBackgroundFiles(userDataDir, []);
     fs.copyFileSync(srcPath, rawPath);
-    return optimizeBackgroundFile(rawPath, maxEdge);
-  } catch {
+    const result = optimizeBackgroundFile(rawPath, maxEdge);
+    if (result) {
+      log.info(`导入壁纸完成 → ${path.basename(result.filePath)} (${result.width}x${result.height}, ${result.bytes}B, optimized=${result.optimized})`);
+    }
+    return result;
+  } catch (e) {
+    log.error('导入壁纸失败:', e);
     return null;
   }
 }

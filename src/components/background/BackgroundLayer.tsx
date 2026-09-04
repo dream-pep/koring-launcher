@@ -6,6 +6,9 @@ import { useDevStore } from "@/stores/devStore";
 import { DEFAULT_BG } from "@/lib/mode";
 import { resourceRegistry } from "@/resources/registry";
 import { estimateDataUrlBytes } from "@/resources/image";
+import { createRendererLogger } from "@/lib/logger";
+
+const log = createRendererLogger("BackgroundLayer");
 
 /** 可直接用于 CSS 的源（默认图/相对 URL/http(s)/file:/data:） */
 const isCssSource = (v: string) => /^(data:|https?:|file:|\/|\.\/|\.\.\/)/i.test(v);
@@ -59,10 +62,12 @@ export function BackgroundLayer() {
     window.electronAPI?.resolveBackgroundResource?.(image).then((res) => {
       if (cancelled || !res) return;
       if (res.url) {
+        log.info(`背景资源解析成功：${image} → ${res.url} (${res.bytes}B)`);
         setBgImage(res.url);
         setBgBytes(res.bytes || 0);
       } else {
         // 文件不可用/越权：回退默认背景（文件已失效，回退优于显示破损背景）
+        log.warn(`背景资源解析失败/越权，回退默认背景：${image}`);
         setBgImage(DEFAULT_BG);
         setBgBytes(0);
       }
@@ -80,6 +85,7 @@ export function BackgroundLayer() {
     setPrevious(oldActive);
     setActive(bgImage);
     activeRef.current = bgImage;
+    log.debug(`背景切换 ${oldActive ?? "(无)"} → ${bgImage ?? "(无)"}`);
     // 已有旧背景且确实发生了内容切换（首次出现不渐入）
     if (oldActive != null && bgImage != null && oldActive !== bgImage) {
       setFading(true);

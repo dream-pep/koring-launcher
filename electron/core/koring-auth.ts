@@ -1,5 +1,8 @@
 import * as https from 'https';
 import { readAuth, writeAuth } from '../auth';
+import { createLogger } from './logger';
+
+const log = createLogger('core/koring-auth');
 
 const CLIENT_ID = '547qe8ky1pr69f08b71kj';
 const DEVICE_AUTH_URL = 'https://oac.lingke.ink/oidc/device/auth';
@@ -36,8 +39,8 @@ function postForm(url: string, data: Record<string, string>): Promise<any> {
     const params = new URLSearchParams(data);
     const body = params.toString().replace(/\+/g, '%20');
     const urlObj = new URL(url);
-    console.log(`[koring-auth] POST ${url}`);
-    console.log(`[koring-auth] body: ${body}`);
+    log.info(`[koring-auth] POST ${url}`);
+    log.info(`[koring-auth] body: ${body}`);
     const req = https.request(
       {
         hostname: urlObj.hostname,
@@ -53,7 +56,7 @@ function postForm(url: string, data: Record<string, string>): Promise<any> {
         let raw = '';
         res.on('data', (chunk) => (raw += chunk));
         res.on('end', () => {
-          console.log(`[koring-auth] response (${res.statusCode}): ${raw}`);
+          log.info(`[koring-auth] response (${res.statusCode}): ${raw}`);
           try {
             resolve(JSON.parse(raw));
           } catch {
