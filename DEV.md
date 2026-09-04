@@ -110,6 +110,8 @@ koring-launcher/
 │   │   ├── about-version/              # 版本更新内容展示
 │   │   │   ├── parse.ts                # release-notes 解析（details 切块 + conventional commit 分类）
 │   │   │   └── index.tsx               # AboutVersion 组件（getReleaseNotes → 分类卡片）
+│   │   ├── feedback/                    # 反馈表单按钮
+│   │   │   └── FeedbackButton.tsx       # HeroUI 按钮 → 系统浏览器打开 YouTrack 表单直链
 │   │   ├── VersionCard.tsx            # 版本/更新卡片
 │   │   ├── UnderConstruction.tsx      # "装修中" 占位组件
 │   │   └── StartupPopup.tsx           # 启动弹窗
@@ -157,6 +159,7 @@ koring-launcher/
 │   │   ├── launcher.ts          # @xmcl/core 游戏启动
 │   │   ├── launch-options.ts    # 配置→LaunchOption 映射 (parseArgs/buildLaunchOptions/resolveJavaPath)
 │   │   ├── paths.ts             # 相对 gameDir 归一化 (resolveGamePath)
+│   │   ├── device-id.ts         # 设备唯一标识（主板/硬盘/BIOS 指纹 → MachineGuid 回退 → SHA-256 UUID 样式）
 │   │   ├── modrinth.ts          # Modrinth/CurseForge API
 │   │   └── instance.ts          # 实例管理（含 importExistingInstance sourceGamePath）
 │   ├── handlers/                # IPC 处理器

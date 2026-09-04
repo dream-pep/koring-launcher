@@ -14,6 +14,7 @@ import {
   type UpdateChannelDef,
 } from "@/api/update";
 import { toast } from "sonner";
+import { getDeviceId, type DeviceIdentity } from "@/api/system";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -45,6 +46,22 @@ export function AboutSetting() {
   const [open, setOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const canConfirm = countdown <= 0;
+
+  // 设备识别码（组合指纹：主板/硬盘/BIOS → 回退系统安装标识）
+  const [device, setDevice] = useState<DeviceIdentity | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getDeviceId()
+      .then((d) => {
+        if (!cancelled) setDevice(d);
+      })
+      .catch(() => {
+        if (!cancelled) setDevice(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // 更新通道（下拉框，选项来自主进程通道注册表）
   const [channels, setChannels] = useState<UpdateChannelDef[]>([]);
@@ -130,6 +147,13 @@ export function AboutSetting() {
             <SettingCard>
               <SettingRow label="技术栈" desc="Electron + React 19 + TypeScript + @xmcl">
                 <span className="text-[13px] text-muted-foreground">Node.js</span>
+              </SettingRow>
+            </SettingCard>
+            <SettingCard>
+              <SettingRow label="设备识别码" desc="设备追踪ID">
+                <span className="text-[13px] text-muted-foreground font-mono">
+                  {device?.deviceId ?? "—"}
+                </span>
               </SettingRow>
             </SettingCard>
           </div>

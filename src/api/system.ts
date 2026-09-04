@@ -11,6 +11,16 @@ export async function getSystemInfo(): Promise<SystemInfo> {
   return ipcInvoke<SystemInfo>('system:info');
 }
 
+/** 设备唯一标识（组合指纹 + 回退 MachineGuid） */
+export interface DeviceIdentity {
+  deviceId: string | null;
+  source: 'board' | 'disk' | 'bios' | 'machine' | 'none';
+}
+
+export async function getDeviceId(): Promise<DeviceIdentity> {
+  return ipcInvoke<DeviceIdentity>('system:deviceId');
+}
+
 // ---- 进程内存快照（资源/内存调试面板用）----
 
 /** app.getAppMetrics() 的进程项；workingSetSize 单位为 KB */

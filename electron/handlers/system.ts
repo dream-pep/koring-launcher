@@ -1,6 +1,7 @@
 import electron from 'electron';
 import { execSync } from 'child_process';
 import * as os from 'os';
+import { getDeviceId } from '../core/device-id';
 
 const { ipcMain, app, shell } = electron;
 
@@ -63,6 +64,16 @@ export function registerSystemHandlers() {
         },
         error: null,
       };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 设备唯一标识（组合指纹 + 回退 MachineGuid；进程内缓存，首次调用探测一次）
+  ipcMain.handle('system:deviceId', () => {
+    try {
+      const identity = getDeviceId();
+      return { success: true, data: identity, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }
