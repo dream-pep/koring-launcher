@@ -33,7 +33,8 @@ export type RouteKey =
   | "debug-update"
   | "debug-task"
   | "debug-resource"
-  | "debug-crash";
+  | "debug-crash"
+  | "debug-routes";
 export type TitleBarMode = "default" | "sub" | "window" | "oobe";
 
 export type TransitionDirection = "forward" | "backward";
@@ -83,6 +84,8 @@ export const allRoutes: RouteItem[] = [
   { key: "debug-update", label: "更新功能测试", path: "/debug/update", hidden: true },
   { key: "debug-task", label: "任务队列调试", path: "/debug/task", hidden: true },
   { key: "debug-resource", label: "资源与内存", path: "/debug/resource", hidden: true },
+  { key: "debug-crash", label: "崩溃测试", path: "/debug/crash", hidden: true },
+  { key: "debug-routes", label: "页面跳转", path: "/debug/routes", hidden: true },
 ];
 
 const topLevelKeys = new Set(routes.map((r) => r.key));

@@ -9,13 +9,14 @@ const CURRENT_VERSION = 1;
 
 /**
  * 配置文件路径：
- * - 打包后 → 安装目录（可执行文件旁）。默认 per-user 安装（%LOCALAPPDATA%\Programs）可写；
- *   若当初选择 per-machine 安装（Program Files）会无写权限，属已知限制
+ * - 打包后 → 系统用户数据目录（userData）。
+ *   ⚠️ 不能放安装目录：NSIS 每次重装/升级都会经旧卸载器 RMDir /r 删除整个安装目录，
+ *   /KEEP_APP_DATA 只保护 %APPDATA%（userData），安装目录内的配置文件会被清空
  * - 开发模式 → 项目根目录（与旧行为一致，方便调试）
  */
 export function configPath(): string {
   if (app.isPackaged) {
-    return path.join(path.dirname(app.getPath('exe')), CONFIG_FILE);
+    return path.join(app.getPath('userData'), CONFIG_FILE);
   }
   return path.join(__dirname, '..', CONFIG_FILE);
 }

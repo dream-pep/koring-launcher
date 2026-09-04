@@ -25,6 +25,7 @@ import { UpdateDebug } from "./pages/debug/update-debug";
 import { TaskDebug } from "./pages/debug/task-debug";
 import { CrashDebug } from "./pages/debug/crash-debug";
 import { ResourceDebug } from "./pages/debug/resource-debug";
+import { RoutesDebug } from "./pages/debug/routes-debug";
 import { Oobe } from "./pages/oobe";
 import { OobeLanguage } from "./pages/oobe/step-language";
 import { OobeAgreement } from "./pages/oobe/step-agreement";
@@ -76,6 +77,7 @@ const pageMap = {
   "debug-task": TaskDebug,
   "debug-crash": CrashDebug,
   "debug-resource": ResourceDebug,
+  "debug-routes": RoutesDebug,
 } as const;
 
 function App() {
@@ -84,13 +86,18 @@ function App() {
   const Page = pageMap[current];
 
   useEffect(() => {
-    // Listen for preloaded config from main process
-    const unsub = window.electronAPI?.onConfigPreload((data) => {
-      const { config, isFirstLaunch } = data;
-      const cfg = config as AppConfig;
+    let done = false;
+    let cancelled = false;
+
+    // 配置引导（幂等，最多执行一次）：
+    // 主进程的 config:preload 推送 与 config:get 兜底拉取，谁先完成谁引导，
+    // 避免重复同步派生 store / 重复导航 / 重复补写版本号。
+    const finishBoot = (cfg: AppConfig, isFirstLaunch: boolean) => {
+      if (done || cancelled) return;
+      done = true;
       useConfigStore.getState().applyPreloaded(cfg, isFirstLaunch);
       // 语言偏好 → <html lang>
-      document.documentElement.lang = (cfg as AppConfig).app?.language ?? "zh-CN";
+      document.documentElement.lang = cfg.app?.language ?? "zh-CN";
       syncThemeFromConfig();
       syncA11yFromConfig();
       syncBackgroundFromConfig();
@@ -114,9 +121,38 @@ function App() {
       if (cfg.appVersion !== VERSION) {
         useRouteStore.getState().navigate("upvp/complete");
       }
-    });
+    };
 
-    return () => { unsub?.(); };
+    const api = window.electronAPI;
+    let unsub: (() => void) | undefined;
+    if (api) {
+      // 主进程在每次 did-finish-load（含 Ctrl+R / F5 刷新）时推送的最新权威配置
+      unsub = api.onConfigPreload((data) => {
+        finishBoot(data.config as AppConfig, data.isFirstLaunch);
+      });
+
+      // 兜底：config:preload 是主进程在页面加载完成后的一次性推送，
+      // 若它早于本订阅到达（页面刷新/快速重载时的竞态）就会被丢弃，store 将永远停在默认值。
+      // 此时主动走 config:get 拉取主进程权威配置，保证刷新后配置一定能被读到。
+      if (!useConfigStore.getState().loaded) {
+        useConfigStore
+          .getState()
+          .init()
+          .then(() => {
+            if (cancelled) return;
+            const { config, isFirstLaunch } = useConfigStore.getState();
+            finishBoot(config, isFirstLaunch);
+          })
+          .catch((e) => {
+            console.error("[config] fallback init failed:", e);
+          });
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
   }, []);
 
   // 主进程权威配置广播 → 覆盖本地镜像并同步派生 store

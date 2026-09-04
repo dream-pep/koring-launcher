@@ -1,7 +1,15 @@
 import { useRouteStore } from "@/stores/routeStore";
-import { Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle, RefreshCw, SquareTerminal, MemoryStick } from "lucide-react";
+import { Waypoints, Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle, RefreshCw, SquareTerminal, MemoryStick } from "lucide-react";
 
 const debugPages = [
+  {
+    key: "debug-routes" as const,
+    icon: Waypoints,
+    title: "页面跳转",
+    desc: "列出所有已注册的页面（含隐藏页），点击即可快速跳转预览",
+    color: "text-sky-500",
+    bg: "bg-sky-500/10",
+  },
   {
     key: "debug-update" as const,
     icon: RefreshCw,

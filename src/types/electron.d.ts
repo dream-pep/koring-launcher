@@ -25,6 +25,10 @@ interface ElectronAPI {
   // Config reset
   resetConfig: () => Promise<void>;
 
+  // 壁纸（文件路径存储 → koring-res:// 资源引用，不使用 BASE64）
+  pickBackgroundImage: () => Promise<string | null>;
+  resolveBackgroundResource: (value: string) => Promise<{ url: string | null; bytes: number }>;
+
   // Auto-update
   checkForUpdates: (manual?: boolean) => Promise<unknown>;
   downloadUpdate: () => Promise<unknown>;

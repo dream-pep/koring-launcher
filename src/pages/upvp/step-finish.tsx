@@ -20,6 +20,13 @@ export function UpvpFinish() {
   const [ready, setReady] = useState(false);
   const [shouldWrite, setShouldWrite] = useState(false);
 
+  // 「前往首页」按钮先隐藏，hello 动画播完后（4 秒）渐入浮现
+  const [btnVisible, setBtnVisible] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setBtnVisible(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     compareVersions(VERSION, appVersion)
@@ -58,7 +65,8 @@ export function UpvpFinish() {
         <button
           onClick={handleFinish}
           disabled={!ready}
-          className="h-12 px-6 rounded-full bg-foreground/[0.06] hover:bg-foreground/[0.12] flex items-center justify-center text-foreground/60 hover:text-foreground transition-all duration-200 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-12 px-6 rounded-full bg-foreground/[0.06] hover:bg-foreground/[0.12] flex items-center justify-center text-foreground/60 hover:text-foreground transition-opacity duration-700 ease-out text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ opacity: btnVisible ? (ready ? 1 : undefined) : 0, pointerEvents: btnVisible ? "auto" : "none" }}
         >
           前往首页
         </button>

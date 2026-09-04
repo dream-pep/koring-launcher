@@ -1,15 +1,11 @@
 /**
  * 背景图处理服务（主进程，程序本体资源管理）。
  *
- * 目标：把用户自选的大图背景在进入渲染进程前，降采样到
- * 「窗口实际需要」的尺寸（长边按 maxEdge 限制），从而避免
- * 数 MB～数十 MB 的原图以 base64 + 全分辨率解码的形式常驻内存，
- * 且不改变可见显示效果（超出屏幕物理像素的部分在视觉上不可见）。
- *
- * 规则：
- * - 长边 ≤ maxEdge → 原样返回（零损耗，效果 100% 一致）；
- * - 长边 > maxEdge → 等比 resize 后重编码（JPEG 有损 q0.9 / 带透明通道用 PNG 无损）；
- * - 动画 GIF / 解析失败 / 无法解码 → 返回 null 或原样，由调用方回退到原始文件（不改变现有行为）。
+ * 职责：
+ * 1. 把用户自选的大图背景降采样/重编码后**落盘**（只生成屏幕所需尺寸），
+ *    返回**文件路径**（供配置文件以路径形式存储，不再使用 BASE64 dataURL）；
+ * 2. 提供壁纸文件定位/安全校验工具，供 `koring-res://` 协议处理器使用
+ *    （仅允许访问 userData 目录下 `background-custom*` 白名单文件，防目录穿越）。
  */
 
 import electron from 'electron';
@@ -18,15 +14,17 @@ import * as path from 'path';
 
 const { nativeImage } = electron;
 
-export interface PreparedBackground {
-  dataUrl: string | null;
+export interface OptimizedBackground {
+  /** 实际使用的文件路径（优化后文件；无需优化时为原始缓存文件） */
+  filePath: string;
   bytes: number;
   width: number;
   height: number;
+  /** 是否发生了降采样/重编码 */
   optimized: boolean;
 }
 
-const MIME_MAP: Record<string, string> = {
+const EXT_MIME: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -35,75 +33,220 @@ const MIME_MAP: Record<string, string> = {
   '.bmp': 'image/bmp',
 };
 
-const TRANSPARENT_MIMES = new Set(['image/png', 'image/webp', 'image/gif']);
-
-function bufferToDataUrl(buffer: Buffer, mime: string): string {
-  return `data:${mime};base64,${buffer.toString('base64')}`;
-}
+const MIME_TO_EXT: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'image/bmp': '.bmp',
+};
 
 /**
- * 解析并（按需）优化背景图片，返回可直接给 CSS 使用的 data URL。
- * @param srcPath 原图文件路径
- * @param maxEdge 目标长边上限（像素），默认 4096
+ * 旧版配置若仍存 BASE64 dataURL 且 userData 里没有原始缓存文件时，
+ * 直接把 dataURL 解码落盘为 `background-custom<ext>`，保证配置文件能迁移为「文件路径」存储。
  */
-export function prepareBackgroundImage(srcPath: string, maxEdge = 4096): PreparedBackground | null {
-  const raw: PreparedBackground = { dataUrl: null, bytes: 0, width: 0, height: 0, optimized: false };
+export function recoverBackgroundFromDataUrl(dataUrl: string, userDataDir: string): string | null {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl.trim());
+  if (!match) return null;
+  const ext = MIME_TO_EXT[match[1].toLowerCase()] ?? '.png';
   try {
-    const buffer = fs.readFileSync(srcPath);
-    const ext = path.extname(srcPath).toLowerCase();
-    const mime = MIME_MAP[ext] || 'image/png';
-
-    // 动画 GIF：nativeImage 只能解码首帧，直接原样返回，避免破坏动画
-    if (mime === 'image/gif') {
-      raw.dataUrl = bufferToDataUrl(buffer, mime);
-      raw.bytes = buffer.length;
-      return raw;
-    }
-
-    const image = nativeImage.createFromBuffer(buffer);
-    if (image.isEmpty()) return null;
-
-    const size = image.getSize();
-    const longEdge = Math.max(size.width, size.height);
-    const needResize = longEdge > maxEdge && size.width > 0 && size.height > 0;
-
-    // 仅当确实需要降尺寸时才做重编码（视觉零影响的边界：超出屏幕物理像素的部分不可见）；
-    // 未超限但体积大的图原样返回，避免任何有损重编码改变显示效果。
-    if (!needResize) {
-      raw.dataUrl = bufferToDataUrl(buffer, mime);
-      raw.bytes = buffer.length;
-      raw.width = size.width;
-      raw.height = size.height;
-      return raw;
-    }
-
-    let output = image;
-    const scale = maxEdge / longEdge;
-    const w = Math.max(1, Math.round(size.width * scale));
-    const h = Math.max(1, Math.round(size.height * scale));
-    output = image.resize({ width: w, height: h, quality: 'best' });
-    if (output.isEmpty()) return null;
-
-    const outSize = output.getSize();
-    const hasTransparency = TRANSPARENT_MIMES.has(mime);
-    let outBuffer: Buffer;
-    let outMime: string;
-    if (hasTransparency) {
-      outBuffer = output.toPNG();
-      outMime = 'image/png';
-    } else {
-      outBuffer = output.toJPEG(90);
-      outMime = 'image/jpeg';
-    }
-    if (outBuffer.length === 0) return null;
-
-    raw.dataUrl = bufferToDataUrl(outBuffer, outMime);
-    raw.bytes = outBuffer.length;
-    raw.width = outSize.width;
-    raw.height = outSize.height;
-    raw.optimized = true;
-    return raw;
+    const buffer = Buffer.from(match[2], 'base64');
+    if (!buffer || buffer.length === 0) return null;
+    if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
+    clearStaleBackgroundFiles(userDataDir, []);
+    const rawPath = path.join(userDataDir, `background-custom${ext}`);
+    fs.writeFileSync(rawPath, buffer);
+    return rawPath;
   } catch {
     return null;
   }
+}
+
+/** 透明通道源格式：优化时用 PNG 无损编码，避免破坏透明背景 */
+const TRANSPARENT_MIMES = new Set(['image/png', 'image/webp', 'image/gif']);
+
+export function mimeForExt(ext: string): string {
+  return EXT_MIME[ext.toLowerCase()] || 'image/png';
+}
+
+export function mimeForFile(filePath: string): string {
+  return mimeForExt(path.extname(filePath));
+}
+
+function statSize(p: string): number {
+  try {
+    return fs.statSync(p).size;
+  } catch {
+    return 0;
+  }
+}
+
+/** 删除 userData 目录里旧的壁纸缓存文件（保留 keep 中列出的完整路径） */
+export function clearStaleBackgroundFiles(userDataDir: string, keep: string[]): void {
+  try {
+    const entries = fs.readdirSync(userDataDir);
+    const keepSet = new Set(keep.map((p) => path.basename(p)));
+    for (const name of entries) {
+      if (!name.startsWith('background-custom')) continue;
+      if (keepSet.has(name)) continue;
+      const full = path.join(userDataDir, name);
+      try {
+        fs.unlinkSync(full);
+      } catch {
+        // 忽略删除失败（其它文件占用等）
+      }
+    }
+  } catch {
+    // userData 目录不存在等
+  }
+}
+
+/**
+ * 对已复制到 userData 的原始壁纸做「按需」降采样，结果直接落盘。
+ * - 长边 ≤ maxEdge：不需要优化 → 直接返回原始缓存文件路径（零损耗，视觉 100% 一致）；
+ * - 长边 > maxEdge：等比 resize → JPEG(q0.9) 或 PNG(透明/动画不处理) 写为
+ *   `background-custom-opt.<ext>`，同时清理旧的其它格式 opt 文件；
+ * - 动画 GIF 或无法解析：原样返回原始路径（不破坏动画/内容）。
+ */
+export function optimizeBackgroundFile(rawFilePath: string, maxEdge = 4096): OptimizedBackground {
+  const fail = (filePath: string): OptimizedBackground => {
+    let width = 0;
+    let height = 0;
+    try {
+      const s = nativeImage.createFromPath(filePath).getSize();
+      width = s.width || 0;
+      height = s.height || 0;
+    } catch {
+      // 无法读取尺寸时按 0 处理
+    }
+    return {
+      filePath,
+      bytes: statSize(filePath),
+      width,
+      height,
+      optimized: false,
+    };
+  };
+
+  const outDir = path.dirname(rawFilePath);
+  const rawExt = path.extname(rawFilePath).toLowerCase();
+  const mime = mimeForExt(rawExt);
+
+  try {
+    // 动画 GIF：nativeImage 只能解码首帧，不处理，保持原样
+    if (mime === 'image/gif') {
+      return fail(rawFilePath);
+    }
+
+    const image = nativeImage.createFromPath(rawFilePath);
+    if (image.isEmpty()) return fail(rawFilePath);
+
+    const size = image.getSize();
+    const longEdge = Math.max(size.width, size.height);
+    if (longEdge <= maxEdge || size.width <= 0 || size.height <= 0) {
+      // 无需优化：清掉历史遗留的旧 opt/其它扩展名缓存后原样返回
+      clearStaleBackgroundFiles(outDir, [rawFilePath]);
+      return {
+        filePath: rawFilePath,
+        bytes: statSize(rawFilePath),
+        width: size.width,
+        height: size.height,
+        optimized: false,
+      };
+    }
+
+    const scale = maxEdge / longEdge;
+    const w = Math.max(1, Math.round(size.width * scale));
+    const h = Math.max(1, Math.round(size.height * scale));
+    const output = image.resize({ width: w, height: h, quality: 'best' });
+    if (output.isEmpty()) return fail(rawFilePath);
+
+    const outSize = output.getSize();
+    const hasTransparency = TRANSPARENT_MIMES.has(mime);
+    const outExt = hasTransparency ? '.png' : '.jpg';
+    const outMime = hasTransparency ? 'image/png' : 'image/jpeg';
+
+    let buffer: Buffer;
+    if (hasTransparency) {
+      buffer = output.toPNG();
+    } else {
+      buffer = output.toJPEG(90);
+    }
+    if (!buffer || buffer.length === 0) return fail(rawFilePath);
+
+    // 先清理旧 opt 文件（其它扩展名/旧尺寸），再原子写入新文件
+    clearStaleBackgroundFiles(outDir, [rawFilePath]);
+    const optPath = path.join(outDir, `background-custom-opt${outExt}`);
+    const tmpPath = `${optPath}.${process.pid}.tmp`;
+    fs.writeFileSync(tmpPath, buffer);
+    try {
+      fs.renameSync(tmpPath, optPath);
+    } catch {
+      fs.unlinkSync(tmpPath);
+      fs.writeFileSync(optPath, buffer);
+    }
+
+    return {
+      filePath: optPath,
+      bytes: buffer.length,
+      width: outSize.width,
+      height: outSize.height,
+      optimized: true,
+    };
+  } catch {
+    return fail(rawFilePath);
+  }
+}
+
+/**
+ * 复制用户选择的图片到 userData（原始缓存，命名 background-custom<ext>），
+ * 清理旧的其它扩展名缓存，然后返回优化结果。
+ */
+export function importUserBackground(srcPath: string, maxEdge = 4096): OptimizedBackground | null {
+  try {
+    if (!fs.existsSync(srcPath) || !fs.statSync(srcPath).isFile()) return null;
+    const userDataDir = electron.app.getPath('userData');
+    if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
+
+    const ext = path.extname(srcPath).toLowerCase() || '.png';
+    const rawPath = path.join(userDataDir, `background-custom${ext}`);
+    // 删除旧的原始缓存（其它扩展名）
+    clearStaleBackgroundFiles(userDataDir, []);
+    fs.copyFileSync(srcPath, rawPath);
+    return optimizeBackgroundFile(rawPath, maxEdge);
+  } catch {
+    return null;
+  }
+}
+
+/** 找到 userData 中现有的壁纸缓存原始文件（不含 opt 变体） */
+export function findCachedBackgroundRaw(userDataDir: string): string | null {
+  try {
+    const entries = fs.readdirSync(userDataDir);
+    const match = entries
+      .filter((n) => n.startsWith('background-custom') && !n.includes('-opt.'))
+      .sort()
+      .map((n) => path.join(userDataDir, n))
+      .find((p) => fs.existsSync(p) && fs.statSync(p).isFile());
+    return match ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 目标路径是否真实地位于 root 之内（realpath 后比较，防符号链接/目录穿越） */
+export function isPathInside(root: string, target: string): boolean {
+  try {
+    const realRoot = fs.realpathSync(root);
+    const realTarget = fs.realpathSync(target);
+    const rel = path.relative(realRoot, realTarget);
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  } catch {
+    return false;
+  }
+}
+
+/** 是否为受管壁纸文件（供协议处理器白名单使用） */
+export function isManagedBackgroundFile(fileName: string): boolean {
+  return fileName.startsWith('background-custom');
 }

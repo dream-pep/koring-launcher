@@ -1,51 +1,13 @@
 import electron from 'electron';
-import path from 'path';
-import fs from 'fs';
 const { contextBridge, ipcRenderer } = electron;
 
-const MIME_MAP: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.gif': 'image/gif',
-  '.bmp': 'image/bmp',
-};
-
-function getFileAsDataUrl(filePath: string): string | null {
-  try {
-    const buffer = fs.readFileSync(filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    const mime = MIME_MAP[ext] || 'image/png';
-    return `data:${mime};base64,${buffer.toString('base64')}`;
-  } catch {
-    return null;
-  }
-}
-
-// 按当前窗口实际像素需求计算背景图长边上限（含高分屏余量），
-// 避免把数 MB～数十 MB 原图原样塞进渲染进程。
+// 按当前窗口实际像素需求计算壁纸长边上限（含高分屏余量），
+// 主进程据此把大图压到「屏幕可见」尺寸后落盘（配置只存文件路径，不存 BASE64）。
 function computeMaxEdge(): number {
   const dpr = window.devicePixelRatio || 1;
   const css = Math.max(window.innerWidth || 1280, window.innerHeight || 800);
   const target = Math.round(Math.max(css, 1920) * dpr * 1.1);
   return Math.min(4096, Math.max(1920, target));
-}
-
-// 经主进程降采样/重编码后返回 data URL；主进程无法处理时回退到原始文件（行为不变）。
-async function prepareBackgroundDataUrl(filePath: string): Promise<string | null> {
-  try {
-    const result = (await ipcRenderer.invoke('background:prepare', {
-      srcPath: filePath,
-      maxEdge: computeMaxEdge(),
-    })) as { success?: boolean; data?: { dataUrl?: string | null } | null };
-    if (result?.success && typeof result.data?.dataUrl === 'string' && result.data.dataUrl.length > 0) {
-      return result.data.dataUrl;
-    }
-  } catch {
-    // fallthrough to raw
-  }
-  return getFileAsDataUrl(filePath);
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -91,24 +53,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('config:changed', handler);
   },
 
-  // Background image — pick file, copy to userData, return base64 data URL
+  // 背景图 — 选择本地图片：主进程复制到 userData、按窗口尺寸优化并落盘，
+  // 返回【文件路径】（配置/Store 以路径保存，不使用 BASE64）。
   pickBackgroundImage: async (): Promise<string | null> => {
     const result = await ipcRenderer.invoke('dialog:openFile', {
       filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
     });
     if (!result) return null;
-    const { srcPath, ext } = result as { srcPath: string; ext: string };
-    // Copy to userData via main process
-    const destPath = await ipcRenderer.invoke('background:copyToUserData', srcPath, ext);
-    if (!destPath) return null;
-    return prepareBackgroundDataUrl(destPath);
+    const { srcPath } = result as { srcPath: string };
+    const imported = await ipcRenderer.invoke('background:import', {
+      srcPath,
+      maxEdge: computeMaxEdge(),
+    });
+    if (imported && imported.success && typeof imported.data?.filePath === 'string' && imported.data.filePath) {
+      return imported.data.filePath;
+    }
+    return null;
   },
 
-  // Get cached background as base64 data URL（自动降采样到屏幕所需尺寸）
-  getBackgroundDataUrl: async (): Promise<string | null> => {
-    const filePath = await ipcRenderer.invoke('background:getCachedPath');
-    if (!filePath) return null;
-    return prepareBackgroundDataUrl(filePath);
+  // 把配置文件/Store 中的壁纸值解析为可显示的资源引用：
+  // data:/http(s):/file: 及 /、./ 相对 URL → 原样返回；
+  // userData 内受管壁纸文件路径 → koring-res:// 协议 URL（流式读取，无 base64 副本）。
+  resolveBackgroundResource: async (value: string): Promise<{ url: string | null; bytes: number }> => {
+    try {
+      const result = await ipcRenderer.invoke('background:resolve', { value });
+      if (result && result.success && typeof result.data?.url === 'string' && result.data.url) {
+        return { url: result.data.url, bytes: typeof result.data.bytes === 'number' ? result.data.bytes : 0 };
+      }
+    } catch {
+      // fallthrough
+    }
+    return { url: null, bytes: 0 };
   },
 
   // Open external URL in system browser

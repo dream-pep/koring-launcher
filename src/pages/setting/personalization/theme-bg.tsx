@@ -1,9 +1,13 @@
+import { useEffect, useState } from "react";
 import { useThemeStore, type DarkMode } from "@/stores/themeStore";
 import { useBackgroundStore } from "@/stores/backgroundStore";
 import { Switch, Button, Slider } from "@heroui/react";
 import { DEFAULT_BG } from "@/lib/mode";
 import clsx from "clsx";
 import { SettingCard, SettingRow, PageHeader, SectionTitle } from "@/components/setting";
+
+/** 可直接用于 CSS/`<img>` 的源（data:/http(s):/file:/相对 URL） */
+const isCssSource = (v: string) => /^(data:|https?:|file:|\/|\.\/|\.\.\/)/i.test(v);
 
 function ThemePreviewCard({ mode, selected, onClick }: { mode: DarkMode; selected: boolean; onClick: () => void }) {
   const isDark = mode === "dark";
@@ -85,11 +89,30 @@ function ThemePreviewCard({ mode, selected, onClick }: { mode: DarkMode; selecte
 export function ThemeBgSetting() {
   const { darkMode, setDarkMode, parallax, setParallax } = useThemeStore();
   const { image, opacity, setOpacity, blur, setBlur, setImage, reset } = useBackgroundStore();
+  // 预览图：配置文件里存的是文件路径 → 主进程解析为 koring-res:// 引用再显示
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!image || image === DEFAULT_BG || isCssSource(image)) {
+      setPreviewUrl(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    window.electronAPI?.resolveBackgroundResource?.(image).then((res) => {
+      if (!cancelled) setPreviewUrl(res?.url ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [image]);
 
   const handlePickImage = async () => {
-    const dataUrl = await (window as any).electronAPI?.pickBackgroundImage();
-    if (dataUrl) {
-      setImage(dataUrl);
+    // 返回的是 userData 内的文件路径（配置/Store 以路径保存，不使用 BASE64）
+    const filePath = await window.electronAPI?.pickBackgroundImage?.();
+    if (filePath) {
+      setImage(filePath);
     }
   };
 
@@ -124,11 +147,15 @@ export function ThemeBgSetting() {
               </SettingRow>
               {image && image !== DEFAULT_BG && (
                 <div className="mt-3 rounded-lg overflow-hidden border border-border/50">
-                  <img
-                    src={image}
-                    alt="背景预览"
-                    className="w-full h-[120px] object-cover"
-                  />
+                  {previewUrl ? (
+                    <img src={previewUrl} alt="背景预览" className="w-full h-[120px] object-cover" />
+                  ) : isCssSource(image) ? (
+                    <img src={image} alt="背景预览" className="w-full h-[120px] object-cover" />
+                  ) : (
+                    <div className="w-full h-[120px] grid place-items-center text-[12px] text-muted-foreground/70 bg-foreground/[0.03]">
+                      预览加载中…
+                    </div>
+                  )}
                 </div>
               )}
             </SettingCard>
