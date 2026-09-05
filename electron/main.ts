@@ -20,6 +20,7 @@ import { saveConfig, configExists, getConfig, flushConfig, configPath } from './
 import { findCachedBackgroundRaw, optimizeBackgroundFile, recoverBackgroundFromDataUrl } from './core/background-image';
 import { registerResourceSchemePrivileges, registerResourceProtocol } from './resource-protocol';
 import { createLogger, setDebugModeProvider, installIpcLogging, registerRendererLogBridge } from './core/logger';
+import { dataBasePath } from './core/paths';
 
 const { app } = electron;
 
@@ -73,9 +74,8 @@ function migrateLegacyFiles(): void {
 
 // Startup checks: .minecraft dir + config file + first launch detection
 function runStartupChecks(): { isFirstLaunch: boolean; config: ReturnType<typeof getConfig> } {
-  const dataPath = app.isPackaged
-    ? path.dirname(app.getPath('exe'))
-    : path.join(__dirname, '..');
+  // 数据基准：开发→项目根；Windows 打包→exe 目录；Linux/AppImage→userData（exe 目录是只读挂载）
+  const dataPath = dataBasePath();
 
   // 1. Ensure .minecraft directory exists
   const minecraftDir = path.join(dataPath, '.minecraft');

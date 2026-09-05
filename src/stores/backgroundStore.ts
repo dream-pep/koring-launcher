@@ -23,6 +23,10 @@ const DEFAULT: { type: BackgroundType; image: string; blur: number; opacity: num
   opacity: 1,
 };
 
+/** 旧版主进程默认值用的绝对路径 /background.png（dev 可显示，打包 file:// 下指向文件系统根→黑屏）。
+ *  统一归一化为渲染端 DEFAULT_BG（BASE_URL 相对路径，dev/打包均正确）。 */
+const normalizeDefaultBg = (url: string): string => (url === "/background.png" ? DEFAULT_BG : url);
+
 export const useBackgroundStore = create<BackgroundState>((set) => ({
   ...DEFAULT,
 
@@ -56,7 +60,7 @@ export function syncBackgroundFromConfig() {
   const bg = useConfigStore.getState().config.background;
   useBackgroundStore.setState({
     type: bg.bgType as BackgroundType,
-    image: bg.image,
+    image: normalizeDefaultBg(bg.image),
     blur: bg.blur,
     opacity: bg.opacity / 100,
   });
