@@ -13,7 +13,8 @@
 #   - run ：创建正式 release
 #   - Release 标题命名（仅展示名，tag/真实版本号不变）：run → "{base}"（如 1.2.1），beta → "BETA {base}"（如 BETA 1.2.1）
 #   - Release 正文为中文：版本信息（当前版本 / 编译状态 / 构建来源 commit）+ 提交记录（默认折叠）
-#   - 上传产物：koring-launcher-{base}-{buildId}-setup.exe + latest.yml（electron-updater 更新清单）
+#   - 上传产物（Windows job）：koring-launcher-{full}-setup.exe + latest.yml
+#   - Linux（AppImage）由 build-linux job 追加：*.AppImage + latest-linux.yml（beta 另加 beta-linux.yml）
 #   - 构建元数据（commit / buildId）写入 src/lib/buildInfo.ts，打包进渲染层供 UI 显示
 #
 # Secrets：
@@ -206,3 +207,99 @@ jobs:
             $ghArgs += "--prerelease"
           }
           gh release create @ghArgs
+
+  # ==================== Linux（AppImage）====================
+  # electron-updater 对 Linux 只原生支持 AppImage 自动更新（deb/rpm 走系统包管理器）。
+  # Windows job 创建 Release 后，本 job 把 AppImage + latest-linux.yml 上传到同一 Release。
+  # ⚠️ Linux 清单文件带 -linux 前缀：provider 取 latest-linux.yml（beta 先试 beta-linux.yml 再回退），
+  #    必须上传，否则 Linux 端更新取不到版本。
+  build-linux:
+    needs: build-sign-publish
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || '' }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 与 Windows job 相同逻辑：BUILD ID = 同一 workflow run 的 RUN_NUMBER，产物版本一致
+      - name: Set version (same RUN_NUMBER)
+        id: linuxver
+        shell: pwsh
+        run: |
+          $buildId = "$env:GITHUB_RUN_NUMBER"
+          if ("${{ inputs.mode }}" -eq "beta") {
+            $full = node scripts/version.js build ci "beta.$buildId"
+          } else {
+            $full = node scripts/version.js build ci "$buildId"
+          }
+          "full=$full" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Linux version: $full"
+
+      - name: Generate build info
+        shell: pwsh
+        run: node scripts/gen-build-info.js ${{ inputs.mode }}
+        env:
+          BUILD_ID: ${{ github.run_number }}
+
+      - name: Build renderer + main (${{ inputs.mode }})
+        shell: pwsh
+        run: |
+          if ("${{ inputs.mode }}" -eq "beta") {
+            pnpm build:beta
+            pnpm icon:beta
+          } else {
+            pnpm build:run
+            pnpm icon:run
+          }
+
+      - name: Package AppImage
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 2; $attempt++) {
+            pnpm exec electron-builder --linux AppImage --publish never
+            if ($LASTEXITCODE -eq 0) { break }
+            Write-Host "electron-builder(AppImage) 失败（第 $attempt 次，exit=$LASTEXITCODE），5 秒后重试..."
+            if ($attempt -eq 2) { exit $LASTEXITCODE }
+            Start-Sleep -Seconds 5
+          }
+
+      - name: Upload AppImage assets to Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "v${{ steps.linuxver.outputs.full }}"
+          $appImage = (Get-ChildItem "dist-electron/*.AppImage" -ErrorAction Stop | Select-Object -First 1).Name
+          $assets = @(
+            "dist-electron/$appImage",
+            "dist-electron/latest-linux.yml"
+          )
+          # beta：补 beta-linux.yml（provider 先取该文件，避免 404 再回退）
+          if ("${{ inputs.mode }}" -eq "beta") {
+            Copy-Item "dist-electron/latest-linux.yml" "dist-electron/beta-linux.yml" -Force
+            $assets += "dist-electron/beta-linux.yml"
+          }
+          foreach ($a in $assets) {
+            if (-not (Test-Path -LiteralPath $a)) {
+              Write-Error "资产不存在: $a"
+              exit 1
+            }
+          }
+          gh release upload $tag @assets --clobber
+          Write-Host "已上传到 $tag : $($assets -join ', ')"
