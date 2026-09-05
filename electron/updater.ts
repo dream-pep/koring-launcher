@@ -104,35 +104,62 @@ function getMirrors(): string[] {
   return DEFAULT_MIRRORS;
 }
 
+/** 版本格式分类 */
+type TagKind = 'stable' | 'beta' | 'oldbeta' | 'plain';
+
+interface ParsedTag {
+  base: number[];
+  /** 构建号（渠道标记不参与排序） */
+  num: number;
+  kind: TagKind;
+}
+
 /**
- * 项目版本序：比较两个版本 tag（如 v1.2.5-17 / v1.2.5-beta.16 / v1.2.0-2608271921），返回 a - b。
- *
- * 语义（与 electron-updater 的纯 semver 不同，专为本项目版本方案定制）：
- * 每个 release = {base, 构建号}。beta.N 与 N 的 **beta/正式只是通道标记，不参与新旧排序**：
- * - base（X.Y.Z）不同 → 按 base 数值比较（优先）
- * - base 相同 → 按构建号（数字部分，忽略 beta 前缀）比较
- * - 无构建号（如 1.2.5，旧版正式格式）→ 构建号视为 -1（同 base 内最旧，可被后续带尾号版本覆盖）
- * - 构建号相同（如 beta.17 与 17）→ 视为相等（通道标记不参与排序；同号跨通道版本实际不会共存）
- *
- * 修复目标：v1.2.5-17（构建 17）不应把 v1.2.5-beta.16（构建 16）当新版本；
- * 但 v1.2.5-beta.18（构建 18）对 v1.2.5-17 是新版本。
+ * 项目版本格式（2026- 起）：
+ *   - 正式版（run）：   {base}-{N}         如 1.2.6-25
+ *   - 测试版（beta）：  {base}-{N}.beta    如 1.2.6-16.beta（编号在前、beta 在后）
+ *   - 旧测试版（废弃）：{base}-beta.{N}    如 1.2.6-beta.16 —— 检测时【屏蔽】不作为候选
+ *   - 旧正式版（更早）：{base}             如 1.2.5（无构建号，同 base 最旧）
+ */
+function parseTag(tag: string): ParsedTag {
+  const s = tag.replace(/^v/i, '');
+  const dash = s.indexOf('-');
+  const baseStr = dash === -1 ? s : s.slice(0, dash);
+  const tail = dash === -1 ? '' : s.slice(dash + 1);
+  const nums = baseStr.split('.').map((n) => parseInt(n, 10) || 0);
+  while (nums.length < 3) nums.push(0);
+  if (tail === '') return { base: nums, num: -1, kind: 'plain' };
+  const mStable = /^(\d+)$/.exec(tail);
+  if (mStable) return { base: nums, num: parseInt(mStable[1], 10), kind: 'stable' };
+  const mBeta = /^(\d+)\.beta$/i.exec(tail);
+  if (mBeta) return { base: nums, num: parseInt(mBeta[1], 10), kind: 'beta' };
+  const mOldBeta = /^beta\.(\d+)$/i.exec(tail);
+  if (mOldBeta) return { base: nums, num: parseInt(mOldBeta[1], 10), kind: 'oldbeta' };
+  // 无法识别 → 视为未知旧格式（候选阶段一并屏蔽），构建号取 0
+  return { base: nums, num: 0, kind: 'oldbeta' };
+}
+
+/** 该 tag 是否为"屏蔽的旧格式"（旧 beta：-beta.N 或无法识别的尾巴） */
+function isMaskedLegacyTag(tag: string): boolean {
+  return parseTag(tag).kind === 'oldbeta';
+}
+
+/** 候选是否允许当前通道使用（woker=仅正式；runner=正式+新版测试版；旧格式一律屏蔽） */
+function isCandidateAllowed(tag: string, allowPrerelease: boolean): boolean {
+  if (isMaskedLegacyTag(tag)) return false;
+  const kind = parseTag(tag).kind;
+  return allowPrerelease || kind === 'stable' || kind === 'plain';
+}
+
+/**
+ * 项目版本序：比较两个版本 tag，返回 a - b。
+ * base 数值优先；base 相同比构建号（数字部分）——beta/正式只是通道标记，不参与新旧排序。
+ * 旧格式（-beta.N）按构建号参与排序（使旧版安装也能升级到新格式/更高构建号），
+ * 但不会作为候选被选中（见 isCandidateAllowed）。
  */
 function compareVersionTags(a: string, b: string): number {
-  const parse = (t: string): { base: number[]; num: number } => {
-    const s = t.replace(/^v/i, '');
-    const [base, buildStr = ''] = s.split('-');
-    const nums = base.split('.').map((n) => parseInt(n, 10) || 0);
-    while (nums.length < 3) nums.push(0);
-    if (buildStr === '') {
-      // 无构建号（旧版正式格式）：同 base 内视为最旧
-      return { base: nums, num: -1 };
-    }
-    const beta = /^beta\.(\d+)$/i.exec(buildStr);
-    const num = parseInt(beta ? beta[1] : buildStr, 10);
-    return { base: nums, num: Number.isFinite(num) ? num : 0 };
-  };
-  const pa = parse(a);
-  const pb = parse(b);
+  const pa = parseTag(a);
+  const pb = parseTag(b);
   for (let i = 0; i < 3; i++) {
     if (pa.base[i] !== pb.base[i]) return pa.base[i] - pb.base[i];
   }
@@ -348,23 +375,19 @@ class UpdateService {
     }
   }
 
-  /** 按当前通道应用 electron-updater 的 allowPrerelease + 频道（woker=只收正式版 / runner=可收预览版） */
+  /**
+   * 按当前通道应用 electron-updater 参数。
+   * 新版本方案（{base}-{N} 正式 / {base}-{N}.beta 测试）下，版本识别不再依赖
+   * electron-updater 的 GitHub 频道循环（-N.beta 的 prerelease[0] 是数字，会被当自定义频道），
+   * 候选由本项目已实现自行选定（check → fetchCandidates/pickCandidate → generic feed）。
+   * 这里统一 channel='latest'（generic feed 取 latest.yml / latest-linux.yml；
+   * 且 setter 自动开启 allowDowngrade，供 semver 门接受"编号更大但 semver 偏旧"的候选）。
+   */
   private applyChannel(): void {
     const def = getChannelDef(this.channelKey);
-    // runner(跑步) 强制开启 allowPrerelease → GitHub provider 走 Atom feed 频道逻辑可收 beta；
-    // woker(慢走) 关闭 → 走 releases/latest 只认稳定版，不被预览版污染。
     autoUpdater.allowPrerelease = def.allowPrerelease;
-    if (def.allowPrerelease) {
-      // 关键：runner 显式指定频道 "beta"。否则当当前版本是数字尾号稳定版（如 1.2.5-13）时，
-      // semver.prerelease(currentVersion)[0] = "13" 会被 GitHub provider 当作"自定义频道"，
-      // 通道循环匹配不到任何版本 → "No published versions on GitHub"，
-      // 正式版切跑步模式将无法检测 beta 预览版。
-      autoUpdater.channel = 'beta';
-    } else {
-      // woker 恢复默认 latest 频道（allowPrerelease=false 走 /releases/latest，频道不影响识别）
-      autoUpdater.channel = 'latest';
-    }
-    log.info(`[updater] 更新通道: ${def.label}（${def.key}，allowPrerelease=${def.allowPrerelease}，channel=${autoUpdater.channel}）`);
+    autoUpdater.channel = 'latest';
+    log.info(`[updater] 更新通道: ${def.label}（${def.key}，allowPrerelease=${def.allowPrerelease}）`);
   }
 
   /** 通道定义列表（UI 动态渲染；可扩展） */
@@ -462,7 +485,12 @@ class UpdateService {
   }
 
   /**
-   * 检查更新：GitHub 官方优先，失败后依次尝试加速源。
+   * 检查更新（版本方案：{base}-{N} 正式 / {base}-{N}.beta 测试 / 旧 -beta.{N} 屏蔽）：
+   * 1. 按来源依次（GitHub 官方 → 各加速源）抓取 release 候选；
+   * 2. 按通道（woker=仅正式 / runner=正式+新测试版）过滤并剔除旧格式；
+   * 3. 按项目版本序挑出"比当前新"的最新 tag → 指向该 tag 的 generic feed 走 electron-updater
+   *    （下载/校验/安装链路复用）；版本序复核通过才判 available。
+   * 不依赖 electron-updater 的 GitHub 频道循环（新格式 -N.beta 会被其当作自定义频道）。
    */
   async check(manual = false): Promise<UpdateStatusPayload> {
     if (!this.ready) return this.buildPayload();
@@ -472,54 +500,44 @@ class UpdateService {
 
     this.manual = manual;
     this.suppressErrors = true;
-
-    // 1) GitHub 官方（app-update.yml 内置 github provider）
-    this.source = 'github';
+    const allowPrerelease = getChannelDef(this.channelKey).allowPrerelease;
     this.state = 'checking';
     this.emit();
-    try {
-      await autoUpdater.checkForUpdates();
-      this.suppressErrors = false;
-      // 复核 electron-updater 的纯 semver 判定（v1.2.5-17 误判 v1.2.5-beta.16 为新版本）
-      this.correctAvailability();
-      const githubResult = this.buildPayload();
-      // runner（跑步）beta 无更新 → 探测最新正式版：
-      // 构建号比当前 beta 大（如 beta.24 → 正式 1.2.6-25）也算更新，只是 GitHub beta 频道
-      // 不返回正式版、且纯 semver 认为 beta.N > N，需切 stable 通道再查一次
-      if (githubResult.state === 'not-available' && this.channelKey === 'runner') {
-        const probe = await this.probeLatestStable();
-        if (probe === 'available') return this.buildPayload();
-      }
-      return githubResult;
-    } catch (err) {
-      log.warn(`[updater] GitHub 官方更新源不可用: ${String((err as Error)?.message ?? err)}`);
-    }
 
-    // 2) 加速源兜底：镜像页面发现最新 tag → generic feed → 检查
-    for (const mirror of getMirrors()) {
+    const sources: { label: string; base: string }[] = [
+      { label: 'github', base: '' },
+      ...getMirrors().map((m) => ({ label: m, base: `${m}/` })),
+    ];
+
+    for (const { label, base } of sources) {
       try {
-        const tag = await this.discoverLatestTag(mirror);
+        const candidates = await this.fetchCandidates(base);
+        const tag = this.pickCandidate(candidates, allowPrerelease);
         if (!tag) {
-          log.warn(`[updater] ${mirror} 无法发现最新版本，跳过`);
-          continue;
+          log.info(`[updater] ${label}: 无符合条件的更新候选（通道/格式/版本序）`);
+          continue; // 该源没有更新，尝试下一个源
         }
-        const feedUrl = `${mirror}/https://github.com/${OWNER}/${REPO}/releases/download/${tag}/`;
-        log.info(`[updater] 切换加速源: ${mirror} (feed: ${feedUrl})`);
+        const feedUrl = `${base}https://github.com/${OWNER}/${REPO}/releases/download/${tag}/`;
+        log.info(`[updater] 检查源 ${label}，命中 ${tag} (feed: ${feedUrl})`);
         autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl });
-        this.source = mirror;
+        // generic feed 取 latest.yml / latest-linux.yml；channel='latest' 同时开启 allowDowngrade，
+        // 使 semver 门接受"编号更大但 semver 判定偏旧"的候选（如旧 -beta.N 当前 → 新格式）
+        autoUpdater.allowPrerelease = allowPrerelease;
+        autoUpdater.channel = 'latest';
+        this.source = label;
         this.state = 'checking';
         this.emit();
         await autoUpdater.checkForUpdates();
-        this.suppressErrors = false;
-        // 复核 electron-updater 的纯 semver 判定
+        // 项目版本序复核：候选确为更新才保留 available
         this.correctAvailability();
-        // 镜像若反馈无更新（可能发现的是旧 tag / latest.yml 不匹配），
-        // 不要就此返回 not-available，继续尝试下一个源
-        const mirrorResult = this.buildPayload();
-        if (mirrorResult.state !== 'not-available') return mirrorResult;
-        log.warn(`[updater] ${mirror} 反馈无可用更新，尝试下一个源`);
+        const result = this.buildPayload();
+        if (result.state !== 'not-available') {
+          this.suppressErrors = false;
+          return result;
+        }
+        log.warn(`[updater] ${label} 反馈无可用更新，尝试下一个源`);
       } catch (err) {
-        log.warn(`[updater] 加速源 ${mirror} 检查失败: ${String((err as Error)?.message ?? err)}`);
+        log.warn(`[updater] 更新源 ${label} 检查失败: ${String((err as Error)?.message ?? err)}`);
       }
     }
 
@@ -531,46 +549,17 @@ class UpdateService {
   }
 
   /**
-   * runner（跑步）beta 无更新时的"最新正式版"探测：
-   * 临时切 stable 通道（allowPrerelease=false / channel=latest，天然开启 allowDowngrade，
-   * 使 semver 判定接受"看似更低"的正式版），再查一次；命中后按项目版本序复核
-   * （构建号更大 → available；否则还原为无更新）。结束后恢复通道配置。
+   * 抓取某来源的 release tag 候选列表：
+   * base='' 为 GitHub 官方直连；否则 base=`${mirror}/`（加速源前缀，原样拼 https://）。
+   * 组合：API 列表（含全部 release）+ /releases/latest 页面 HTML（兜底）。
    */
-  private async probeLatestStable(): Promise<'available' | 'not-available' | 'failed'> {
-    try {
-      autoUpdater.allowPrerelease = false;
-      autoUpdater.channel = 'latest';
-      this.state = 'checking';
-      this.emit();
-      log.info('[updater] runner beta 无更新，探测最新正式版...');
-      await autoUpdater.checkForUpdates();
-      // 项目版本序复核：构建号大于当前才算更新（beta.24 → 正式 25 是更新；25 → 26 是更新）
-      this.correctAvailability();
-      const probeResult = this.buildPayload();
-      return probeResult.state === 'available' ? 'available' : 'not-available';
-    } catch (e) {
-      log.warn(`[updater] 正式版探测失败: ${String((e as Error)?.message ?? e)}`);
-      return 'failed';
-    } finally {
-      // 还原 runner 通道配置（allowPrerelease=true / channel=beta）
-      this.applyChannel();
-    }
-  }
-
-  /**
-   * 通过加速源发现最新 release tag：
-   * 1) /releases/latest 页面 HTML 中提取 tag（多数下载型加速源可代理该页面；
-   *    ⚠️ 该页面只指向最新「非 prerelease」release，本项目所有版本都是 prerelease 形式，结果可能偏旧）
-   * 2) GitHub API（经加速源代理，列表含 prerelease），作为备选
-   * 最终取两种方式候选集中版本最大者（buildId 数值比较），避免旧 tag 覆盖新 prerelease。
-   */
-  private async discoverLatestTag(mirror: string): Promise<string | null> {
+  private async fetchCandidates(base: string): Promise<string[]> {
     const candidates: string[] = [];
-
-    // 方式 1：HTML 页面
+    const web = `${base}https://github.com/${OWNER}/${REPO}`;
+    const api = `${base}https://api.github.com/repos/${OWNER}/${REPO}`;
+    // 方式 1：/releases/latest 页面（最新非 prerelease release 的 tag，HTML 正则兜底）
     try {
-      const pageUrl = `${mirror}/https://github.com/${OWNER}/${REPO}/releases/latest`;
-      const res = await fetch(pageUrl, {
+      const res = await fetch(`${web}/releases/latest`, {
         headers: { 'User-Agent': 'koring-launcher-updater' },
         signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
       });
@@ -582,34 +571,42 @@ class UpdateService {
     } catch {
       /* 尝试下一种方式 */
     }
-
-    // 方式 2：GitHub API（经加速源代理）
+    // 方式 2：GitHub API release 列表
     try {
-      const apiUrl = `${mirror}/https://api.github.com/repos/${OWNER}/${REPO}/releases?per_page=20`;
-      const res = await fetch(apiUrl, {
+      const res = await fetch(`${api}/releases?per_page=40`, {
         headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'koring-launcher-updater' },
         signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
       });
       if (res.ok) {
-        const releases: { draft?: boolean; prerelease?: boolean; tag_name?: string }[] = await res.json();
-        const allowPrerelease = getChannelDef(this.channelKey).allowPrerelease;
+        const releases: { draft?: boolean; tag_name?: string }[] = await res.json();
         for (const r of releases ?? []) {
-          // draft 一律跳过；woker（只收正式版）跳过 GitHub 标记为 prerelease 的 release
-          if (r.draft || (!allowPrerelease && r.prerelease)) continue;
-          if (r.tag_name) candidates.push(r.tag_name);
+          if (r.draft || !r.tag_name) continue;
+          candidates.push(r.tag_name);
         }
       }
     } catch {
       /* ignore */
     }
+    return candidates;
+  }
 
-    if (candidates.length === 0) return null;
-    candidates.sort(compareVersionTags);
-    const latest = candidates[candidates.length - 1];
-    if (candidates.length > 1) {
-      log.info(`[updater] ${mirror} 候选版本: ${candidates.join(', ')} → 取 ${latest}`);
-    }
-    return latest;
+  /** 从候选里挑出允许当前通道、且按项目版本序比当前更新的最新 tag；没有返回 null */
+  private pickCandidate(candidates: string[], allowPrerelease: boolean): string | null {
+    const allowed = candidates
+      .filter((c) => isCandidateAllowed(c, allowPrerelease))
+      .filter((c) => compareVersionTags(c, this.currentVersion) > 0);
+    if (allowed.length === 0) return null;
+    allowed.sort(compareVersionTags);
+    return allowed[allowed.length - 1];
+  }
+
+  /** 不限当前版本：返回某来源允许通道/格式的最新 tag（发布说明回退用）；没有返回 null */
+  private async fetchBestCandidate(base: string, allowPrerelease: boolean): Promise<string | null> {
+    const candidates = await this.fetchCandidates(base);
+    const allowed = candidates.filter((c) => isCandidateAllowed(c, allowPrerelease));
+    if (allowed.length === 0) return null;
+    allowed.sort(compareVersionTags);
+    return allowed[allowed.length - 1];
   }
 
   /**
@@ -621,9 +618,9 @@ class UpdateService {
     const found = await this.fetchNotesForTag(tag);
     if (found) return found;
 
-    // 回退：最新版本（通过 /releases/latest 页面发现 tag）
+    // 回退：最新版本（发现 tag 后取发布说明）
     for (const mirror of getMirrors()) {
-      const latestTag = await this.discoverLatestTag(mirror);
+      const latestTag = await this.fetchBestCandidate(`${mirror}/`, true);
       if (latestTag && latestTag !== tag) {
         const foundLatest = await this.fetchNotesForTag(latestTag);
         if (foundLatest) {

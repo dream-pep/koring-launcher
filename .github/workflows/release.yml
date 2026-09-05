@@ -119,7 +119,7 @@ jobs:
           $buildId = "$env:GITHUB_RUN_NUMBER"
           $base = node scripts/version.js get
           if ("${{ inputs.mode }}" -eq "beta") {
-            $full = node scripts/version.js build ci "beta.$buildId"
+            $full = node scripts/version.js build ci "$buildId.beta"
           } else {
             $full = node scripts/version.js build ci "$buildId"
           }
@@ -244,7 +244,7 @@ jobs:
         run: |
           $buildId = "$env:GITHUB_RUN_NUMBER"
           if ("${{ inputs.mode }}" -eq "beta") {
-            $full = node scripts/version.js build ci "beta.$buildId"
+            $full = node scripts/version.js build ci "$buildId.beta"
           } else {
             $full = node scripts/version.js build ci "$buildId"
           }
