@@ -110,14 +110,22 @@ function buildMenuData(
 
 export function Setting() {
   const [selected, setSelected] = useState("home");
-  const [animKey, setAnimKey] = useState(0);
+  const [animOn, setAnimOn] = useState(true);
+  // 已访问过的子页缓存（keep-alive）：切换时不再全量卸载/重挂载，
+  // 避免每个子页的 VersionCard/Silk、发布说明请求等重活反复执行；隐藏页不卸载。
+  const [visited, setVisited] = useState<Record<string, boolean>>({ home: true });
   const routeNavigate = useRouteStore((s) => s.navigate);
 
   const switchPage = useCallback((key: string) => {
-    if (key === selected) return;
-    setSelected(key);
-    setAnimKey((k) => k + 1);
-  }, [selected]);
+    setSelected((prev) => {
+      if (prev === key) return prev;
+      setVisited((v) => ({ ...v, [key]: true }));
+      // 两步重放进入动画：先移除类再回加（CSS 动画重新触发，页面无需重挂载）
+      setAnimOn(false);
+      requestAnimationFrame(() => setAnimOn(true));
+      return key;
+    });
+  }, []);
 
   const handleItemClick = useCallback((item: MenuItem) => {
     if (item.onSelect) {
@@ -129,7 +137,7 @@ export function Setting() {
 
   const menuData = buildMenuData(switchPage, routeNavigate);
   const allItems = menuData.flatMap((g) => g.items);
-  const current = allItems.find((i) => i.key === selected);
+  const cachedItems = allItems.filter((i) => visited[i.key]);
 
   return (
     <div className="flex h-full">
@@ -172,11 +180,16 @@ export function Setting() {
         </nav>
       </aside>
 
-      {/* 内容区 */}
+      {/* 内容区（已访问页缓存保活；仅活动页可见并重放进入动画） */}
       <main className="scroll-area flex-1 h-full overflow-y-auto p-8">
-        <div key={animKey} className="setting-page-enter">
-          {current?.component}
-        </div>
+        {cachedItems.map((item) => {
+          const active = selected === item.key;
+          return (
+            <div key={item.key} className={active ? (animOn ? "setting-page-enter" : undefined) : "hidden"}>
+              {item.component}
+            </div>
+          );
+        })}
       </main>
     </div>
   );

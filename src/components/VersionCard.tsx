@@ -6,7 +6,7 @@ import { useRouteStore } from "@/stores/routeStore";
 import Silk from "@/components/silk/Silk";
 import clsx from "clsx";
 import { ChevronRight } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 const modeColors: Record<string, string> = {
   dev: "#F59E0B",
@@ -73,8 +73,26 @@ export function VersionCard({
     if (clickable) navigate("update");
   };
 
+  // Silk（WebGL 动画）仅在卡片可见时运行：
+  // 设置子页 keep-alive 后隐藏页仍挂在 DOM，若动画照跑会白白占 GPU/rAF →
+  // 用 IntersectionObserver 按可见性挂载/卸载 Silk（隐藏/滚出视野即暂停，观感不变）
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [silkVisible, setSilkVisible] = useState(true);
+  useEffect(() => {
+    if (simple || !cardRef.current || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const en of entries) setSilkVisible(en.isIntersecting);
+      },
+      { root: null, threshold: 0.02 },
+    );
+    io.observe(cardRef.current);
+    return () => io.disconnect();
+  }, [simple]);
+
   return (
     <div
+      ref={cardRef}
       className={clsx(
         "relative overflow-hidden rounded-xl border border-white/10 min-h-[200px]",
         clickable && "cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-transform",
@@ -93,8 +111,8 @@ export function VersionCard({
       {/* 背景层 */}
       <div className="absolute inset-0" style={{ background: gradient }} />
 
-      {/* Silk 动画层 (非 simple 模式) */}
-      {!simple && (
+      {/* Silk 动画层 (非 simple 模式；仅卡片可见时挂载，隐藏即暂停) */}
+      {!simple && silkVisible && (
         <Suspense fallback={null}>
           <div className="absolute inset-0 opacity-60 mix-blend-soft-light">
             <Silk speed={3} scale={1.2} color={color} noiseIntensity={1.2} rotation={0.3} />
