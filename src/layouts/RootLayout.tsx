@@ -3,6 +3,7 @@ import { BackgroundLayer } from "@/components/background/BackgroundLayer";
 import { SystemLayer } from "@/components/system/SystemLayer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
+import { RuntimeNotices } from "@/components/RuntimeNotices";
 import { Toaster } from "sonner";
 import { useA11yStore } from "@/stores/a11yStore";
 import clsx from "clsx";
@@ -58,6 +59,9 @@ export function RootLayout({
 
       {/* 全局：发现新版本弹窗（检查到新版本时自动弹出） */}
       <UpdateAvailableDialog />
+
+      {/* 运行时提示（Linux AppImage 未解包安装等） */}
+      <RuntimeNotices />
 
       {/* Sonner toaster */}
       <Toaster

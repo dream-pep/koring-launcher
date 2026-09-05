@@ -16,6 +16,8 @@ interface ElectronAPI {
 
   onConfigChanged: (callback: (config: unknown) => void) => () => void;
 
+  onRuntimeNotice: (callback: (notice: { kind: string; message: string }) => void) => () => void;
+
   openExternal: (url: string) => Promise<void>;
 
   // Crash monitoring

@@ -190,6 +190,13 @@ function createMainWindow(): electron.BrowserWindow {
   main.webContents.on('did-finish-load', () => {
     if (main.isDestroyed()) return;
     main.webContents.send('config:preload', { config: getConfig(), isFirstLaunch: isFirstLaunchFlag });
+    // Linux 打包但并非以 AppImage 方式运行（无 APPIMAGE 环境变量）→ 提示影响更新组件
+    if (app.isPackaged && process.platform === 'linux' && !process.env.APPIMAGE) {
+      main.webContents.send('runtime:notice', {
+        kind: 'linux-appimage-unpacked',
+        message: '您并未解包安装，这可能会影响更新组件的运行',
+      });
+    }
   });
 
   main.on('maximize', () => {

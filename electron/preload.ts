@@ -53,6 +53,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('config:changed', handler);
   },
 
+  // 主进程运行时提示（如 Linux 未以 AppImage 方式运行，影响更新组件）
+  onRuntimeNotice: (callback: (notice: { kind: string; message: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, notice: { kind: string; message: string }) => callback(notice);
+    ipcRenderer.on('runtime:notice', handler);
+    return () => ipcRenderer.removeListener('runtime:notice', handler);
+  },
+
   // 背景图 — 选择本地图片：主进程复制到 userData、按窗口尺寸优化并落盘，
   // 返回【文件路径】（配置/Store 以路径保存，不使用 BASE64）。
   pickBackgroundImage: async (): Promise<string | null> => {
