@@ -31,6 +31,10 @@ if (!mode || !validModes.includes(mode)) {
   process.exit(1);
 }
 
+// NSIS 专属资源（ico / 侧边横幅 BMP / 自定义脚本 / license）仅 Windows 打包需要；
+// Linux（AppImage 等）只需 build/icon.png，且不能调用 PowerShell。
+const isWin = process.platform === 'win32';
+
 const root = join(__dirname, '..');
 const srcDir = join(root, 'public', 'icons', mode);
 const buildDir = join(root, 'build');
@@ -45,13 +49,17 @@ const licenseSrc = join(
   mode === 'beta' ? 'protocol-beta.txt' : 'protocol-user.txt'
 );
 
-// 必选文件存在性检查
+// 必选文件存在性检查（Windows 全量；Linux 仅 icon.png）
 const requiredFiles = [
   { path: png, label: 'icon.png' },
-  { path: ico, label: 'icon.ico' },
-  { path: installerHeader, label: 'installer-header.png' },
-  { path: nsisCustom, label: 'installer-custom.nsh' },
-  { path: licenseSrc, label: 'license 协议文件' },
+  ...(isWin
+    ? [
+        { path: ico, label: 'icon.ico' },
+        { path: installerHeader, label: 'installer-header.png' },
+        { path: nsisCustom, label: 'installer-custom.nsh' },
+        { path: licenseSrc, label: 'license 协议文件' },
+      ]
+    : []),
 ];
 for (const file of requiredFiles) {
   if (!existsSync(file.path)) {
@@ -112,19 +120,27 @@ function writeLicenseWithBom(src, out) {
 
 mkdirSync(buildDir, { recursive: true });
 
-// 1. 图标
+// 1. 图标（各平台通用：AppImage / Linux 需要 build/icon.png）
 cpSync(png, join(buildDir, 'icon.png'), { overwrite: true });
-cpSync(ico, join(buildDir, 'icon.ico'), { overwrite: true });
 
-// 2. 安装程序欢迎页左侧大图（installerSidebar，由横幅 PNG 适配生成）
-createSidebarBmp(installerHeader, join(buildDir, 'installer-header.bmp'));
+// Windows 专属：NSIS 安装器资源
+if (isWin) {
+  cpSync(ico, join(buildDir, 'icon.ico'), { overwrite: true });
 
-// 3. NSIS 自定义脚本
-cpSync(nsisCustom, join(buildDir, 'installer-custom.nsh'), { overwrite: true });
+  // 2. 安装程序欢迎页左侧大图（installerSidebar，由横幅 PNG 适配生成）
+  createSidebarBmp(installerHeader, join(buildDir, 'installer-header.bmp'));
 
-// 4. 协议文件（带 UTF-8 BOM，防止中文乱码）
-writeLicenseWithBom(licenseSrc, join(buildDir, 'license.txt'));
+  // 3. NSIS 自定义脚本
+  cpSync(nsisCustom, join(buildDir, 'installer-custom.nsh'), { overwrite: true });
+
+  // 4. 协议文件（带 UTF-8 BOM，防止中文乱码）
+  writeLicenseWithBom(licenseSrc, join(buildDir, 'license.txt'));
+}
 
 console.log(
-  `[switch-icon] Mode: ${mode} → build/icon.png + build/icon.ico + build/installer-header.bmp (sidebar 164x314) + build/installer-custom.nsh + build/license.txt updated`
+  `[switch-icon] Mode: ${mode} → build/icon.png` +
+    (isWin
+      ? ' + build/icon.ico + build/installer-header.bmp (sidebar 164x314) + build/installer-custom.nsh + build/license.txt'
+      : '（Linux：仅 icon.png）') +
+    ' updated'
 );
