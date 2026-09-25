@@ -1,7 +1,7 @@
 ﻿# Koring Launcher 中文 Release 发布说明生成器
 #
 # 用法（GitHub Actions 中调用）：
-#   ./scripts/release-notes.ps1 -BaseVersion "1.2.0" -FullVersion "1.2.0-2608280224" -Mode "beta" -OutputPath release-notes.md
+#   ./scripts/release-notes.ps1 -BaseVersion "1.2.6" -FullVersion "1.2.6-33.beta" -Mode "beta" -OutputPath release-notes.md
 #
 # 输出（Markdown，UTF-8）：
 #   # Koring Launcher Releases {BaseVersion}
@@ -20,6 +20,10 @@ param(
   [string] $OutputPath = "release-notes.md"
 )
 
+# git 输出为 UTF-8；必须显式告知控制台，否则 Windows PowerShell 按 OEM 代码页解码，
+# 中文乱码且 0x1f/0x1e 分隔符可能被吞，导致 commit 解析丢块（已验证：56 → 35）。
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 $status = if ($Mode -eq 'beta') { 'BETA' } else { 'RUN' }
 $commitShort = if ($Commit) { $Commit.Substring(0, [Math]::Min(7, $Commit.Length)) } else { '' }
 
@@ -27,28 +31,44 @@ $rec = [char]0x1e   # 记录分隔符（每个 commit 一条）
 $sep = [char]0x1f   # 字段分隔符（hash / subject / body）
 $format = "%x1f%H%x1f%s%x1f%b%x1e"
 
-# 提交范围（base tag）：按 tag 创建时间从新到旧取"上一个 release"。
+# 提交范围（base tag）：解析 tag 名取"上一个 release"（结构化版本序，不依赖 creatordate）。
+#   tag 结构（新）：v{base}-{N} 正式版 / v{base}-{N}.beta 测试版（N = GITHUB_RUN_NUMBER，全局递增）
+#   兼容旧格式：    v{base}-beta.{N} 旧测试版 / v{base} 无构建号
 #   run（正式版）→ 上一个【正式版】tag：把上一个正式版之后所有 beta 的提交也写进正式版更新内容
 #   beta         → 上一个 release tag（任意通道）
-# 注意用 creatordate 而非 git 版本序：git 对 -beta.N / -N 混排不可靠（会把 beta.16 排到 -17 之前）。
-$tagsNewestFirst = git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags 2>$null |
-  Where-Object { $_ -match '^v' }
-$baseTag = if ($Mode -eq 'run') {
-  ($tagsNewestFirst | Where-Object { $_ -notmatch '-beta\.' } | Select-Object -First 1)
-} else {
-  ($tagsNewestFirst | Select-Object -First 1)
+# 按 (base版本, 构建号) 降序排序：creatordate 在同 commit 多 tag / tag 重建时不可靠。
+$tagInfos = @()
+foreach ($tag in (git for-each-ref --format '%(refname:short)' refs/tags 2>$null)) {
+  if ($tag -notmatch '^v') { continue }
+  if ($tag -match '^v(\d+)\.(\d+)\.(\d+)-(\d+)(\.beta)?$') {
+    $tagInfos += [pscustomobject]@{ Tag = $tag; Base = [version]"$($Matches[1]).$($Matches[2]).$($Matches[3])"; Build = [int64]$Matches[4]; IsBeta = [bool]$Matches[5] }
+  } elseif ($tag -match '^v(\d+)\.(\d+)\.(\d+)-beta\.(\d+)$') {
+    $tagInfos += [pscustomobject]@{ Tag = $tag; Base = [version]"$($Matches[1]).$($Matches[2]).$($Matches[3])"; Build = [int64]$Matches[4]; IsBeta = $true }
+  } elseif ($tag -match '^v(\d+)\.(\d+)\.(\d+)$') {
+    $tagInfos += [pscustomobject]@{ Tag = $tag; Base = [version]"$($Matches[1]).$($Matches[2]).$($Matches[3])"; Build = [int64]0; IsBeta = $false }
+  }
 }
+$sortedNewestFirst = $tagInfos |
+  Sort-Object -Property @{ Expression = { $_.Base }; Descending = $true }, @{ Expression = { $_.Build }; Descending = $true }
+$baseTag = if ($Mode -eq 'run') {
+  ($sortedNewestFirst | Where-Object { -not $_.IsBeta } | Select-Object -First 1).Tag
+} else {
+  ($sortedNewestFirst | Select-Object -First 1).Tag
+}
+$noTagReason = if ($tagInfos.Count -eq 0) { 'No release tags found' } else { 'No stable (run) tag found' }
 
 if ($baseTag) {
   Write-Host "Commits since tag: $baseTag (mode=$Mode)"
   $raw = git log --format=$format "$baseTag..HEAD"
 } else {
-  Write-Host "No release tags found, listing all commits"
+  Write-Host "$noTagReason, listing all commits"
   $raw = git log --format=$format "HEAD"
 }
 
 $blocks = @()
-foreach ($record in ($raw -split [regex]::Escape($rec))) {
+# git 输出被 PowerShell 收成「按行数组」；多行 commit body 必须先 join 再按记录符切分，
+# 否则逐元素 split 会把每条记录的第一行当整条、丢掉 body 后续行（实测 56 条只解析出 35 条）。
+foreach ($record in (($raw -join "`n") -split [regex]::Escape($rec))) {
   if (-not $record) { continue }
   $parts = $record -split [regex]::Escape($sep)
   if ($parts.Length -lt 4) { continue }
@@ -56,6 +76,7 @@ foreach ($record in ($raw -split [regex]::Escape($rec))) {
   $subject = $parts[2].Trim()
   $body = $parts[3].Trim()
   if (-not $hash) { continue }
+  if (-not ($hash -match '^[0-9a-f]{7,40}$')) { continue }  # 防御：仅接受 hex hash
 
   $short = $hash.Substring(0, [Math]::Min(7, $hash.Length))
   $inner = $subject
