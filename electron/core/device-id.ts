@@ -7,8 +7,9 @@
 //   3. bios   — BIOS 序列号（Win32_BIOS；存在大量 OEM 默认值，故置后）
 //   4. machine— 注册表 MachineGuid（系统安装级，作为最终回退）
 // 取第一个有效值 → SHA-256 → 前 32 位十六进制 → UUID 样式分段展示。
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { createHash } from 'crypto';
+import * as os from 'os';
 
 export type DeviceIdSource = 'board' | 'disk' | 'bios' | 'machine' | 'none';
 
@@ -44,31 +45,67 @@ function isValid(value?: string | null): value is string {
   return !INVALID_VALUES.some((bad) => low.includes(bad));
 }
 
-/** 读取四类候选标识（Windows 一条 PowerShell 完成，逐项容错） */
-function probeSources(): { board: string; disk: string; bios: string; machine: string } {
-  const empty = { board: '', disk: '', bios: '', machine: '' };
+interface ProbeResult {
+  board: string;
+  disk: string;
+  bios: string;
+  machine: string;
+  /** 操作系统名称（Win32_OperatingSystem.Caption） */
+  osName: string;
+  /** 操作系统版本（Win32_OperatingSystem.Version） */
+  osVersion: string;
+}
+
+/**
+ * 读取候选标识 + 系统信息（Windows 一条 PowerShell 完成，逐项容错）。
+ * board 即 SMBIOS UUID（Win32_ComputerSystemProduct.UUID），同时供
+ * getSmbiosUuid()（Account API 设备上报用）与 getDeviceId()（哈希指纹）使用。
+ *
+ * 注意：必须用 execFileSync 直接传参。execSync 走 cmd.exe，脚本里的 `|`（管道）
+ * 会被 cmd 当成自己的管道符解析，导致 Get-CimInstance 从未真正执行
+ * （历史 bug：getDeviceId() 一直返回 source='none'）。
+ */
+function probeSources(): ProbeResult {
+  const empty: ProbeResult = { board: '', disk: '', bios: '', machine: '', osName: '', osVersion: '' };
   if (process.platform !== 'win32') return empty;
   const ps = [
-    '-NoProfile -Command',
+    // Windows PowerShell 5.1 默认按控制台代码页（简中为 GBK）写 stdout，
+    // Node 按 UTF-8 解码会把中文系统名变成乱码 → 强制 UTF-8 输出
+    '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;',
     "$ErrorActionPreference='SilentlyContinue';",
     '$b=(Get-CimInstance Win32_ComputerSystemProduct).UUID;',
     '$d=(Get-CimInstance Win32_DiskDrive|Select-Object -First 1).SerialNumber;',
     '$i=(Get-CimInstance Win32_BIOS).SerialNumber;',
     "$g=(Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography').MachineGuid;",
-    '[pscustomobject]@{board=[string]$b;disk=[string]$d;bios=[string]$i;machine=[string]$g}|ConvertTo-Json -Compress',
+    '$o=Get-CimInstance Win32_OperatingSystem;',
+    '[pscustomobject]@{board=[string]$b;disk=[string]$d;bios=[string]$i;machine=[string]$g;osName=[string]$o.Caption;osVersion=[string]$o.Version}|ConvertTo-Json -Compress',
   ].join(' ');
   try {
-    const output = execSync(`powershell ${ps}`, { encoding: 'utf-8', timeout: 8000, windowsHide: true });
+    const output = execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      encoding: 'utf-8',
+      timeout: 8000,
+      windowsHide: true,
+    });
     const parsed = JSON.parse(output.trim() || '{}');
     return {
       board: String(parsed.board ?? ''),
       disk: String(parsed.disk ?? ''),
       bios: String(parsed.bios ?? ''),
       machine: String(parsed.machine ?? ''),
+      osName: String(parsed.osName ?? ''),
+      osVersion: String(parsed.osVersion ?? ''),
     };
   } catch {
     return empty;
   }
+}
+
+let probed: ProbeResult | null = null;
+
+/** 进程内缓存的原始探测结果（只探测一次） */
+function probe(): ProbeResult {
+  if (!probed) probed = probeSources();
+  return probed;
 }
 
 /** 32 位十六进制 → UUID 样式（8-4-4-4-12，小写） */
@@ -88,7 +125,7 @@ let cached: DeviceIdentity | null = null;
 export function getDeviceId(): DeviceIdentity {
   if (cached) return cached;
 
-  const { board, disk, bios, machine } = probeSources();
+  const { board, disk, bios, machine } = probe();
 
   let seed: string | undefined;
   let source: DeviceIdSource = 'none';
@@ -113,7 +150,55 @@ export function getDeviceId(): DeviceIdentity {
   return cached;
 }
 
+export type SmbiosUuidSource = 'smbios' | 'fingerprint' | 'none';
+
+export interface SmbiosUuidResult {
+  /** Account API 设备上报用的 uuid（1..128 字符） */
+  uuid: string;
+  source: SmbiosUuidSource;
+}
+
+/**
+ * SMBIOS UUID（Account API /api/v1/device/report 的 uuid 字段）。
+ *
+ * 与 getDeviceId() 的哈希指纹不同：这里返回**原始** SMBIOS UUID
+ * （Win32_ComputerSystemProduct.UUID）。服务端不做严格 UUID 校验
+ * （真机上可能是全 F 或异常串），只要求 trim 后 1..128 字符，故这里
+ * 不做合法性过滤，仅去除首尾空白并截断超长值。
+ *
+ * 兜底：SMBIOS UUID 不可用时回退哈希指纹（保证上报流程仍可完成）。
+ */
+export function getSmbiosUuid(): SmbiosUuidResult {
+  const raw = probe().board.trim();
+  if (raw) {
+    return { uuid: raw.slice(0, 128), source: 'smbios' };
+  }
+  const fallback = getDeviceId().deviceId;
+  if (fallback) {
+    return { uuid: fallback.slice(0, 128), source: 'fingerprint' };
+  }
+  return { uuid: '', source: 'none' };
+}
+
+/** 操作系统名称与版本（设备上报用；非 Windows 平台回退 Node os 模块） */
+export function getOsInfo(): { name: string; version: string } {
+  const { osName, osVersion } = probe();
+  if (osName || osVersion) {
+    return { name: osName.slice(0, 64), version: osVersion.slice(0, 64) };
+  }
+  const type =
+    process.platform === 'win32'
+      ? 'Windows'
+      : process.platform === 'darwin'
+        ? 'macOS'
+        : process.platform === 'linux'
+          ? 'Linux'
+          : process.platform;
+  return { name: type.slice(0, 64), version: os.release().slice(0, 64) };
+}
+
 /** 调试用：清空缓存（下次调用重新探测） */
 export function resetDeviceIdCache(): void {
   cached = null;
+  probed = null;
 }

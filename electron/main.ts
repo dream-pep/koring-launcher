@@ -13,6 +13,8 @@ import { registerSystemHandlers } from './handlers/system';
 import { registerWindowHandlers } from './handlers/window';
 import { registerCrashHandlers, setupCrashListeners, testCrashDialog } from './handlers/crash-monitor';
 import { registerKoringAuthHandlers } from './handlers/koring-auth';
+import { registerLauncherApiHandlers } from './handlers/launcher-api';
+import { startupCheck } from './core/launcher-api';
 import { registerJavaHandlers } from './handlers/java';
 import { registerUpdateHandlers } from './handlers/update';
 import { updateService } from './updater';
@@ -20,11 +22,16 @@ import { saveConfig, configExists, getConfig, flushConfig, configPath } from './
 import { findCachedBackgroundRaw, optimizeBackgroundFile, recoverBackgroundFromDataUrl } from './core/background-image';
 import { registerResourceSchemePrivileges, registerResourceProtocol } from './resource-protocol';
 import { createLogger, setDebugModeProvider, installIpcLogging, registerRendererLogBridge } from './core/logger';
+import { loadEnv } from './core/env';
 import { dataBasePath } from './core/paths';
 
 const { app } = electron;
 
 const isDev = !app.isPackaged;
+
+// 环境变量（.env）最先加载：Account API 的地址与密钥、OIDC 端点等都从这里读取；
+// 真实操作系统环境变量优先级更高（CI / 运维注入不会被文件覆盖）
+loadEnv();
 
 // 统一日志：debug 模式（config.advanced.debugMode）→ 控制台 + userData/koring.log；
 // dev（未打包）运行下直接写进程 stdout/stderr，日志实时输出到启动它的终端；否则仅控制台
@@ -223,6 +230,7 @@ function registerAllHandlers() {
   registerWindowHandlers(win);
   registerCrashHandlers();
   registerKoringAuthHandlers();
+  registerLauncherApiHandlers();
   registerJavaHandlers();
   registerUpdateHandlers();
 }
@@ -244,6 +252,19 @@ app.whenReady().then(() => {
 
   // 旧配置中 background.image 若是 BASE64 dataURL → 落盘优化并改写为文件路径
   migrateBackgroundDataUrlToPath(config);
+
+  // 进程启动即做一次「设备 + 版本」校验（Account API）：结果进 30s 缓存，
+  // 渲染端挂载 ActivationGate 时立即拿到，黑名单/禁激活的阻断画面无需等待网络往返；
+  // 同时让日志在窗口出现前就留下这次校验的记录（失败不影响启动，交由渲染端提示）
+  void startupCheck()
+    .then((r) =>
+      log.info(
+        `[launcher-api] 启动校验：block=${r.block ?? 'none'} 设备=${r.device.ok ? '查询成功' : `失败(${r.device.error})`} ` +
+          `版本=${r.policy.ok ? '查询成功' : `失败(${r.policy.error})`} ` +
+          `开发者模式=${r.device.data?.developer_mode ? '开' : '关'}`,
+      ),
+    )
+    .catch((e) => log.warn(`[launcher-api] 启动校验异常：${String(e)}`));
 
   // 1. Show splash immediately
   win.splashWindow = createSplashWindow();

@@ -108,8 +108,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Config reset
   resetConfig: () => ipcRenderer.invoke('config:reset'),
 
+  // Koring Account 启动器 API（主进程发起：API KEY 与网络请求不下发到渲染层）
+  launcherEnvInfo: () => ipcRenderer.invoke('launcher-api:env-info'),
+  launcherDeviceCheck: () => ipcRenderer.invoke('launcher-api:device-check'),
+  launcherVersionPolicy: (version?: string) => ipcRenderer.invoke('launcher-api:version-policy', { version }),
+  launcherStartupCheck: (force = false) => ipcRenderer.invoke('launcher-api:startup-check', { force }),
+  launcherDeviceUuid: () => ipcRenderer.invoke('launcher-api:device-uuid'),
+  launcherDeviceStatus: () => ipcRenderer.invoke('launcher-api:device-status'),
+  launcherDeviceReport: () => ipcRenderer.invoke('launcher-api:device-report'),
+  launcherDeviceNotifications: () => ipcRenderer.invoke('launcher-api:device-notifications'),
+
   // Auto-update (main process: electron/updater.ts)
-  checkForUpdates: (manual = false) => ipcRenderer.invoke('update:check', { manual }),
+  checkForUpdates: (manual = false, targetVersion?: string) => ipcRenderer.invoke('update:check', { manual, targetVersion }),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   pauseUpdate: () => ipcRenderer.invoke('update:pause'),
   resumeUpdate: () => ipcRenderer.invoke('update:resume'),

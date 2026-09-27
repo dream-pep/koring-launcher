@@ -10,8 +10,8 @@ export function OobeAboutVersion() {
   const navigate = useRouteStore((s) => s.navigate);
 
   const isTestBuild = BUILD_MODE === "dev" || BUILD_MODE === "beta";
-  // 与原本 step-version 的分流一致：测试版需先同意 Beta 测试协议
-  const nextRoute = isTestBuild ? "oobe/beta-test" : "oobe/finish";
+  // 测试版需先同意 Beta 测试协议；正式版直接进入版本激活校验（两者都必须经过）
+  const nextRoute = isTestBuild ? "oobe/beta-test" : "oobe/activation";
 
   return (
     <OobeLayout>

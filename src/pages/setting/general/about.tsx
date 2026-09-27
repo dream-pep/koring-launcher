@@ -51,7 +51,8 @@ export function AboutSetting() {
   const adv = useConfigStore((s) => s.config.advanced);
   const setAdvanced = useConfigStore((s) => s.setAdvanced);
 
-  // 设备识别码（组合指纹：主板/硬盘/BIOS → 回退系统安装标识）
+  // 设备识别码 = SMBIOS UUID（Account API 用来追踪本机的标识）；
+  // 取不到 SMBIOS 时主进程会回退到组合指纹，这里据实标注来源
   const [device, setDevice] = useState<DeviceIdentity | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +67,14 @@ export function AboutSetting() {
       cancelled = true;
     };
   }, []);
+
+  const deviceIdValue = device?.smbiosUuid || device?.deviceId || "—";
+  const deviceIdDesc =
+    device?.smbiosUuid
+      ? "设备追踪ID · SMBIOS UUID"
+      : device?.deviceId
+        ? "设备追踪ID · 设备指纹（未取到 SMBIOS UUID）"
+        : "设备追踪ID · SMBIOS UUID";
 
   // 更新通道（下拉框，选项来自主进程通道注册表）
   const [channels, setChannels] = useState<UpdateChannelDef[]>([]);
@@ -154,9 +163,9 @@ export function AboutSetting() {
               </SettingRow>
             </SettingCard>
             <SettingCard>
-              <SettingRow label="设备识别码" desc="设备追踪ID">
+              <SettingRow label="设备识别码" desc={deviceIdDesc}>
                 <span className="text-[13px] text-muted-foreground font-mono">
-                  {device?.deviceId ?? "—"}
+                  {deviceIdValue}
                 </span>
               </SettingRow>
             </SettingCard>

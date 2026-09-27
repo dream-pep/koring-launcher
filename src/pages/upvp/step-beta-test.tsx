@@ -72,7 +72,7 @@ export function UpvpBetaTest() {
         </label>
       </div>
 
-      <NextButton onClick={() => navigate("upvp/finish")} disabled={!checked} />
+      <NextButton onClick={() => navigate("upvp/activation")} disabled={!checked} />
     </UpvpLayout>
   );
 }

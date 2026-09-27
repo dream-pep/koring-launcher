@@ -13,6 +13,7 @@ import {
   type DownloadConfig,
   type NetworkConfig,
   type UiConfig,
+  type ActivationConfig,
   type InstanceMeta,
 } from "@/api/config";
 import { DEFAULT_BG } from "@/lib/mode";
@@ -42,6 +43,7 @@ interface ConfigState {
   setDownload: (patch: Partial<DownloadConfig>) => void;
   setNetwork: (patch: Partial<NetworkConfig>) => void;
   setUi: (patch: Partial<UiConfig>) => void;
+  setActivation: (patch: Partial<ActivationConfig>) => void;
   setInstances: (instances: InstanceMeta[]) => void;
   setOobe: (value: boolean) => void;
   /** 记录当前应用版本号到配置（升级引导完成后由 upvp 流程写入） */
@@ -62,6 +64,7 @@ const DEFAULT_CONFIG: AppConfig = {
   download: { fileSource: "mirror", versionSource: "mirror", threads: 16, speedLimit: 0 },
   network: { securityId: { enabled: false, authUrl: "" } },
   ui: { showInstanceTitle: true, showTaskButton: true },
+  activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: "", reason: "", upgradeTarget: "" },
   update: { state: "idle", version: "", percent: 0, transferred: 0, total: 0, source: "github", channel: "woker", error: "" },
   instances: [],
 };
@@ -157,6 +160,12 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     const { config } = get();
     set({ config: { ...config, ui: { ...config.ui, ...patch } } });
     submit("ui", patch);
+  },
+
+  setActivation: (patch) => {
+    const { config } = get();
+    set({ config: { ...config, activation: { ...config.activation, ...patch } } });
+    submit("activation", patch);
   },
 
   setInstances: (instances) => {

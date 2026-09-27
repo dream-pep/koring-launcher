@@ -21,15 +21,18 @@
     "icon:dev": "node scripts/switch-icon.js dev",
     "icon:beta": "node scripts/switch-icon.js beta",
     "icon:run": "node scripts/switch-icon.js run",
+    "env:dev": "node scripts/gen-env.js dev",
+    "env:beta": "node scripts/gen-env.js beta",
+    "env:run": "node scripts/gen-env.js run",
     "version:set": "node scripts/version.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux",
-    "dist:dev": "pnpm build:dev && pnpm icon:dev && electron-builder --win",
-    "dist:beta": "pnpm build:beta && pnpm icon:beta && electron-builder --win",
-    "dist:run": "pnpm build:run && pnpm icon:run && electron-builder --win"
+    "dist:dev": "pnpm build:dev && pnpm icon:dev && pnpm env:dev && electron-builder --win",
+    "dist:beta": "pnpm build:beta && pnpm icon:beta && pnpm env:beta && electron-builder --win",
+    "dist:run": "pnpm build:run && pnpm icon:run && pnpm env:run && electron-builder --win"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { VersionCard } from "@/components/VersionCard";
 import { AboutVersion } from "@/components/about-version";
 import { SectionTitle, SettingCard } from "@/components/setting";
 import { Progress } from "@/components/ui/progress";
 import { BUILD_MODE } from "@/lib/mode";
+import { useConfigStore } from "@/stores/configStore";
 import {
   cancelUpdate,
   checkForUpdates,
@@ -17,7 +18,7 @@ import {
   type ReleaseNotesResult,
   type UpdateStatusPayload,
 } from "@/api/update";
-import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Link } from "@heroui/react";
 import { toast } from "sonner";
 import clsx from "clsx";
@@ -58,6 +59,9 @@ function formatMB(bytes?: number): string {
  * - 下载/安装进度由主进程写入 Koring.yml（update 段）
  */
 export function UpdatePage() {
+  // Account 版本策略要求的升级目标版本（由 OOBE 激活校验 / 启动门禁写入配置）
+  const upgradeTarget = useConfigStore((s) => s.config.activation.upgradeTarget);
+
   // 发布说明：notesTag 为空 = 当前版本；有可用更新后切到对应 tag
   const [notes, setNotes] = useState<ReleaseNotesResult | null>(null);
   const [notesLoading, setNotesLoading] = useState(true);
@@ -133,11 +137,19 @@ export function UpdatePage() {
 
   const handleCheck = async () => {
     try {
-      await checkForUpdates(true);
+      await checkForUpdates(true, upgradeTarget || undefined);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     }
   };
+
+  // 强制升级引导：进入本页且有目标版本时自动按目标版本检查一次（避免用户还要手点）
+  const autoChecked = useRef(false);
+  useEffect(() => {
+    if (autoChecked.current || !upgradeTarget) return;
+    autoChecked.current = true;
+    checkForUpdates(true, upgradeTarget).catch(() => {});
+  }, [upgradeTarget]);
 
   const handleDownload = async () => {
     try {
@@ -208,6 +220,19 @@ export function UpdatePage() {
   return (
     <div className="max-w-3xl mx-auto p-6 md:p-8 pb-44">
       <div className="space-y-6">
+        {/* 强制升级提示（Account 版本策略要求，非用户可跳过的更新） */}
+        {upgradeTarget && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+            <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+            <div className="text-[13px] leading-relaxed text-foreground/80">
+              <p className="font-medium text-foreground">需要升级至 v{upgradeTarget}</p>
+              <p className="mt-0.5 text-muted-foreground">
+                当前版本已被要求升级，请下载并安装 v{upgradeTarget}（或更高）后才能继续使用。
+              </p>
+            </div>
+          </div>
+        )}
+
         <VersionCard />
 
         {/* 版本卡片下方：当前版本更新内容速览（分类卡片） */}

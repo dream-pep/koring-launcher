@@ -12,6 +12,8 @@ interface WindowControlsProps {
   showClose?: boolean;
   isSub?: boolean;
   isOobe?: boolean;
+  /** 阻断态页面（设备异常）：不显示任务队列与信息按钮 */
+  isBlocked?: boolean;
 }
 
 export function WindowControls({
@@ -20,6 +22,7 @@ export function WindowControls({
   showClose = true,
   isSub = false,
   isOobe = false,
+  isBlocked = false,
 }: WindowControlsProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const navigate = useRouteStore((s) => s.navigate);
@@ -44,8 +47,8 @@ export function WindowControls({
   const showBadge = BUILD_MODE !== "run";
   const badgeLabel = BUILD_MODE === "dev" ? "DEV" : "BETA";
 
-  const showTask = !isSub && !isOobe && showTaskButton;
-  const showInfo = isOobe;
+  const showTask = !isSub && !isOobe && !isBlocked && showTaskButton;
+  const showInfo = isOobe && !isBlocked;
 
   return (
     <div className="flex items-center gap-0.5 pr-2" style={noDrag}>

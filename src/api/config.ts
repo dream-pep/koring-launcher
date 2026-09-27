@@ -65,6 +65,16 @@ export interface UiConfig {
   showTaskButton: boolean;
 }
 
+/** 激活状态（OOBE / 启动校验结果，见 electron/config.ts 同名段） */
+export interface ActivationConfig {
+  versionOk: boolean;
+  deviceOk: boolean;
+  checkedAt: number;
+  version: string;
+  reason: string;
+  upgradeTarget: string;
+}
+
 export interface DownloadConfig {
   fileSource: string;
   versionSource: string;
@@ -120,6 +130,7 @@ export interface AppConfig {
   download: DownloadConfig;
   network: NetworkConfig;
   ui: UiConfig;
+  activation: ActivationConfig;
   update: UpdateConfig;
   instances: InstanceMeta[];
 }

@@ -32,7 +32,8 @@ export function UpvpCheck() {
   }, [appVersion]);
 
   const isTestBuild = BUILD_MODE === "dev" || BUILD_MODE === "beta";
-  const nextRoute = isTestBuild ? "upvp/beta-test" : "upvp/finish";
+  // 与 OOBE 一致：测试版先同意 Beta 测试协议再校验版本；正式版直接进入版本激活校验
+  const nextRoute = isTestBuild ? "upvp/beta-test" : "upvp/activation";
 
   return (
     <UpvpLayout>

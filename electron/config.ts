@@ -89,6 +89,25 @@ export interface UiConfig {
   showTaskButton: boolean;
 }
 
+/**
+ * 激活状态（OOBE / 启动校验结果落盘）：
+ * - versionOk：版本策略校验通过（未被禁激活、无强制升级）
+ * - deviceOk：设备已登记且未被拉黑
+ * 两者同时为真才算「完成激活」（step-finish 与启动门禁据此放行）。
+ */
+export interface ActivationConfig {
+  versionOk: boolean;
+  deviceOk: boolean;
+  /** 最近一次校验时间戳（ms） */
+  checkedAt: number;
+  /** 最近一次校验时的程序版本 */
+  version: string;
+  /** 最近一次禁激活 / 黑名单原因（展示用） */
+  reason: string;
+  /** 最近一次版本策略要求的升级目标版本（供更新页优先选用） */
+  upgradeTarget: string;
+}
+
 export interface DownloadConfig {
   fileSource: string;
   versionSource: string;
@@ -150,6 +169,7 @@ export interface AppConfig {
   download: DownloadConfig;
   network: NetworkConfig;
   ui: UiConfig;
+  activation: ActivationConfig;
   update: UpdateConfig;
   instances: InstanceMeta[];
 }
@@ -168,6 +188,7 @@ const DEFAULTS: AppConfig = {
   download: { fileSource: 'mirror', versionSource: 'mirror', threads: 16, speedLimit: 0 },
   network: { securityId: { enabled: false, authUrl: '' } },
   ui: { showInstanceTitle: true, showTaskButton: true },
+  activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: '', reason: '', upgradeTarget: '' },
   update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', channel: 'woker', error: '' },
   instances: [],
 };

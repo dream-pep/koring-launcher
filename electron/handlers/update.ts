@@ -17,9 +17,9 @@ export function registerUpdateHandlers() {
     }
   });
 
-  ipcMain.handle('update:check', async (_event, payload?: { manual?: boolean }) => {
+  ipcMain.handle('update:check', async (_event, payload?: { manual?: boolean; targetVersion?: string }) => {
     try {
-      const state = await updateService.check(payload?.manual === true);
+      const state = await updateService.check(payload?.manual === true, payload?.targetVersion);
       return { success: true, data: state, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };

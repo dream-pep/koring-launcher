@@ -4,6 +4,7 @@ import { SystemLayer } from "@/components/system/SystemLayer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 import { RuntimeNotices } from "@/components/RuntimeNotices";
+import { ActivationGate } from "@/components/ActivationGate";
 import { Toaster } from "sonner";
 import { useA11yStore } from "@/stores/a11yStore";
 import clsx from "clsx";
@@ -62,6 +63,9 @@ export function RootLayout({
 
       {/* 运行时提示（Linux AppImage 未解包安装等） */}
       <RuntimeNotices />
+
+      {/* 启动通知（设备 + 版本）与激活门禁（黑名单 / 禁激活 / 强制升级） */}
+      <ActivationGate />
 
       {/* Sonner toaster */}
       <Toaster

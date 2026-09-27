@@ -1,5 +1,5 @@
 import { useRouteStore } from "@/stores/routeStore";
-import { Waypoints, Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle, RefreshCw, SquareTerminal, MemoryStick } from "lucide-react";
+import { Waypoints, Monitor, Paintbrush, CreditCard, ListTodo, ChevronRight, FlaskConical, Rocket, AlertTriangle, RefreshCw, SquareTerminal, MemoryStick, ShieldCheck } from "lucide-react";
 
 const debugPages = [
   {
@@ -17,6 +17,14 @@ const debugPages = [
     desc: "设置测试版本号、检查更新、获取发布说明、版本比对与下载",
     color: "text-emerald-500",
     bg: "bg-emerald-500/10",
+  },
+  {
+    key: "debug-activation" as const,
+    icon: ShieldCheck,
+    title: "激活校验测试",
+    desc: "设备状态/上报、版本策略、启动门禁的直调与校验页预览（Account API）",
+    color: "text-orange-500",
+    bg: "bg-orange-500/10",
   },
   {
     key: "debug-crash" as const,

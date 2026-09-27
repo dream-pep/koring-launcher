@@ -15,7 +15,7 @@ export function UpvpComplete() {
         <p className="text-sm text-muted-foreground">Koring Launcher 已成功更新，来了解一下新的改动吧！</p>
       </div>
 
-      <NextButton onClick={() => navigate("upvp/version")} />
+      <NextButton onClick={() => navigate("upvp/device")} />
     </UpvpLayout>
   );
 }

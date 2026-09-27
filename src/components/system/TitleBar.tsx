@@ -21,9 +21,11 @@ export function TitleBar({
   const isSub = titleBarMode === "sub";
   const isDefault = titleBarMode === "default";
   const isOobe = titleBarMode === "oobe";
+  const isBlocked = titleBarMode === "blocked";
 
   const currentRoute = allRoutes.find((r) => r.key === current);
-  const showBack = isSub || (isOobe && currentRoute?.backable);
+  // blocked（设备异常页）不提供返回入口：该状态不允许离开
+  const showBack = !isBlocked && (isSub || (isOobe && currentRoute?.backable));
 
   const currentIdx = routes.findIndex((r) => r.key === current);
 
@@ -240,6 +242,7 @@ export function TitleBar({
           showClose={showClose}
           isSub={isSub}
           isOobe={isOobe}
+          isBlocked={isBlocked}
         />
       </div>
     </div>

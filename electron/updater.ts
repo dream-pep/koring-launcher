@@ -157,7 +157,7 @@ function isCandidateAllowed(tag: string, allowPrerelease: boolean): boolean {
  * 旧格式（-beta.N）按构建号参与排序（使旧版安装也能升级到新格式/更高构建号），
  * 但不会作为候选被选中（见 isCandidateAllowed）。
  */
-function compareVersionTags(a: string, b: string): number {
+export function compareVersionTags(a: string, b: string): number {
   const pa = parseTag(a);
   const pb = parseTag(b);
   for (let i = 0; i < 3; i++) {
@@ -491,8 +491,11 @@ class UpdateService {
    * 3. 按项目版本序挑出"比当前新"的最新 tag → 指向该 tag 的 generic feed 走 electron-updater
    *    （下载/校验/安装链路复用）；版本序复核通过才判 available。
    * 不依赖 electron-updater 的 GitHub 频道循环（新格式 -N.beta 会被其当作自定义频道）。
+   *
+   * preferredVersion（可选）：Account 版本策略要求的升级目标版本；候选里存在同构建号
+   * 的 tag 时优先选它（保证「升级至要求版本」），否则退回按版本序取最新候选。
    */
-  async check(manual = false): Promise<UpdateStatusPayload> {
+  async check(manual = false, preferredVersion?: string): Promise<UpdateStatusPayload> {
     if (!this.ready) return this.buildPayload();
     if (['downloading', 'paused', 'downloaded', 'installing'].includes(this.state)) {
       return this.buildPayload(); // 已有更新在进行中/已完成
@@ -512,7 +515,7 @@ class UpdateService {
     for (const { label, base } of sources) {
       try {
         const candidates = await this.fetchCandidates(base);
-        const tag = this.pickCandidate(candidates, allowPrerelease);
+        const tag = this.pickCandidate(candidates, allowPrerelease, preferredVersion);
         if (!tag) {
           log.info(`[updater] ${label}: 无符合条件的更新候选（通道/格式/版本序）`);
           continue; // 该源没有更新，尝试下一个源
@@ -590,12 +593,26 @@ class UpdateService {
     return candidates;
   }
 
-  /** 从候选里挑出允许当前通道、且按项目版本序比当前更新的最新 tag；没有返回 null */
-  private pickCandidate(candidates: string[], allowPrerelease: boolean): string | null {
+  /**
+   * 从候选里挑出允许当前通道、且按项目版本序比当前更新的最新 tag；没有返回 null。
+   * preferredVersion 命中时优先返回该候选（Account 要求的升级目标版本）。
+   */
+  private pickCandidate(candidates: string[], allowPrerelease: boolean, preferredVersion?: string): string | null {
     const allowed = candidates
       .filter((c) => isCandidateAllowed(c, allowPrerelease))
       .filter((c) => compareVersionTags(c, this.currentVersion) > 0);
     if (allowed.length === 0) return null;
+
+    const preferred = preferredVersion?.trim().replace(/^v/i, '');
+    if (preferred) {
+      const matched = allowed.find((c) => compareVersionTags(c.replace(/^v/i, ''), preferred) === 0);
+      if (matched) {
+        log.info(`[updater] 命中版本策略要求的升级目标 ${matched}`);
+        return matched;
+      }
+      log.warn(`[updater] 候选里没有版本策略要求的目标 ${preferredVersion}，退回最新候选`);
+    }
+
     allowed.sort(compareVersionTags);
     return allowed[allowed.length - 1];
   }

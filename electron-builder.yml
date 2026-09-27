@@ -12,6 +12,12 @@ asar: true
 files:
   - dist/**
   - electron-dist/**/*.js
+# 主进程环境变量（Account API 地址 / 密钥等）：由 scripts/gen-env.js 按构建模式生成
+# build/.env，复制为 resources/.env；运行时读取 <resources>/.env 与 <userData>/.env
+# （现场覆盖），见 electron/core/env.ts
+extraResources:
+  - from: build/.env
+    to: .env
 win:
   target: nsis
   icon: build/icon.ico

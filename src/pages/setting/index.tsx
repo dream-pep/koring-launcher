@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useEffect, type ReactNode } from "react";
 import {
   Home,
   Info,
@@ -20,6 +20,7 @@ import {
   Code,
 } from "lucide-react";
 import { useRouteStore } from "@/stores/routeStore";
+import { useDeveloperModeStore, refreshDeveloperMode } from "@/stores/developerModeStore";
 
 import { HomeSetting } from "./general/home";
 // import { AccountSetting } from "./general/account";  // Koring 账户（暂时隐藏）
@@ -58,6 +59,7 @@ const iconCls = "w-[18px] h-[18px] shrink-0";
 function buildMenuData(
   switchPage: (key: string) => void,
   routeNavigate: (key: any) => void,
+  developerMode: boolean,
 ): MenuGroup[] {
   return [
     {
@@ -102,7 +104,10 @@ function buildMenuData(
       items: [
         { key: "feedback", label: "服务与反馈", icon: <MessageSquareHeart className={iconCls} />, component: <FeedbackSetting /> },
         { key: "sponsor", label: "赞助我们", icon: <Heart className={iconCls} />, component: <SponsorSetting /> },
-        { key: "developer", label: "开发者选项", icon: <Code className={iconCls} />, onSelect: () => routeNavigate("debug") },
+        // 「开发者选项」由服务端下发：设备接口 data.developer_mode === true 才显示
+        ...(developerMode
+          ? [{ key: "developer", label: "开发者选项", icon: <Code className={iconCls} />, onSelect: () => routeNavigate("debug") }]
+          : []),
       ],
     },
   ];
@@ -115,6 +120,13 @@ export function Setting() {
   // 避免每个子页的 VersionCard/Silk、发布说明请求等重活反复执行；隐藏页不卸载。
   const [visited, setVisited] = useState<Record<string, boolean>>({ home: true });
   const routeNavigate = useRouteStore((s) => s.navigate);
+  // 服务端下发的开发者模式（设备接口 data.developer_mode）；false 时隐藏「开发者选项」入口
+  const developerMode = useDeveloperModeStore((s) => s.enabled);
+
+  // 进入设置页时按需复查一次（冷却 5 分钟，超时才真正发请求；见 developerModeStore）
+  useEffect(() => {
+    void refreshDeveloperMode();
+  }, []);
 
   const switchPage = useCallback((key: string) => {
     setSelected((prev) => {
@@ -135,7 +147,7 @@ export function Setting() {
     }
   }, [switchPage]);
 
-  const menuData = buildMenuData(switchPage, routeNavigate);
+  const menuData = buildMenuData(switchPage, routeNavigate, developerMode);
   const allItems = menuData.flatMap((g) => g.items);
   const cachedItems = allItems.filter((i) => visited[i.key]);
 

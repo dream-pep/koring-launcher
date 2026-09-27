@@ -1,13 +1,32 @@
 import * as https from 'https';
 import { readAuth, writeAuth } from '../auth';
 import { createLogger } from './logger';
+import { getEnv, getEnvBase } from './env';
 
 const log = createLogger('core/koring-auth');
 
 const CLIENT_ID = '547qe8ky1pr69f08b71kj';
-const DEVICE_AUTH_URL = 'https://oac.lingke.ink/oidc/device/auth';
-const TOKEN_URL = 'https://oac.lingke.ink/oidc/token';
 const SCOPE = 'openid offline_access profile';
+
+/**
+ * OIDC 设备码端点基址（来自环境变量，不写死在代码里）：
+ *   KORING_API_BASE   服务地址，如 https://account.koring.space
+ *   KORING_OIDC_BASE  可选：直接指定 OIDC 基址；默认 `${KORING_API_BASE}/api/v1/oidc`
+ *
+ * ⚠️ 实测（2026-09-26）：新 API 域名上 **不带版本号** 的 `/oidc/*` 会 308 重定向到
+ * https://account.koring.space/oidc/*（Node 侧 https.request 不跟随重定向，会直接失败），
+ * 可用路径是带版本号的别名 `/api/v1/oidc/*`（与文档 §0 的说明一致）。
+ * 需要指回旧服务（只有不带版本号的路径）时用 KORING_OIDC_BASE 覆盖。
+ */
+function oidcBase(): string {
+  const override = getEnvBase('KORING_OIDC_BASE');
+  if (override) return override;
+  const base = getEnvBase('KORING_API_BASE');
+  if (!base) {
+    throw new Error('未配置 KORING_API_BASE（Koring Account 服务地址），请检查 .env 文件');
+  }
+  return `${base}/api/v1/oidc`;
+}
 
 export interface DeviceAuthResponse {
   device_code: string;
@@ -58,7 +77,16 @@ function postForm(url: string, data: Record<string, string>): Promise<any> {
         res.on('end', () => {
           log.info(`[koring-auth] response (${res.statusCode}): ${raw}`);
           try {
-            resolve(JSON.parse(raw));
+            const parsed = JSON.parse(raw);
+            // 兼容两种响应形状：新 Account 服务的 OIDC 端点在成功时用统一信封
+            // （{ok:true,data:{…}}，见 docs/LAUNCHER-API.MD §5.2/§5.3），
+            // 旧服务与失败响应是裸 JSON（{device_code…} / {error…}）。
+            // 这里统一拆包，调用方逻辑无需区分。
+            if (parsed && typeof parsed === 'object' && parsed.ok === true && parsed.data && typeof parsed.data === 'object') {
+              resolve(parsed.data);
+              return;
+            }
+            resolve(parsed);
           } catch {
             reject(new Error(`Invalid response: ${raw}`));
           }
@@ -82,7 +110,7 @@ function parseJwt(token: string): Record<string, unknown> {
 }
 
 export async function requestDeviceCode(): Promise<DeviceAuthResponse> {
-  const res = await postForm(DEVICE_AUTH_URL, {
+  const res = await postForm(`${oidcBase()}/device/auth`, {
     client_id: CLIENT_ID,
     scope: SCOPE,
   });
@@ -93,7 +121,7 @@ export async function requestDeviceCode(): Promise<DeviceAuthResponse> {
 export async function pollForTokenOnce(
   device_code: string
 ): Promise<TokenResponse> {
-  const res = await postForm(TOKEN_URL, {
+  const res = await postForm(`${oidcBase()}/token`, {
     client_id: CLIENT_ID,
     grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
     device_code,
@@ -112,7 +140,7 @@ export async function pollForTokenOnce(
 }
 
 export async function refreshAccessToken(refresh_token: string): Promise<TokenResponse> {
-  const res = await postForm(TOKEN_URL, {
+  const res = await postForm(`${oidcBase()}/token`, {
     client_id: CLIENT_ID,
     grant_type: 'refresh_token',
     refresh_token,

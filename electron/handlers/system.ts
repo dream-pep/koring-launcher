@@ -1,7 +1,7 @@
 import electron from 'electron';
 import { execSync } from 'child_process';
 import * as os from 'os';
-import { getDeviceId } from '../core/device-id';
+import { getDeviceId, getSmbiosUuid } from '../core/device-id';
 
 const { ipcMain, app, shell } = electron;
 
@@ -69,11 +69,23 @@ export function registerSystemHandlers() {
     }
   });
 
-  // 设备唯一标识（组合指纹 + 回退 MachineGuid；进程内缓存，首次调用探测一次）
+  // 设备唯一标识：
+  // - smbiosUuid：原始 SMBIOS UUID（Account API 设备上报/追踪用的 uuid）
+  // - deviceId  ：组合指纹哈希（主板/硬盘/BIOS → 回退 MachineGuid），SMBIOS 缺失时的兜底
+  // 进程内缓存，首次调用探测一次
   ipcMain.handle('system:deviceId', () => {
     try {
       const identity = getDeviceId();
-      return { success: true, data: identity, error: null };
+      const smbios = getSmbiosUuid();
+      return {
+        success: true,
+        data: {
+          ...identity,
+          smbiosUuid: smbios.uuid || null,
+          smbiosSource: smbios.source,
+        },
+        error: null,
+      };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }

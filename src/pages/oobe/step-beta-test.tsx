@@ -71,7 +71,7 @@ export function OobeBetaTest() {
         </label>
       </div>
 
-      <NextButton onClick={() => navigate("oobe/finish")} disabled={!checked} />
+      <NextButton onClick={() => navigate("oobe/activation")} disabled={!checked} />
     </OobeLayout>
   );
 }

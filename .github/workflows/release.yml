@@ -141,9 +141,11 @@ jobs:
           if ("${{ inputs.mode }}" -eq "beta") {
             pnpm build:beta
             pnpm icon:beta
+            pnpm env:beta
           } else {
             pnpm build:run
             pnpm icon:run
+            pnpm env:run
           }
 
       # 关键步骤：win.sign 自定义签名（SignPath）在打包过程中逐个签名内部 exe 与 setup.exe
@@ -263,9 +265,11 @@ jobs:
           if ("${{ inputs.mode }}" -eq "beta") {
             pnpm build:beta
             pnpm icon:beta
+            pnpm env:beta
           } else {
             pnpm build:run
             pnpm icon:run
+            pnpm env:run
           }
 
       - name: Package AppImage

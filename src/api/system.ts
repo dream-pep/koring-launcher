@@ -11,10 +11,17 @@ export async function getSystemInfo(): Promise<SystemInfo> {
   return ipcInvoke<SystemInfo>('system:info');
 }
 
-/** 设备唯一标识（组合指纹 + 回退 MachineGuid） */
+/**
+ * 设备标识：
+ * - smbiosUuid：原始 SMBIOS UUID（Account API 设备上报 / 设备追踪用的标识）
+ * - deviceId  ：组合指纹哈希（主板/硬盘/BIOS → 回退系统安装标识），SMBIOS 缺失时的兜底
+ */
 export interface DeviceIdentity {
   deviceId: string | null;
   source: 'board' | 'disk' | 'bios' | 'machine' | 'none';
+  /** 原始 SMBIOS UUID；取不到时为 null */
+  smbiosUuid: string | null;
+  smbiosSource: 'smbios' | 'fingerprint' | 'none';
 }
 
 export async function getDeviceId(): Promise<DeviceIdentity> {

@@ -28,6 +28,7 @@ pnpm dist:run           # production icon + Windows installer
 - **IPC handlers**: All handlers are in `electron/handlers/` directory.
 - **Mutable win ref**: `electron/main.ts` uses a mutable `win` object — handlers read `win.mainWindow` at runtime, not at registration time.
 - **Config**: YAML format (`Koring.yml`) stored in userData (packaged) / project root (dev). Sparse save (only non-default values). ⚠️ 不可放安装目录：NSIS 重装/升级会经旧卸载器删除整个安装目录。
+- **Env (主进程)**: Vite 只把 `VITE_*` 注入渲染端；主进程的环境变量由 `electron/core/env.ts` 读取 —— dev 读 `.env` → `.env.development` → `.env.local`，打包读 `<resources>/.env` → `<userData>/.env`（现场覆盖）。`<resources>/.env` 由 `scripts/gen-env.js <dev|beta|run>` 按模式生成（`.env` → `.env.<development|beta|production>` → `.env.local`），已挂在 `dist:*` 与发布 workflow 上。Account API 的 `KORING_API_BASE` / `KORING_API_KEY` / `KORING_OIDC_BASE` 走这套机制，不写死在代码里。真实操作系统环境变量优先级最高。
 - **Auth**: JSON file (`koring-auth.json`) stored in userData (packaged) / project root (dev).
 - **Path alias**: `@/` maps to `src/` (configured in `vite.config.ts` and `tsconfig.json`).
 - **Dev mode**: Vite runs on port 1420, Electron loads from localhost.

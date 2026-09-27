@@ -17,31 +17,37 @@ import { SettingLogin } from "./pages/setting/login";
 import { TaskQueue } from "./pages/task-queue";
 import { GalleryPlaceholder, StorePlaceholder } from "./pages/placeholder";
 import { UpdatePage } from "./pages/update";
+import { DeviceBlocked } from "./pages/device-blocked";
 import { Debug } from "./pages/debug";
 import { SplashDebug } from "./pages/debug/splash-debug";
 import { DisplayDebug } from "./pages/debug/display-debug";
 import { VersionCardDebug } from "./pages/debug/version-card-debug";
 import { UpdateDebug } from "./pages/debug/update-debug";
 import { TaskDebug } from "./pages/debug/task-debug";
+import { ActivationDebug } from "./pages/debug/activation-debug";
 import { CrashDebug } from "./pages/debug/crash-debug";
 import { ResourceDebug } from "./pages/debug/resource-debug";
 import { RoutesDebug } from "./pages/debug/routes-debug";
 import { Oobe } from "./pages/oobe";
 import { OobeLanguage } from "./pages/oobe/step-language";
+import { OobeDevice } from "./pages/oobe/step-device";
 import { OobeAgreement } from "./pages/oobe/step-agreement";
 import { OobeLogin } from "./pages/oobe/step-login";
 import { OobeWelcome } from "./pages/oobe/step-welcome";
 import { OobeVersion } from "./pages/oobe/step-version";
 import { OobeAboutVersion } from "./pages/oobe/about-version";
 import { OobeBetaTest } from "./pages/oobe/step-beta-test";
+import { OobeActivation } from "./pages/oobe/step-activation";
 import { OobeFinish } from "./pages/oobe/step-finish";
 import { OobeLegal } from "./pages/oobe/step-legal";
 import { OobeAboutInfo } from "./pages/oobe/about-info";
 import { UpvpComplete } from "./pages/upvp/step-complete";
+import { UpvpDevice } from "./pages/upvp/step-device";
 import { UpvpVersion } from "./pages/upvp/step-version";
 import { UpvpAboutVersion } from "./pages/upvp/about-version";
 import { UpvpCheck } from "./pages/upvp/step-check";
 import { UpvpBetaTest } from "./pages/upvp/step-beta-test";
+import { UpvpActivation } from "./pages/upvp/step-activation";
 import { UpvpFinish } from "./pages/upvp/step-finish";
 import { VERSION } from "./lib/version";
 
@@ -55,23 +61,28 @@ const pageMap = {
   gallery: GalleryPlaceholder,
   "task-queue": TaskQueue,
   update: UpdatePage,
+  "device-blocked": DeviceBlocked,
   oobe: Oobe,
   "oobe/language": OobeLanguage,
+  "oobe/device": OobeDevice,
   "oobe/agreement": OobeAgreement,
   "oobe/login": OobeLogin,
   "oobe/welcome": OobeWelcome,
   "oobe/version": OobeVersion,
   "oobe/about-version": OobeAboutVersion,
   "oobe/beta-test": OobeBetaTest,
+  "oobe/activation": OobeActivation,
   "oobe/finish": OobeFinish,
   "oobe/about-info": OobeAboutInfo,
   "oobe/legal": OobeLegal,
   upvp: UpvpComplete,
   "upvp/complete": UpvpComplete,
+  "upvp/device": UpvpDevice,
   "upvp/version": UpvpVersion,
   "upvp/about-version": UpvpAboutVersion,
   "upvp/check": UpvpCheck,
   "upvp/beta-test": UpvpBetaTest,
+  "upvp/activation": UpvpActivation,
   "upvp/finish": UpvpFinish,
   debug: Debug,
   "debug-splash": SplashDebug,
@@ -79,6 +90,7 @@ const pageMap = {
   "debug-version-card": VersionCardDebug,
   "debug-update": UpdateDebug,
   "debug-task": TaskDebug,
+  "debug-activation": ActivationDebug,
   "debug-crash": CrashDebug,
   "debug-resource": ResourceDebug,
   "debug-routes": RoutesDebug,
@@ -88,6 +100,8 @@ function App() {
   useTheme();
   const current = useRouteStore((s) => s.current);
   const Page = pageMap[current];
+  const configLoaded = useConfigStore((s) => s.loaded);
+  const oobePending = useConfigStore((s) => s.config.oobe);
 
   useEffect(() => {
     let done = false;
@@ -170,6 +184,25 @@ function App() {
 
     return () => { unsub?.(); };
   }, []);
+
+  /**
+   * 强制必须完成 OOBE：config.oobe 为真（OOBE 未完成）时，任何非 OOBE / UPVP /
+   * 版本更新页 / 设备异常阻断页 / 调试页的路由都会被拉回 OOBE 起点。step-finish 的
+   * 「前往首页」会先 setOobe(false)（本地状态立即生效）再导航，因此正常结束流程不受影响。
+   */
+  useEffect(() => {
+    if (!configLoaded || !oobePending) return;
+    if (
+      current.startsWith("oobe") ||
+      current.startsWith("upvp") ||
+      current === "update" ||
+      current === "device-blocked" ||
+      current.startsWith("debug")
+    ) {
+      return;
+    }
+    useRouteStore.getState().navigate("oobe");
+  }, [current, configLoaded, oobePending]);
 
   return (
     <RootLayout>

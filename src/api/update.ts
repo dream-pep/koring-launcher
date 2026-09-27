@@ -63,9 +63,12 @@ export interface ReleaseNotesResult {
   isLatest: boolean;
 }
 
-/** 检查更新（manual=true 表示用户手动点击，前端不弹提示） */
-export const checkForUpdates = (manual = false): Promise<UpdateStatusPayload> =>
-  ipcInvoke<UpdateStatusPayload>("update:check", { manual });
+/**
+ * 检查更新（manual=true 表示用户手动点击，前端不弹提示）
+ * targetVersion：Account 版本策略要求的升级目标版本（有候选时优先选它）
+ */
+export const checkForUpdates = (manual = false, targetVersion?: string): Promise<UpdateStatusPayload> =>
+  ipcInvoke<UpdateStatusPayload>("update:check", { manual, targetVersion });
 
 /** 触发下载更新（进度经 update:status 事件上报）；paused 状态下调用即继续 */
 export const downloadUpdate = (): Promise<null> => ipcInvoke<null>("update:download");

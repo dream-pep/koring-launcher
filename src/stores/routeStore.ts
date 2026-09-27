@@ -10,12 +10,15 @@ export type RouteKey =
   | "gallery"
   | "task-queue"
   | "update"
+  | "device-blocked"
   | "oobe"
   | "oobe/language"
+  | "oobe/device"
   | "oobe/agreement"
   | "oobe/version"
   | "oobe/about-version"
   | "oobe/beta-test"
+  | "oobe/activation"
   | "oobe/login"
   | "oobe/welcome"
   | "oobe/finish"
@@ -23,10 +26,12 @@ export type RouteKey =
   | "oobe/legal"
   | "upvp"
   | "upvp/complete"
+  | "upvp/device"
   | "upvp/version"
   | "upvp/about-version"
   | "upvp/check"
   | "upvp/beta-test"
+  | "upvp/activation"
   | "upvp/finish"
   | "debug"
   | "debug-splash"
@@ -34,10 +39,11 @@ export type RouteKey =
   | "debug-version-card"
   | "debug-update"
   | "debug-task"
+  | "debug-activation"
   | "debug-resource"
   | "debug-crash"
   | "debug-routes";
-export type TitleBarMode = "default" | "sub" | "window" | "oobe";
+export type TitleBarMode = "default" | "sub" | "window" | "oobe" | "blocked";
 
 export type TransitionDirection = "forward" | "backward";
 
@@ -63,12 +69,15 @@ export const allRoutes: RouteItem[] = [
   { key: "setting/login", label: "登录", path: "/setting/login", hidden: true, backable: true },
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
   { key: "update", label: "更新日志", path: "/update", hidden: true, backable: true },
+  { key: "device-blocked", label: "设备异常", path: "/device-blocked", hidden: true },
   { key: "oobe", label: "OOBE", path: "/oobe", hidden: true },
   { key: "oobe/language", label: "语言设置", path: "/oobe/language", hidden: true },
+  { key: "oobe/device", label: "设备校验", path: "/oobe/device", hidden: true },
   { key: "oobe/agreement", label: "同意协议", path: "/oobe/agreement", hidden: true },
   { key: "oobe/version", label: "当前版本", path: "/oobe/version", hidden: true },
   { key: "oobe/about-version", label: "关于此版本", path: "/oobe/about-version", hidden: true },
   { key: "oobe/beta-test", label: "测试协议", path: "/oobe/beta-test", hidden: true },
+  { key: "oobe/activation", label: "版本激活", path: "/oobe/activation", hidden: true },
   { key: "oobe/login", label: "登录", path: "/oobe/login", hidden: true },
   { key: "oobe/welcome", label: "欢迎", path: "/oobe/welcome", hidden: true },
   { key: "oobe/finish", label: "完成", path: "/oobe/finish", hidden: true },
@@ -76,10 +85,12 @@ export const allRoutes: RouteItem[] = [
   { key: "oobe/legal", label: "法律信息", path: "/oobe/legal", hidden: true },
   { key: "upvp", label: "更新引导", path: "/upvp", hidden: true },
   { key: "upvp/complete", label: "更新已完成", path: "/upvp/complete", hidden: true },
+  { key: "upvp/device", label: "设备校验", path: "/upvp/device", hidden: true },
   { key: "upvp/version", label: "当前版本", path: "/upvp/version", hidden: true },
   { key: "upvp/about-version", label: "关于此版本", path: "/upvp/about-version", hidden: true },
   { key: "upvp/check", label: "检查版本", path: "/upvp/check", hidden: true },
   { key: "upvp/beta-test", label: "测试协议", path: "/upvp/beta-test", hidden: true },
+  { key: "upvp/activation", label: "版本激活", path: "/upvp/activation", hidden: true },
   { key: "upvp/finish", label: "完成", path: "/upvp/finish", hidden: true },
   { key: "debug", label: "调试", path: "/debug", hidden: true },
   { key: "debug-splash", label: "启动动画调试", path: "/debug/splash", hidden: true },
@@ -87,6 +98,7 @@ export const allRoutes: RouteItem[] = [
   { key: "debug-version-card", label: "版本卡片调试", path: "/debug/version-card", hidden: true },
   { key: "debug-update", label: "更新功能测试", path: "/debug/update", hidden: true },
   { key: "debug-task", label: "任务队列调试", path: "/debug/task", hidden: true },
+  { key: "debug-activation", label: "激活校验测试", path: "/debug/activation", hidden: true },
   { key: "debug-resource", label: "资源与内存", path: "/debug/resource", hidden: true },
   { key: "debug-crash", label: "崩溃测试", path: "/debug/crash", hidden: true },
   { key: "debug-routes", label: "页面跳转", path: "/debug/routes", hidden: true },
@@ -95,6 +107,8 @@ export const allRoutes: RouteItem[] = [
 const topLevelKeys = new Set(routes.map((r) => r.key));
 
 function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
+  // 设备异常页：顶栏只保留品牌与窗口控制（无胶囊菜单、无任务按钮、无返回）
+  if (key === "device-blocked") return "blocked";
   if (key === "oobe" || key.startsWith("oobe/") || key === "upvp" || key.startsWith("upvp/")) return "oobe";
   return topLevelKeys.has(key) ? "default" : "sub";
 }

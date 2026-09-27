@@ -35,7 +35,7 @@ interface ElectronAPI {
   resolveBackgroundResource: (value: string) => Promise<{ url: string | null; bytes: number }>;
 
   // Auto-update
-  checkForUpdates: (manual?: boolean) => Promise<unknown>;
+  checkForUpdates: (manual?: boolean, targetVersion?: string) => Promise<unknown>;
   downloadUpdate: () => Promise<unknown>;
   pauseUpdate: () => Promise<unknown>;
   resumeUpdate: () => Promise<unknown>;
@@ -48,6 +48,16 @@ interface ElectronAPI {
   setTestVersion: (version: string) => Promise<unknown>;
   compareVersions: (a: string, b: string) => Promise<unknown>;
   onUpdateStatus: (callback: (data: unknown) => void) => () => void;
+
+  // Koring Account 启动器 API（主进程发起；见 electron/core/launcher-api.ts）
+  launcherEnvInfo: () => Promise<unknown>;
+  launcherDeviceCheck: () => Promise<unknown>;
+  launcherVersionPolicy: (version?: string) => Promise<unknown>;
+  launcherStartupCheck: (force?: boolean) => Promise<unknown>;
+  launcherDeviceUuid: () => Promise<unknown>;
+  launcherDeviceStatus: () => Promise<unknown>;
+  launcherDeviceReport: () => Promise<unknown>;
+  launcherDeviceNotifications: () => Promise<unknown>;
 }
 
 declare global {
