@@ -65,20 +65,35 @@ IPC 与主进程通信。
 
 **游戏能力（基于 @xmcl）**
 
+- **可启动性优先的启动链路**：启动前解析「启动方案」——资源根（实例自定义 / 实例目录 / 共享资源目录）
+  与可启动版本（指定版本 → 加载器版本 → 原版 → 回退匹配），并做依赖体检
+  （版本 JSON / 客户端 JAR / `rules` 过滤后的依赖库），**依赖缺失时明确报错而不是启动半成品**
 - **统一配置驱动启动**：主进程读取权威配置，自动映射为 `LaunchOption`
   （Java 路径 / 内存 / GC / JVM 参数 / 游戏参数 / 窗口 / 启动前命令），
-  支持启动事件推送与 `afterLaunch` 窗口处理
-- **Java 自动检测与路径校验**（`java:scan` / `java:resolve`）
-- **实例系统**：主库实例 + 游戏目录批量导入（幂等、目录变更自动重扫）
+  支持 `plan` / `warning` / `stdout` / `stderr` / `window-ready` / `exit` 事件推送与 `afterLaunch` 窗口处理
+- **Java 自动匹配**：按 Minecraft 版本推算所需 Java 主版本（1.20.5+ → 21 / 1.17–1.20.4 → 17 / ≤1.16.5 → 8），
+  在设置页给出预览与候选（`java:plan`），并提供 `java:scan` / `java:resolve` 手动校验
+- **实例依赖修复**：一键补全缺失的原版、加载器与依赖库并回写实例（`instance:repair`，带进度）
+- **PCL2 式目录识别与管理**：选中 `versions/`、单个版本目录或实例目录都会自动上溯为游戏根，
+  识别启动器类型（Koring / 官方 / PCL2 / HMCL / Prism / MultiMC）与版本健康度，
+  支持本机常见位置**自动查找**；导入支持**引用**（省空间）与**复制**（含共享 libraries/assets）两种模式
+- **实例卡片画廊**：每个实例一张卡片，实例目录里放 `logo.png`（或 `icon.png` / `logo.jpg` 等）即自动作为图标，
+  缺失时用按名称取色的默认图标；支持**搜索**（名称 / 分类 / 版本）、**分类筛选**与**收藏**，
+  卡片上可直接启动或打开目录，详情页展示启动方案与依赖体检并提供一键修复
 - **Mod 生态**：Modrinth / CurseForge 检索与安装模块
-- **账号体系**：Koring 账号、离线账号（规范离线 UUID），微软 OAuth 核心已接入
+- **账号体系**：Koring 账号、离线账号（规范离线 UUID），微软 OAuth 核心已接入；
+  账户页展示真实启动档案（`--username` / `--uuid` / 认证方式）
 - 任务系统：安装 / 下载进度统一通过主进程任务队列（`task:*`）推进，UI 可查看队列
+
+> 启动链路、目录识别、下载源与 IPC 契约的实现细节见 **[`docs/launch-pipeline.md`](docs/launch-pipeline.md)**；
+> 纯逻辑可用 `pnpm build:main && node scripts/verify-launch-core.mjs` 校验（90 项断言）。
 
 **配置与个性化**
 
 - **主进程权威配置**：YAML（`Koring.yml`），深度合并 + 稀疏写盘 + 变更广播
 - **设置中心**（参考 PCL2 的分组结构）：游戏（账号 / Java / 目录 / 高级）、
-  个性化（主题背景 / 主界面 / 语言 / 无障碍）、网络（下载 / 安全识别）等均已接入
+  个性化（主题背景 / 主界面 / 语言 / 无障碍）、网络（下载 / 安全识别）等均已接入；
+  目录、Java 与下载页已按新的能力重做（识别结果、自动匹配预览、下载源预览）
 - **背景系统**：颜色 / 渐变 / 模糊 / 自选壁纸；自选壁纸由主进程按屏幕尺寸降采样并
   落盘存储，经 `koring-res://` 特权协议流式读取（**全程无 base64**），并纳入
   **资源注册表**统一管理（引用计数、预算 + LRU 逐出）
@@ -236,7 +251,8 @@ koring-launcher/
 │  ├─ auth.ts · updater.ts · resource-protocol.ts
 │  ├─ core/                   # @xmcl 集成与业务核心
 │  │  ├─ auth.ts · koring-auth.ts · installer.ts · launcher.ts
-│  │  ├─ launch-options.ts · modrinth.ts · instance.ts
+│  │  ├─ launch-options.ts · launch-target.ts · version-scan.ts
+│  │  ├─ game-folder.ts · download-options.ts · modrinth.ts · instance.ts
 │  │  ├─ task.ts · paths.ts · background-image.ts · crash-logger.ts
 │  └─ handlers/               # IPC 处理器（config/auth/install/launch/java/
 │                             #   mods/instance/background/task/system/update/
@@ -351,17 +367,40 @@ resource registry with memory management, and dual-channel (beta/run) auto-updat
 
 **Game capabilities (via @xmcl)**
 
-- **Config-driven unified launch**: the main process maps authoritative config
-  to `LaunchOption` (Java path, memory, GC, JVM args, window, pre-launch
-  commands), with launch event streaming and `afterLaunch` window handling
-- **Java auto-detection & validation** (`java:scan` / `java:resolve`)
-- **Instance system**: instances in the main library + bulk import from an
-  existing game directory (idempotent, auto-rescan on directory change)
+- **Launchability first**: before launching, the launcher resolves the *launch plan* —
+  resource root (instance override / instance dir / shared resource dir) and the runnable
+  version (configured → loader → base → fallback) — then checks dependencies (version JSON,
+  client JAR, `rules`-filtered libraries). Missing dependencies fail loudly instead of
+  launching a half-installed instance
+- **Config-driven unified launch**: the main process maps authoritative config to
+  `LaunchOption` (Java path, memory, GC, JVM args, window, pre-launch commands), with
+  `plan` / `warning` / `stdout` / `stderr` / `window-ready` / `exit` event streaming and
+  `afterLaunch` window handling
+- **Java auto-matching**: derives the required Java major from the Minecraft version
+  (1.20.5+ → 21, 1.17–1.20.4 → 17, ≤ 1.16.5 → 8), previews the chosen runtime and
+  candidates in Settings (`java:plan`), plus `java:scan` / `java:resolve` validation
+- **One-click instance repair**: fills in missing vanilla, loader and library artifacts and
+  writes back the instance (`instance:repair`, with progress)
+- **PCL2-style directory recognition**: picking `versions/`, a single version folder or an
+  instance folder resolves to the real game root; detects the launcher kind (Koring /
+  official / PCL2 / HMCL / Prism / MultiMC) and version health, and can **auto-discover**
+  common locations; importing supports **reference** (space-saving) and **copy** (with
+  shared `libraries`/`assets`) modes
+- **Instance card gallery**: every instance is a card; drop a `logo.png` (or `logo.jpg` /
+  `icon.png` …) into the instance folder and it becomes the icon, otherwise a default icon
+  tinted from the instance name is used. Supports **search** (name / category / version),
+  **category filters** and **favorites**; cards launch the game or open the folder directly,
+  and the detail view shows the launch plan and dependency report with one-click repair
 - **Mod ecosystem**: Modrinth / CurseForge search & install modules
 - **Accounts**: Koring account, offline login (spec-compliant offline UUID),
-  Microsoft OAuth core integrated
+  Microsoft OAuth core integrated; the account page shows the real launch profile
+  (`--username` / `--uuid` / auth mode)
 - **Task system**: install / download progress flows through a main-process
   task queue (`task:*`) with a visible UI queue
+
+> Implementation details for the launch pipeline, directory recognition, download sources
+> and the IPC contract live in **[`docs/launch-pipeline.md`](docs/launch-pipeline.md)**;
+> the pure logic is verified by `pnpm build:main && node scripts/verify-launch-core.mjs` (90 assertions).
 
 **Configuration & personalization**
 
@@ -538,7 +577,8 @@ koring-launcher/
 │  ├─ auth.ts · updater.ts · resource-protocol.ts
 │  ├─ core/                   # @xmcl integrations & business core
 │  │  ├─ auth.ts · koring-auth.ts · installer.ts · launcher.ts
-│  │  ├─ launch-options.ts · modrinth.ts · instance.ts
+│  │  ├─ launch-options.ts · launch-target.ts · version-scan.ts
+│  │  ├─ game-folder.ts · download-options.ts · modrinth.ts · instance.ts
 │  │  ├─ task.ts · paths.ts · background-image.ts · crash-logger.ts
 │  └─ handlers/               # IPC handlers (config/auth/install/launch/java/
 │                             #   mods/instance/background/task/system/update/

@@ -25,6 +25,12 @@ interface DecodedPayload {
 export interface UseManagedImageOptions extends ImageDecodeOptions {
   /** release 后是否缓存解码结果；默认 true */
   cache?: boolean;
+  /**
+   * 自定义注册表 key。默认用 `image:<maxDimension>:<source>`，
+   * 但对超长源（例如实例图标的 data URL）应传一个短 key，
+   * 否则 key 会把整段 base64 带进注册表与资源调试页。
+   */
+  key?: string;
 }
 
 /**
@@ -38,6 +44,7 @@ export function useManagedImage(
 ): ManagedImageValue {
   const maxDimension = options.maxDimension ?? 1024;
   const cache = options.cache ?? true;
+  const keyOverride = options.key;
   const [value, setValue] = useState<ManagedImageValue>({
     status: source ? "loading" : "idle",
     url: null,
@@ -49,7 +56,7 @@ export function useManagedImage(
       return;
     }
     let alive = true;
-    const key = `image:${maxDimension}:${source}`;
+    const key = keyOverride ?? `image:${maxDimension}:${source}`;
     setValue({ status: "loading", url: null });
 
     resourceRegistry
@@ -88,7 +95,7 @@ export function useManagedImage(
       alive = false;
       resourceRegistry.release(key);
     };
-  }, [source, maxDimension, cache]);
+  }, [source, maxDimension, cache, keyOverride]);
 
   return value;
 }

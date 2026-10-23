@@ -20,14 +20,16 @@ import {
   getVersionList,
 } from '@xmcl/installer';
 import { Version } from '@xmcl/core';
-import { rewriteToMirror } from './installer';
+import {
+  buildInstallOptions,
+  resolveDownloadSource,
+  rewriteToMirror,
+  versionListRequest,
+} from './download-options';
+import { getConfig } from '../config';
 import {
   createInstance,
   updateInstance,
-  BMCLAPI_VERSION_MANIFEST,
-  BMCLAPI_MAVEN,
-  BMCLAPI_ASSETS,
-  mirrorFetch,
   type InstanceRuntime,
 } from './instance';
 import { resolveGamePath } from './paths';
@@ -219,25 +221,30 @@ executorRegistry.set('install', (rawParams, hooks) => {
       }),
     );
 
-    // 预步骤：获取版本清单，定位 Minecraft 版本元数据（走 BMCLAPI 镜像）
-    const versionList = await getVersionList({ remote: BMCLAPI_VERSION_MANIFEST, fetch: mirrorFetch });
+    // 预步骤：获取版本清单，定位 Minecraft 版本元数据（按设置的下载源）
+    const downloadSettings = getConfig().download;
+    const source = resolveDownloadSource(downloadSettings);
+    const listRequest = versionListRequest(downloadSettings);
+    const installOptions = buildInstallOptions(downloadSettings);
+    const rewriteUrl = (url: string) => (source.rewriteRequests ? rewriteToMirror(url) : url);
+
+    const versionList = await getVersionList({ remote: listRequest.remote, fetch: listRequest.fetch });
     const versionInfo = versionList.versions.find((v) => v.id === runtime.minecraft);
     if (!versionInfo) {
       throw new Error(`Minecraft 版本 ${runtime.minecraft} 不存在`);
     }
 
     // 子任务 2：安装 Minecraft 本体（版本 JSON / 客户端 JAR）
-    hooks.log('info', `下载 Minecraft ${runtime.minecraft}...`);
+    hooks.log('info', `下载 Minecraft ${runtime.minecraft}...（${source.label}）`);
     await this.yield(
       installTask(
         { id: versionInfo.id, url: versionInfo.url },
         instancePath,
         {
-          // 版本 JSON / 客户端 JAR 走 BMCLAPI 镜像
-          json: (v) => rewriteToMirror(v.url),
-          client: (v) => (v.downloads?.client ? rewriteToMirror(v.downloads.client.url) : []),
-          mavenHost: BMCLAPI_MAVEN,
-          assetsHost: BMCLAPI_ASSETS,
+          ...installOptions,
+          // 版本 JSON / 客户端 JAR 按所选源改写地址
+          json: (v) => rewriteUrl(v.url),
+          client: (v) => (v.downloads?.client ? rewriteUrl(v.downloads.client.url) : []),
         },
       ).setName('minecraft'),
     );
@@ -249,7 +256,7 @@ executorRegistry.set('install', (rawParams, hooks) => {
         installForgeTask(
           { version: runtime.forge, mcversion: runtime.minecraft },
           instancePath,
-          { mavenHost: BMCLAPI_MAVEN },
+          { mavenHost: source.mavenHost },
         ).setName('forge'),
       );
     }
@@ -260,7 +267,7 @@ executorRegistry.set('install', (rawParams, hooks) => {
         minecraftVersion: runtime.minecraft,
         version: runtime.fabricLoader,
         minecraft: instancePath,
-        fetch: mirrorFetch,
+        fetch: installOptions.fetch,
       });
     }
 
@@ -270,22 +277,23 @@ executorRegistry.set('install', (rawParams, hooks) => {
         minecraftVersion: runtime.minecraft,
         version: runtime.quiltLoader,
         minecraft: instancePath,
+        fetch: installOptions.fetch,
       });
     }
 
     if (runtime.neoForged) {
       hooks.log('info', `安装 NeoForge ${runtime.neoForged}...`);
       await this.yield(
-        installNeoForgedTask('neoforge', runtime.neoForged, instancePath, { mavenHost: BMCLAPI_MAVEN }).setName('neoforge'),
+        installNeoForgedTask('neoforge', runtime.neoForged, instancePath, {
+          mavenHost: source.mavenHost,
+        }).setName('neoforge'),
       );
     }
 
     // 子任务 4：安装依赖（libraries + assets）
     hooks.log('info', '安装依赖...');
     const resolved = await Version.parse(instancePath, runtime.minecraft);
-    await this.yield(
-      installDependenciesTask(resolved, { mavenHost: BMCLAPI_MAVEN, assetsHost: BMCLAPI_ASSETS }).setName('dependencies'),
-    );
+    await this.yield(installDependenciesTask(resolved, installOptions).setName('dependencies'));
 
     // 收尾：更新实例最近访问时间
     await updateInstance(name, gamePath, { lastAccessDate: Date.now() });

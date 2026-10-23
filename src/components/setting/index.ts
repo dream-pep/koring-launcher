@@ -8,6 +8,7 @@ export {
   SettingSelect,
   SettingNumberField,
   SettingSwitch,
+  SettingInput,
   SettingRadioGroup,
   SettingTextArea,
   SettingFilePicker,

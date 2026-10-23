@@ -21,6 +21,7 @@ export interface BackgroundConfig {
 
 export interface GameConfig {
   gameDir: string;
+  /** 共享资源目录（可选）：versions / libraries / assets 从该目录读取；留空表示各实例自包含 */
   resourceDir: string;
   savesDir: string;
   instancesDir: string;
@@ -30,6 +31,8 @@ export interface GameConfig {
 
 export interface JavaConfig {
   javaPath: string;
+  /** 自动选择 Java：开启后忽略 javaPath，按实例的 Minecraft 版本挑选最合适的运行时 */
+  autoJavaPath: boolean;
   memMode: string;
   memGB: number;
   gc: string;
@@ -76,10 +79,16 @@ export interface ActivationConfig {
 }
 
 export interface DownloadConfig {
-  fileSource: string;
-  versionSource: string;
+  /** 下载源：official（官方） | bmclapi（BMCLAPI 镜像，默认） | custom（自定义镜像地址） */
+  source: string;
+  /** 并发下载线程数（1–64） */
   threads: number;
-  speedLimit: number;
+  /** 自定义源的版本清单地址 */
+  customVersionManifest: string;
+  /** 自定义源的 Maven 仓库地址 */
+  customMavenHost: string;
+  /** 自定义源的 Assets 地址 */
+  customAssetsHost: string;
 }
 
 export interface SecurityIdConfig {

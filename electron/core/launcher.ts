@@ -8,11 +8,11 @@
 // 未经允许的情况下删除此版权头可能会受到民事指控
 // 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
 
-import * as fs from 'fs';
 import * as path from 'path';
 import { Version, launch, createMinecraftProcessWatcher } from '@xmcl/core';
 import type { AppConfig } from '../config';
-import { getInstanceInfo, updateInstance } from './instance';
+import { getInstanceInfo, planInstanceLaunch, updateInstance } from './instance';
+import { checkDependencies, describeDependencyReport } from './launch-target';
 import {
   buildLaunchOptions,
   resolveJavaPath,
@@ -54,22 +54,33 @@ export interface LaunchGameOptions {
 export async function launchGame(options: LaunchGameOptions): Promise<GameLaunchResult> {
   const { config, instanceName, gamePath, profile, server, onEvent } = options;
 
-  // 1. 读取实例信息并做健康检查
-  const instance = await getInstanceInfo(instanceName, gamePath);
-  if (!instance.healthy) {
-    const detail = instance.issues.join('；') || '未知问题';
-    throw new Error(`实例「${instanceName}」未安装完整：${detail}。请先在资源中心安装或重新安装该实例。`);
+  // 1. 计算启动方案：资源根（versions/libraries/assets）、可启动版本 id、依赖体检
+  const { instance, plan } = planInstanceLaunch(instanceName, gamePath);
+  for (const warning of plan.issues) {
+    onEvent?.({ event: 'warning', message: warning });
   }
 
-  // 2. 解析版本
-  const resolved = await Version.parse(instance.path, instance.config.runtime.minecraft);
+  // 2. 解析版本（resourceRoot 决定 versions/libraries/assets，不是实例目录）
+  const resolved = await Version.parse(plan.roots.resourceRoot, plan.resolved.id);
 
-  // 3. 解析 Java 路径（配置路径 → 系统扫描 → PATH）
-  const javaPath = await resolveJavaPath(config.java.javaPath);
+  // 3. 解析 Java 路径（按 MC 版本自动匹配 → 配置路径 → 系统扫描 → PATH）
+  const javaPath = await resolveJavaPath(config.java.javaPath, {
+    auto: config.java.autoJavaPath !== false,
+    minecraftVersion: instance.config.runtime.minecraft,
+  });
 
   // 4. 配置 → LaunchOption（version 覆盖为已解析版本）
-  const launchOption = buildLaunchOptions(config, instance, profile, javaPath, server);
+  const launchOption = buildLaunchOptions(config, instance, profile, javaPath, server, plan);
   launchOption.version = resolved;
+
+  onEvent?.({
+    event: 'plan',
+    versionId: plan.resolved.id,
+    versionVia: plan.resolved.via,
+    resourceRoot: plan.roots.resourceRoot,
+    gameRoot: plan.roots.gameRoot,
+    javaPath,
+  });
 
   // 5. 启动（detached：启动器关闭后游戏继续运行；pipe：转发 stdout/stderr）
   const mcProcess = await launch({
@@ -111,36 +122,33 @@ export async function launchGame(options: LaunchGameOptions): Promise<GameLaunch
   });
 
   // 8. 更新最近访问时间
-  await updateInstance(instanceName, gamePath, { lastAccessDate: Date.now() }).catch(() => {});
+  try {
+    updateInstance(instanceName, gamePath, { lastAccessDate: Date.now() });
+  } catch {
+    // 忽略
+  }
 
   return {
     pid: mcProcess.pid || 0,
-    version: instance.config.runtime.minecraft,
+    version: plan.resolved.id,
     username: profile.username,
   };
 }
 
 /**
- * 诊断指定游戏目录下某个版本的健康状态（JSON + JAR 是否存在）。
+ * 诊断指定游戏目录下某个版本的健康状态（版本 JSON / 客户端 JAR / libraries / assets）。
  * 供 launch:diagnose 使用。
  */
 export async function diagnoseVersion(gamePath: string, version: string): Promise<Record<string, unknown>> {
-  const issues: string[] = [];
-  const versionDir = path.join(gamePath, 'versions', version);
-  const versionJsonPath = path.join(versionDir, `${version}.json`);
-  const jarPath = path.join(versionDir, `${version}.jar`);
-
-  if (!fs.existsSync(versionJsonPath)) {
-    issues.push(`Version JSON not found: ${versionJsonPath}`);
-  }
-  if (!fs.existsSync(jarPath)) {
-    issues.push(`Client JAR not found: ${jarPath}`);
-  }
+  const report = checkDependencies(gamePath, version);
+  const detail = describeDependencyReport(report);
 
   return {
     version,
     gamePath,
-    healthy: issues.length === 0,
-    issues,
+    versionsDir: path.join(gamePath, 'versions'),
+    healthy: report.ready,
+    issues: detail ? [detail] : [],
+    dependency: report,
   };
 }

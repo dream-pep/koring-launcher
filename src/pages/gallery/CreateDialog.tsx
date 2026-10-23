@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button, Input, RadioGroup, Radio, Slider } from "@heroui/react";
 import { X, Loader2, Plus } from "lucide-react";
-import { getMinecraftVersionList, getFabricVersionList, getForgeVersionList, getQuiltVersionList, type InstanceRuntime } from "@/api/instance";
+import { getMinecraftVersionList, type InstanceRuntime } from "@/api/instance";
+import { fieldCls } from "@/components/setting";
 
 interface CreateDialogProps {
   isOpen: boolean;
@@ -106,10 +107,16 @@ export function CreateDialog({ isOpen, onClose, onCreate, initialVersion }: Crea
 
           {step === 0 && (
             <div className="space-y-4">
-              <Input label="实例名称 (英文ID)" placeholder="例如: survival-world"
-                value={name} onChange={(e) => setName(e.target.value.replace(/\s/g, "-").toLowerCase())} autoFocus />
-              <Input label="显示名称 (可选)" placeholder="例如: 生存世界"
-                value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <div className="space-y-1.5">
+                <p className="text-[12px] font-medium text-muted-foreground">实例名称 (英文ID)</p>
+                <Input className={fieldCls} placeholder="例如: survival-world"
+                  value={name} onChange={(e) => setName(e.target.value.replace(/\s/g, "-").toLowerCase())} autoFocus />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[12px] font-medium text-muted-foreground">显示名称 (可选)</p>
+                <Input className={fieldCls} placeholder="例如: 生存世界"
+                  value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              </div>
             </div>
           )}
 

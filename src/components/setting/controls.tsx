@@ -1,7 +1,7 @@
 // 可复用设置控件：HeroUI 3 复合组件封装，统一风格，绑定 configStore setter 自动保存。
 // 每个控件都遵循 label / desc / value / onChange 通用接口。
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Button,
   Input,
@@ -209,6 +209,61 @@ export function SettingRadioGroup({
         ))}
       </RadioGroup>
     </div>
+  );
+}
+
+// ---------- 单行文本输入 ----------
+export function SettingInput({
+  label,
+  desc,
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  type = "text",
+  mono = false,
+  suffix,
+  width = "w-64",
+  onEnter,
+}: {
+  label: string;
+  desc?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+  type?: string;
+  /** 等宽字体（路径、参数、IP 等） */
+  mono?: boolean;
+  /** 输入框右侧单位后缀（字符串显示为灰字，也可传按钮等节点） */
+  suffix?: ReactNode;
+  width?: string;
+  onEnter?: () => void;
+}) {
+  return (
+    <SettingRow label={label} desc={desc}>
+      <div className={`flex items-center gap-1.5 ${width}`}>
+        <Input
+          aria-label={label}
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          fullWidth
+          className={`${fieldCls} ${mono ? "font-mono" : ""}`}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && onEnter) onEnter();
+          }}
+        />
+        {suffix &&
+          (typeof suffix === "string" ? (
+            <span className="text-[13px] text-muted-foreground shrink-0">{suffix}</span>
+          ) : (
+            <div className="shrink-0">{suffix}</div>
+          ))}
+      </div>
+    </SettingRow>
   );
 }
 

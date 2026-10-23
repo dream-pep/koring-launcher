@@ -1,15 +1,68 @@
-import { useState } from "react";
-import { Button, Avatar, Input } from "@heroui/react";
-import { Gamepad2, LogOut, Loader2, UserRound, Wifi, ShieldQuestion, AlertCircle } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Button, Avatar } from "@heroui/react";
+import {
+  Gamepad2,
+  LogOut,
+  Loader2,
+  UserRound,
+  Wifi,
+  ShieldQuestion,
+  AlertCircle,
+  Copy,
+  Fingerprint,
+  Container,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
+import { useInstanceStore } from "@/stores/instanceStore";
 import {
   SettingCard,
   SettingBadge,
+  SettingInput,
   PageHeader,
   SectionTitle,
-  fieldCls,
 } from "@/components/setting";
+
+// 启动档案信息行（可复制）
+function ProfileRow({
+  icon,
+  label,
+  value,
+  mono = false,
+  copyable = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+  copyable?: boolean;
+}) {
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success("已复制");
+    } catch {
+      toast.error("复制失败");
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <div className="w-8 h-8 rounded-lg bg-foreground/[0.05] dark:bg-white/[0.05] flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[12px] text-muted-foreground/70">{label}</p>
+        <p className={`text-[13px] text-foreground truncate ${mono ? "font-mono" : ""}`}>{value}</p>
+      </div>
+      {copyable && (
+        <Button size="sm" variant="ghost" className="shrink-0" onPress={handleCopy}>
+          <Copy className="w-3.5 h-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export function GameAccountSetting() {
   const user = useAuthStore((s) => s.user);
@@ -19,6 +72,10 @@ export function GameAccountSetting() {
   const loginOffline = useAuthStore((s) => s.loginOffline);
   const clearError = useAuthStore((s) => s.clearError);
 
+  const currentInstance = useInstanceStore((s) => s.currentInstance);
+  const instances = useInstanceStore((s) => s.instances);
+  const reference = currentInstance ?? instances[0] ?? null;
+
   const [username, setUsername] = useState("");
 
   // 离线账号登录
@@ -27,6 +84,10 @@ export function GameAccountSetting() {
     const name = username.trim();
     if (!name) {
       toast.warning("请输入离线用户名");
+      return;
+    }
+    if (name.length > 16) {
+      toast.warning("离线用户名不能超过 16 个字符");
       return;
     }
     await loginOffline(name);
@@ -41,6 +102,8 @@ export function GameAccountSetting() {
     await logout();
     toast.success("已退出游戏账号");
   };
+
+  const isPremium = !!user?.accessToken;
 
   return (
     <div>
@@ -62,7 +125,7 @@ export function GameAccountSetting() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-base font-medium text-foreground truncate">{user.username}</p>
-                      {user.accessToken ? (
+                      {isPremium ? (
                         <SettingBadge variant="info">微软账号</SettingBadge>
                       ) : (
                         <SettingBadge variant="neutral">离线账号</SettingBadge>
@@ -95,6 +158,50 @@ export function GameAccountSetting() {
           </div>
         </div>
 
+        {/* 启动档案 */}
+        <div>
+          <SectionTitle>启动档案</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              {user ? (
+                <div className="divide-y divide-border/40 dark:divide-white/[0.06]">
+                  <ProfileRow
+                    icon={<UserRound className="w-4 h-4 text-muted-foreground/70" />}
+                    label="游戏内用户名（启动参数 --username）"
+                    value={user.username}
+                    copyable
+                  />
+                  <ProfileRow
+                    icon={<Fingerprint className="w-4 h-4 text-muted-foreground/70" />}
+                    label="玩家 UUID（启动参数 --uuid）"
+                    value={user.uuid}
+                    mono
+                    copyable
+                  />
+                  <ProfileRow
+                    icon={<ShieldQuestion className="w-4 h-4 text-muted-foreground/70" />}
+                    label="认证方式"
+                    value={isPremium ? "正版登录（携带访问令牌）" : "离线（无访问令牌，服务器需关闭正版验证）"}
+                  />
+                  <ProfileRow
+                    icon={<Container className="w-4 h-4 text-muted-foreground/70" />}
+                    label="应用实例"
+                    value={
+                      reference
+                        ? `${reference.name}（Minecraft ${reference.config.runtime.minecraft}）`
+                        : "未选择实例（启动前请在主界面选择实例）"
+                    }
+                  />
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground py-2">
+                  登录账号后，此处会显示将写入启动参数的档案信息（用户名、UUID、认证方式）。
+                </p>
+              )}
+            </SettingCard>
+          </div>
+        </div>
+
         {/* 登录方式 */}
         <div>
           <SectionTitle>登录方式</SectionTitle>
@@ -111,29 +218,31 @@ export function GameAccountSetting() {
                     <p className="text-[12px] text-muted-foreground/70">无需正版验证，输入用户名即可启动</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="输入离线用户名（不超过 16 字符）"
-                    maxLength={16}
-                    fullWidth
-                    className={fieldCls}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleOfflineLogin();
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    className="shrink-0"
-                    onPress={handleOfflineLogin}
-                    isDisabled={loading}
-                  >
-                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserRound className="w-3.5 h-3.5" />}
-                    登录
-                  </Button>
-                </div>
+                <SettingInput
+                  label="用户名"
+                  desc="离线 UUID 由 MD5(OfflinePlayer:用户名) 推导，同一用户名始终对应同一 UUID"
+                  value={username}
+                  onChange={setUsername}
+                  placeholder="输入离线用户名（不超过 16 字符）"
+                  maxLength={16}
+                  width="w-full"
+                  onEnter={handleOfflineLogin}
+                  suffix={
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onPress={handleOfflineLogin}
+                      isDisabled={loading || !username.trim()}
+                    >
+                      {loading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <UserRound className="w-3.5 h-3.5" />
+                      )}
+                      登录
+                    </Button>
+                  }
+                />
                 {error && (
                   <p className="text-[12px] text-red-500/80 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />

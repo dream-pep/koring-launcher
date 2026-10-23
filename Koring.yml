@@ -1,9 +1,17 @@
 appVersion: 1.2.6
 oobe: false
+background:
+  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-opt-munsp44ab1ez86.png
+  blur: 12
+  opacity: 97
+game:
+  gameDir: C:\Users\ab090\AppData\Roaming\.minecraft
+  gameDirs:
+    - .minecraft
 advanced:
   preLaunchCmd: '123'
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1790484732016
+  checkedAt: 1790758857700
   version: 1.2.6

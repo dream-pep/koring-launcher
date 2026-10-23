@@ -1,11 +1,11 @@
-import { Input } from "@heroui/react";
 import { useConfigStore } from "@/stores/configStore";
 import {
   SettingCard,
   SettingSelect,
   SettingNumberField,
+  SettingSwitch,
+  SettingInput,
   SettingFilePicker,
-  fieldCls,
   PageHeader,
   SectionTitle,
 } from "@/components/setting";
@@ -88,32 +88,35 @@ export function AdvancedSetting() {
           <SectionTitle>快速进入服务器</SectionTitle>
           <div className="space-y-3">
             <SettingCard>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">自动加入服务器</p>
-                <p className="text-[13px] text-muted-foreground">
-                  启动游戏后自动加入该服务器；IP 留空则不自动加入
-                </p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={adv.server?.ip ?? ""}
-                    onChange={(e) =>
-                      setAdvanced({ server: { ip: e.target.value, port: adv.server?.port ?? 25565 } })
-                    }
-                    placeholder="例如 mc.example.com"
-                    fullWidth
-                    className={fieldCls}
-                  />
-                  <Input
-                    type="number"
-                    value={String(adv.server?.port ?? 25565)}
-                    onChange={(e) =>
-                      setAdvanced({ server: { ip: adv.server?.ip ?? "", port: Number(e.target.value) || 25565 } })
-                    }
-                    className={`w-24 shrink-0 ${fieldCls}`}
-                    aria-label="服务器端口"
-                  />
-                  <span className="text-[13px] text-muted-foreground shrink-0">端口</span>
-                </div>
+              <div className="space-y-3">
+                <SettingInput
+                  label="自动加入服务器"
+                  desc="启动游戏后自动加入该服务器；IP 留空则不自动加入"
+                  value={adv.server?.ip ?? ""}
+                  onChange={(v) => setAdvanced({ server: { ip: v, port: adv.server?.port ?? 25565 } })}
+                  placeholder="例如 mc.example.com"
+                  mono
+                  width="w-72"
+                />
+                <SettingNumberField
+                  label="服务器端口"
+                  desc="默认 25565"
+                  value={adv.server?.port ?? 25565}
+                  min={1}
+                  max={65535}
+                  onChange={(v) =>
+                    setAdvanced({ server: { ip: adv.server?.ip ?? "", port: v } })
+                  }
+                />
+                {adv.server?.ip?.trim() ? (
+                  <p className="text-[12px] text-muted-foreground">
+                    启动时将以
+                    <code className="font-mono text-foreground/80">
+                      {` --server ${adv.server.ip.trim()} --port ${adv.server.port ?? 25565}`}
+                    </code>
+                    进入该服务器
+                  </p>
+                ) : null}
               </div>
             </SettingCard>
           </div>
@@ -124,19 +127,15 @@ export function AdvancedSetting() {
           <SectionTitle>游戏参数</SectionTitle>
           <div className="space-y-3">
             <SettingCard>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">额外游戏启动参数</p>
-                <p className="text-[13px] text-muted-foreground">
-                  附加到游戏启动命令末尾的参数，例如 --demo；支持引号包裹含空格的值
-                </p>
-                <Input
-                  value={adv.gameArgs}
-                  onChange={(e) => setAdvanced({ gameArgs: e.target.value })}
-                  placeholder="可选，例如 --demo"
-                  fullWidth
-                  className={fieldCls}
-                />
-              </div>
+              <SettingInput
+                label="额外游戏启动参数"
+                desc="附加到游戏启动命令末尾的参数，例如 --demo；支持引号包裹含空格的值"
+                value={adv.gameArgs}
+                onChange={(v) => setAdvanced({ gameArgs: v })}
+                placeholder="可选，例如 --demo"
+                mono
+                width="w-80"
+              />
             </SettingCard>
           </div>
         </div>
@@ -158,6 +157,26 @@ export function AdvancedSetting() {
                   { name: "所有文件", extensions: ["*"] },
                 ]}
               />
+            </SettingCard>
+          </div>
+        </div>
+
+        {/* 诊断 */}
+        <div>
+          <SectionTitle>诊断</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              <div className="space-y-3">
+                <SettingSwitch
+                  label="调试模式"
+                  desc="开启后写入完整日志（userData/koring.log，5MB 轮转），并给游戏进程附加 -Dkoring.debugMode=true"
+                  checked={adv.debugMode}
+                  onChange={(v) => setAdvanced({ debugMode: v })}
+                />
+                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                  启动游戏时会在实例详情页展示本次使用的版本、资源目录与 Java 路径，便于排查启动失败问题。
+                </p>
+              </div>
             </SettingCard>
           </div>
         </div>

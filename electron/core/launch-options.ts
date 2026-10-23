@@ -12,6 +12,7 @@ import type { LaunchOption } from '@xmcl/core';
 import { resolveJava, getPotentialJavaLocations } from '@xmcl/installer';
 import type { AppConfig } from '../config';
 import type { InstanceInfo } from './instance';
+import type { LaunchPlan } from './launch-target';
 
 /** 游戏启动所需的账户档案 */
 export interface LaunchProfile {
@@ -67,6 +68,7 @@ export function buildLaunchOptions(
   profile: LaunchProfile,
   javaPath: string,
   server?: LaunchServer,
+  plan?: LaunchPlan,
 ): LaunchOption {
   const java = config.java;
   const adv = config.advanced;
@@ -110,8 +112,10 @@ export function buildLaunchOptions(
     accessToken: profile.accessToken,
     javaPath,
     // version 由调用方在 Version.parse 后覆盖为 ResolvedVersion
-    version: instance.config.runtime.minecraft,
-    gamePath: instance.path,
+    version: plan?.resolved.id ?? instance.config.runtime.minecraft,
+    // gamePath 决定 --gameDir（saves/mods/logs），resourcePath 决定 versions/libraries/assets
+    gamePath: plan?.roots.gameRoot ?? instance.path,
+    resourcePath: plan?.roots.resourceRoot ?? instance.path,
     minMemory,
     maxMemory,
     resolution,
@@ -124,13 +128,98 @@ export function buildLaunchOptions(
   };
 }
 
+/** 该 Minecraft 版本要求的 Java 主版本（1.20.5+ / 1.21+ → 21，1.18–1.20.4 → 17，1.16.5- → 8） */
+export function requiredJavaMajor(minecraftVersion: string): number {
+  const parts = minecraftVersion.split('.').map((part) => Number.parseInt(part, 10));
+  const [major, minor, patch] = parts;
+  if (!Number.isFinite(major)) return 21; // 快照（24w45a 等）按最新版处理
+  if (major > 1) return 21;
+  if (!Number.isFinite(minor)) return 21;
+  if (minor > 20) return 21;
+  if (minor === 20) return (patch ?? 0) >= 5 ? 21 : 17;
+  if (minor >= 17) return 17;
+  return 8;
+}
+
+export interface JavaCandidate {
+  path: string;
+  version?: string;
+  majorVersion?: number;
+  vendor?: string;
+}
+
+/** 扫描本机所有可用的 Java（供设置页展示与自动匹配使用） */
+export async function scanJavaInstallations(): Promise<JavaCandidate[]> {
+  const candidates: JavaCandidate[] = [];
+  try {
+    const locations = await getPotentialJavaLocations();
+    for (const location of locations) {
+      const info = await resolveJava(location).catch(() => undefined);
+      if (!info?.path) continue;
+      if (candidates.some((entry) => entry.path === info.path)) continue;
+      candidates.push({
+        path: info.path,
+        version: (info as { version?: string }).version,
+        majorVersion: (info as { majorVersion?: number }).majorVersion,
+        vendor: (info as { vendor?: string }).vendor,
+      });
+    }
+  } catch {
+    // 扫描失败返回空列表，调用方自行回退
+  }
+  return candidates;
+}
+
+/** 按 Minecraft 版本要求挑一个最合适的 Java：优先主版本完全一致，其次满足要求的最小版本 */
+export async function pickJavaForVersion(minecraftVersion: string): Promise<string | undefined> {
+  const required = requiredJavaMajor(minecraftVersion);
+  const candidates = (await scanJavaInstallations()).filter((entry) => Number.isFinite(entry.majorVersion));
+  if (!candidates.length) return undefined;
+
+  const exact = candidates.filter((entry) => entry.majorVersion === required);
+  if (exact.length) return exact[0].path;
+
+  const compatible = candidates
+    .filter((entry) => (entry.majorVersion ?? 0) > required)
+    .sort((a, b) => (a.majorVersion ?? 0) - (b.majorVersion ?? 0));
+  if (compatible.length) return compatible[0].path;
+
+  return candidates.sort((a, b) => (b.majorVersion ?? 0) - (a.majorVersion ?? 0))[0].path;
+}
+
+/**
+ * Java 自动匹配方案（供设置页展示「启动该版本会使用哪个 Java」）。
+ */
+export interface JavaPlan {
+  /** 该 MC 版本要求的 Java 主版本 */
+  requiredMajor: number;
+  /** 自动匹配到的 Java 路径（本机没有可用 Java 时为 undefined） */
+  pickedPath?: string;
+  /** 本机扫描到的全部 Java */
+  candidates: JavaCandidate[];
+}
+
+export async function planJavaForVersion(minecraftVersion: string): Promise<JavaPlan> {
+  const candidates = await scanJavaInstallations();
+  const pickedPath = await pickJavaForVersion(minecraftVersion);
+  return { requiredMajor: requiredJavaMajor(minecraftVersion), pickedPath, candidates };
+}
+
 /**
  * 解析 Java 可执行文件路径，优先级：
- * 1. 用户配置路径（resolveJava 校验，无效则继续向下）
- * 2. 系统扫描（`where java` / `which java` 结果逐个 resolve）
- * 3. 兜底 PATH 中的 `java`
+ * 1. `autoJavaPath` 开启时，按 Minecraft 版本自动匹配本机 Java
+ * 2. 用户配置路径（resolveJava 校验，无效则继续向下）
+ * 3. 系统扫描（`where java` / `which java` 结果逐个 resolve）
+ * 4. 兜底 PATH 中的 `java`
  */
-export async function resolveJavaPath(configuredPath: string): Promise<string> {
+export async function resolveJavaPath(
+  configuredPath: string,
+  options?: { auto?: boolean; minecraftVersion?: string }
+): Promise<string> {
+  if (options?.auto && options.minecraftVersion) {
+    const picked = await pickJavaForVersion(options.minecraftVersion);
+    if (picked) return picked;
+  }
   if (configuredPath?.trim()) {
     const info = await resolveJava(configuredPath.trim()).catch(() => undefined);
     if (info) return info.path;

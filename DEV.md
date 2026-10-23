@@ -157,17 +157,21 @@ koring-launcher/
 │   │   ├── auth.ts              # Microsoft OAuth, Xbox Live, MC auth
 │   │   ├── installer.ts         # @xmcl/installer
 │   │   ├── launcher.ts          # @xmcl/core 游戏启动
-│   │   ├── launch-options.ts    # 配置→LaunchOption 映射 (parseArgs/buildLaunchOptions/resolveJavaPath)
+│   │   ├── launch-options.ts    # 配置→LaunchOption 映射 (parseArgs/buildLaunchOptions/resolveJavaPath/requiredJavaMajor/planJavaForVersion)
+│   │   ├── launch-target.ts     # 启动方案：资源根/可启动版本解析 + 依赖体检 (resolveLaunchPlan/checkDependencies)
+│   │   ├── version-scan.ts      # 版本 JSON 继承链解析与加载器识别
+│   │   ├── game-folder.ts       # 目录归一化/识别/自动发现 (normalizeGameFolder/inspectGameFolder/discoverGameFolders)
+│   │   ├── download-options.ts  # 下载源解析与镜像请求改写 (resolveDownloadSource/rewriteToMirror/buildInstallOptions)
 │   │   ├── paths.ts             # 相对 gameDir 归一化 (resolveGamePath)
 │   │   ├── device-id.ts         # 设备唯一标识（主板/硬盘/BIOS 指纹 → MachineGuid 回退 → SHA-256 UUID 样式）
 │   │   ├── modrinth.ts          # Modrinth/CurseForge API
-│   │   └── instance.ts          # 实例管理（含 importExistingInstance sourceGamePath）
+│   │   └── instance.ts          # 实例管理（含 repairInstance / planInstanceLaunch / importExistingInstance）
 │   ├── handlers/                # IPC 处理器
 │   │   ├── config.ts            # 配置读写 + config:update/config:changed
 │   │   ├── auth.ts              # 认证操作
 │   │   ├── install.ts           # 安装操作
 │   │   ├── launch.ts            # 统一游戏启动 + afterLaunch
-│   │   ├── java.ts              # Java 检测 (java:scan / java:resolve)
+│   │   ├── java.ts              # Java 检测 (java:scan / java:resolve / java:plan)
 │   │   ├── mods.ts              # Mod 操作
 │   │   ├── instance.ts          # 实例操作（gamePath 统一 resolveGamePath）
 │   │   ├── background.ts        # 背景操作
@@ -261,6 +265,7 @@ game:
 
 java:
   javaPath: ""
+  autoJavaPath: true      # 按 Minecraft 版本自动匹配 Java（失败回退 javaPath）
   memMode: auto           # auto | custom
   memGB: 4                # 1-16
   gc: auto                # auto | zgc | g1
@@ -279,10 +284,11 @@ advanced:
     port: 25565
 
 download:
-  fileSource: mirror      # mirror | official | official-only
-  versionSource: mirror
-  threads: 16             # 1-64
-  speedLimit: 0           # KB/s, 0=不限速
+  source: bmclapi        # official | bmclapi | custom（旧 fileSource/versionSource 自动迁移）
+  threads: 16            # 1-64
+  customVersionManifest: ""   # 仅 source=custom 时生效
+  customMavenHost: ""
+  customAssetsHost: ""
 
 network:
   securityId:
@@ -355,6 +361,9 @@ win.mainWindow?.webContents.send('install:progress', data);
 | `java:scan` / `java:resolve` | Java 环境检测（JAVA_HOME/PATH/常见目录）/ 路径校验 |
 | `mods:search` / `mods:install` | Mod 操作 |
 | `instance:create` / `instance:list` / `instance:delete` / `instance:install` / `instance:import` | 实例操作（启动统一走 `launch:launch`） |
+| `instance:repair` / `instance:diagnose` / `instance:launch-info` / `instance:version-loaders` | 依赖体检与一键修复（修复进度走 `instance:progress`，`channel='repair'`） |
+| `instance:icon` / `instance:set-icon` / `instance:reset-icon` | 实例图标：读（候选文件 → data URL）/ 从本地图片设置（写 `logo.<ext>`）/ 恢复默认 |
+| `instance:inspect-dir` / `instance:discover-dirs` / `instance:scan-dir` | 目录识别 / 自动查找 / 版本扫描 |
 | `background:set-image` / `background:set-color` / `background:reset` | 背景操作 |
 | `task:progress` / `task:completed` | 任务进度 |
 | `system:info` / `system:open-path` | 系统信息 / 打开路径 |
@@ -369,13 +378,30 @@ launchStore.launch(instanceName, gamePath)
   → launchGame({instanceName, gamePath, profile, server?})   # src/api/launch.ts
   → ipc launch:launch                                        # electron/handlers/launch.ts
       → getConfig()               # 主进程内存权威配置
-      → getInstanceInfo()         # 实例 runtime / path / 健康检查
-      → resolveJavaPath()         # config.javaPath → 系统扫描 → PATH
+      → planInstanceLaunch()      # 实例 + 启动方案（launch-target.ts），依赖不就绪直接拒绝
+      → Version.parse(plan.resourceRoot, plan.resolved.id)
+      → resolveJavaPath()         # java.autoJavaPath=自动匹配 → config.javaPath → 系统扫描 → PATH
       → buildLaunchOptions()      # electron/core/launch-options.ts（配置→LaunchOption 映射）
+      → 用已解析版本覆盖 launchOption.version
       → @xmcl/core launch() + createMinecraftProcessWatcher
-      → 事件 launch:event（stdout/stderr/window-ready/exit）+ playtime 累计
+      → 事件 launch:event（plan/warning/stdout/stderr/window-ready/exit）+ playtime 累计
       → window-ready 时按 advanced.afterLaunch 处理启动器窗口（close/minimize/keep）
 ```
+
+**启动方案（`electron/core/launch-target.ts`）**——决定「从哪读版本、启动哪个版本、能不能启动」：
+
+- `resolveLaunchRoots()`：`instance-custom`（实例 `resourcePath`）→ `instance`（实例自带 `versions/`）→
+  `shared`（`game.resourceDir`）；`gameRoot` 恒为实例目录，运行期数据不写进共享目录。
+- `resolveLaunchVersionId()`：`launchVersion` → 按加载器匹配 → 原版 id → 名称近似匹配（`via` 分别为
+  `configured` / `loader` / `base` / `fallback`），失败抛 `LAUNCH_VERSION_NOT_FOUND`。
+- `checkDependencies()`：校验版本 JSON、客户端 JAR 与 `rules` 过滤后的 `libraries`（含 `inheritsFrom` 链），
+  返回 `DependencyReport{ready, missingLibraries, missingVersions, missingJar, missingAssetIndex, checkedLibraries}`，
+  经 `describeDependencyReport()` 转为可读中文提示。
+- 修复入口：`repairInstance`（IPC `instance:repair`）按「原版 → 加载器 → 依赖库 → 回写 launchVersion」补齐；
+  实例详情页「修复」按钮与 `launch:event` 的 `plan`/`warning` 事件即为此链路。
+
+**Java 自动匹配**：`requiredJavaMajor(mcVersion)`（1.20.5+/1.21+→21、1.17–1.20.4→17、≤1.16.5→8、快照→21），
+`planJavaForVersion()`（IPC `java:plan`）给出所需主版本、选中路径与候选列表，供设置页预览。
 
 **配置 → 启动参数映射**（`buildLaunchOptions`）：
 
@@ -532,7 +558,7 @@ z-200 StartupPopup        启动弹窗 (环境变量控制)
 | `SectionTitle` / `PageHeader` | HeroUI Typography.Heading / Paragraph |
 | `SettingBadge` | 统一徽章：neutral / primary / success / warning / info / error / violet |
 | `SettingListItem` | 列表项行（版本行/扫描行，支持 selected 高亮） |
-| `SettingSelect` / `SettingNumberField` / `SettingSwitch` / `SettingRadioGroup` / `SettingTextArea` / `SettingFilePicker` | HeroUI 控件封装 |
+| `SettingSelect` / `SettingNumberField` / `SettingSwitch` / `SettingRadioGroup` / `SettingTextArea` / `SettingFilePicker` / `SettingInput` | HeroUI 控件封装（`SettingInput` 支持 `mono` 等宽、`suffix` 右侧插槽、`onEnter`） |
 | `fieldCls` | 输入框统一样式类（见下方注意） |
 
 **HeroUI 3 控件要点（易踩坑）**：
@@ -543,28 +569,55 @@ z-200 StartupPopup        启动弹窗 (环境变量控制)
 4. **Select 单选**：`selectedKey` + `onSelectionChange`（回调可能是 `Key | null` 或 `Set<Key>`，控件内已做兼容）。
 5. **NumberField**：Group 内需显式渲染 Increment/Decrement 按钮。
 
-### 游戏目录版本识别（设置页 → 导入）
+### 游戏目录识别与导入（PCL2 式）
 
-- 扫描任意目录（主目录 / 已添加目录）→ `instance:scan-dir` → `scanGameDirectories`（读 `versions/` 子目录，检测 JSON/JAR 健康度与 Forge/Fabric/Quilt/OptiFine 加载器）。
-- **导入源 = 当前扫描目录**：`handleImport`/`handleImportAll` 传 `scanTarget` 作为 `sourceGamePath`，实例仍创建在主库 `gameDir/instances/`。
-- **主目录变更自动重扫**（`useEffect([gameDir])`），旧结果先清空。
+- **目录归一化**：`normalizeGameFolder()`（`electron/core/game-folder.ts`）把用户选中的 `versions/`、
+  单个版本目录或实例目录上溯为游戏根（`kind` = `game-root` / `versions-dir` / `version-dir` / `instance` / `unknown`）。
+- **目录识别**：`inspectGameFolder()`（IPC `instance:inspect-dir`）返回 `GameFolderInfo`——
+  启动器类型（`detectLauncher`：koring / official / pcl / hmcl / prism / multimc / unknown）、
+  版本总数与健康数、`libraries`/`assets` 标记、加载器汇总、告警。
+- **自动查找**：`discoverGameFolders()`（IPC `instance:discover-dirs`）扫描本机常见位置（含已添加目录），
+  返回带启动器徽章与版本数的候选列表。
+- **版本扫描**：`instance:scan-dir` → `scanGameDirectories`，内部走 `version-scan.ts`
+  （`readVersionChain` 解析 `inheritsFrom` 链、检测 Forge/Fabric/Quilt/NeoForge/OptiFine，`healthy = hasJson && hasJar`）。
+- **导入模式**（`importExistingInstance(..., mode)`）：`reference`（默认，只记 `resourcePath` 引用源目录）与
+  `copy`（复制继承链版本目录，并尝试以目录链接共享源 `libraries`/`assets`，失败回退引用）。
 - **批量导入幂等**：先取 `listInstances` 名集合，已存在实例跳过并计入「跳过」。
 - **相对 gameDir 归一化**：`electron/core/paths.ts` 的 `resolveGamePath` 在 IPC 边界（instance/launch/task）统一应用，相对路径按 exe 目录（打包）/ 项目根（开发）解析，与 `.minecraft` 创建位置一致。
+
+### 实例卡片画廊（gallery）
+
+- **卡片网格**：`src/pages/gallery/index.tsx` 为「工具栏 + 卡片网格 ⇄ 详情」两视图；
+  `InstanceCard.tsx` 展示图标、名称、加载器 / 版本 / 可启动徽章、分类标签、模组数与游玩时长，
+  卡片上可直接启动、打开目录、点星标收藏；点卡片主体进入 `InstanceDetail`（detail 视图，带返回按钮）。
+- **实例图标**：实例目录里放 `logo.png` 即作为图标（候选顺序 `INSTANCE_ICON_CANDIDATES`：
+  `logo.png` → `logo.jpg` → `logo.jpeg` → `logo.webp` → `icon.png` … → `PCL/logo.png`），
+  缺失时回退 `instance.json` 的 `icon` 字段（支持 `data:` / `http(s)` / 相对路径），仍无则显示按实例名取色的默认图标。
+  读取走 IPC `instance:icon`（主进程按文件头嗅探 PNG/JPEG/WebP/GIF/BMP，**上限 2 MB**，超限或非图片返回 `problem` 文案），
+  以 data URL 交给 `ManagedImage` 渲染——注意必须传 `cacheKey`（`InstanceIcon.tsx` 用
+  `instance-icon:<name>:<mtimeMs>`），否则整段 base64 会成为资源注册表 key。
+  设置/清除走 `instance:set-icon`（校验后写 `<实例>/logo.<ext>` 并清掉其它候选文件）与 `instance:reset-icon`。
+- **分类与收藏**：存在 `instance.json`（`InstanceConfig.favorite` / `category`），经 `instance:update` 写入，
+  `listInstances` 会一并带回；画廊据此聚合分类筛选标签（含「未分类」）、收藏筛选与排序
+  （最近游玩 / 名称 / 游玩时长 / 创建时间），搜索同时匹配实例名、显示名、分类与 MC 版本。
+- **状态层**：`src/stores/instanceStore.ts` 的 `icons` 缓存 + `loadIcon`（按 `gamePath::name` 去重）、
+  `setIcon` / `resetIcon` / `updateMeta`（单实例）/ `bulkUpdateMeta`（批量归类）。
+  旧的 `InstanceList.tsx` 已被卡片取代并删除。
 
 ### 设置子页面状态（参考 PCL2 组织）
 
 | 分组 | 页面 | 状态 | 对接 |
 |---|---|---|---|
 | 通用 | 主页 / Koring 账户 / 关于 / 版权 | 保留 | — |
-| 游戏 | 游戏账户&档案 | 实装 | `auth:offline-login`（离线账号）；微软按钮占位 |
-| 游戏 | Java虚拟机与内存 | 实装 | `java:scan` / `java:resolve` / `java.*` |
-| 游戏 | 游戏目录 | 实装 | `instance:scan-dir` / `instance:import`（sourceGamePath） |
-| 游戏 | 高级设置 | 实装 | `advanced.*`（含快速进入服务器 `advanced.server`） |
+| 游戏 | 游戏账户&档案 | 实装 | `auth:offline-login`（离线账号）+ 启动档案（`--username` / `--uuid` / 认证方式）；微软按钮占位 |
+| 游戏 | Java虚拟机与内存 | 实装 | `java:scan` / `java:resolve` / `java:plan`（自动匹配预览）/ `java.*` |
+| 游戏 | 游戏目录 | 实装 | `instance:inspect-dir` / `instance:discover-dirs` / `instance:scan-dir` / `instance:import`（mode: reference\|copy）+ 共享资源目录 |
+| 游戏 | 高级设置 | 实装 | `advanced.*`（含快速进入服务器 `advanced.server`、调试模式 `advanced.debugMode`） |
 | 个性化 | 主题与背景 | 实装 | `theme.*` / `background.*` |
 | 个性化 | 主界面 | 实装 | `ui.showInstanceTitle` / `ui.showTaskButton`（应用到 InstanceTitle / WindowControls） |
 | 个性化 | 语言 | 实装 | `app.language`（保存 + `<html lang>`；语言包开发中） |
 | 个性化 | 辅助功能 | 实装 | `a11y.*` |
-| 网络 | 下载 | 实装 | `download.*` |
+| 网络 | 下载 | 实装 | `download.source`（official\|bmclapi\|custom）/ `threads` / `customVersionManifest` / `customMavenHost` / `customAssetsHost` |
 | 网络 | 安全识别服务 | 实装 | `network.securityId` |
 | 网络 | 以太联机 / 陶瓦联机 | 占位 | 无后端接口 |
 | 其他 | 服务与反馈 / 赞助我们 / 开发者选项 | 保留 | — |

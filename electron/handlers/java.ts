@@ -2,6 +2,7 @@ import electron from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { scanLocalJava, resolveJava } from '@xmcl/installer';
+import { planJavaForVersion } from '../core/launch-options';
 
 const { ipcMain } = electron;
 
@@ -55,6 +56,16 @@ export function registerJavaHandlers() {
     try {
       const java = await resolveJava(payload.path);
       return { success: true, data: { java: java ?? null }, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // Java 自动匹配方案：该 MC 版本要求的主版本 + 本机候选 + 自动选中的路径
+  ipcMain.handle('java:plan', async (_event, payload: { minecraftVersion?: string }) => {
+    try {
+      const plan = await planJavaForVersion(payload?.minecraftVersion?.trim() || '1.21');
+      return { success: true, data: plan, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }

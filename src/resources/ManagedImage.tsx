@@ -13,6 +13,8 @@ export interface ManagedImageProps
   source: string;
   /** 目标长边上限（超过则降采样，默认 1024） */
   maxDimension?: number;
+  /** 自定义注册表 key（源很长时必传，例如实例图标的 data URL） */
+  cacheKey?: string;
   /** 加载中占位（默认无） */
   loadingFallback?: ReactNode;
   /** 失败占位（默认无） */
@@ -22,12 +24,13 @@ export interface ManagedImageProps
 export function ManagedImage({
   source,
   maxDimension,
+  cacheKey,
   loadingFallback = null,
   errorFallback = null,
   alt,
   ...rest
 }: ManagedImageProps) {
-  const { status, url } = useManagedImage(source, { maxDimension });
+  const { status, url } = useManagedImage(source, { maxDimension, key: cacheKey });
 
   if (status === "idle" || status === "loading") {
     return <>{loadingFallback}</>;

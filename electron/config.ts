@@ -45,15 +45,20 @@ export interface BackgroundConfig {
 
 export interface GameConfig {
   gameDir: string;
+  /**
+   * 共享资源目录（可选）：versions / libraries / assets 从该目录读取。
+   * 留空表示各实例自包含（实例目录内的 versions/libraries/assets）。
+   * 启动解析顺序：实例 resourcePath → 实例目录 → 此处配置的共享目录。
+   */
   resourceDir: string;
-  savesDir: string;
-  instancesDir: string;
   /** 已添加的游戏目录列表 */
   gameDirs: string[];
 }
 
 export interface JavaConfig {
   javaPath: string;
+  /** 自动选择 Java：开启后忽略 javaPath，按实例的 Minecraft 版本挑选最合适的运行时 */
+  autoJavaPath: boolean;
   memMode: string;
   memGB: number;
   gc: string;
@@ -87,6 +92,10 @@ export interface UiConfig {
   showInstanceTitle: boolean;
   /** 标题栏任务队列按钮显示 */
   showTaskButton: boolean;
+  /** 首页实例标题下的副信息：version（版本）/ loader（加载器）/ playtime（游玩时长）/ none */
+  homeTitleDetail: string;
+  /** 首页启动按钮下方的快捷入口（选择实例 / 打开目录） */
+  showQuickActions: boolean;
 }
 
 /**
@@ -108,11 +117,23 @@ export interface ActivationConfig {
   upgradeTarget: string;
 }
 
+/**
+ * 下载配置：主进程所有安装 / 依赖补齐的唯一来源。
+ * 旧的 fileSource / versionSource / speedLimit 已废弃：
+ * - fileSource + versionSource 合并为统一的 source
+ * - speedLimit 删除（@xmcl/file-transfer 无带宽限制能力，保留会变成假设置）
+ */
 export interface DownloadConfig {
-  fileSource: string;
-  versionSource: string;
+  /** 下载源：official | bmclapi | custom */
+  source: string;
+  /** 并发线程数（1-64），同时作用于 libraries 与 assets */
   threads: number;
-  speedLimit: number;
+  /** 自定义源：版本清单地址 */
+  customVersionManifest: string;
+  /** 自定义源：Maven 仓库根地址 */
+  customMavenHost: string;
+  /** 自定义源：资源文件根地址 */
+  customAssetsHost: string;
 }
 
 export interface SecurityIdConfig {
@@ -182,12 +203,12 @@ const DEFAULTS: AppConfig = {
   theme: { darkMode: 'auto', parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 },
-  game: { gameDir: '.minecraft', resourceDir: '', savesDir: '', instancesDir: '.minecraft/instances', gameDirs: [] },
-  java: { javaPath: '', memMode: 'auto', memGB: 4, gc: 'auto', jvmArgs: '' },
+  game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [] },
+  java: { javaPath: '', autoJavaPath: true, memMode: 'auto', memGB: 4, gc: 'auto', jvmArgs: '' },
   advanced: { afterLaunch: 'close', winMode: 'default', customWidth: 854, customHeight: 480, gameArgs: '', preLaunchCmd: '', debugMode: false, server: { ip: '', port: 25565 } },
-  download: { fileSource: 'mirror', versionSource: 'mirror', threads: 16, speedLimit: 0 },
+  download: { source: 'bmclapi', threads: 16, customVersionManifest: '', customMavenHost: '', customAssetsHost: '' },
   network: { securityId: { enabled: false, authUrl: '' } },
-  ui: { showInstanceTitle: true, showTaskButton: true },
+  ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: 'version', showQuickActions: true },
   activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: '', reason: '', upgradeTarget: '' },
   update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', channel: 'woker', error: '' },
   instances: [],
@@ -197,6 +218,30 @@ function migrate(config: AppConfig): AppConfig {
   if (config.version < 1) {
     config.version = 1;
   }
+
+  // 下载配置迁移：fileSource / versionSource / speedLimit → source + threads
+  const legacy = config.download as unknown as {
+    fileSource?: string;
+    versionSource?: string;
+    speedLimit?: number;
+    source?: string;
+    threads?: number;
+    customVersionManifest?: string;
+    customMavenHost?: string;
+    customAssetsHost?: string;
+  };
+  if (!legacy.source) {
+    const raw = legacy.fileSource || legacy.versionSource;
+    legacy.source = raw === 'official' ? 'official' : 'bmclapi';
+  }
+  config.download = {
+    source: legacy.source === 'official' || legacy.source === 'custom' ? legacy.source : 'bmclapi',
+    threads: Math.min(64, Math.max(1, Number(legacy.threads) || DEFAULTS.download.threads)),
+    customVersionManifest: legacy.customVersionManifest || '',
+    customMavenHost: legacy.customMavenHost || '',
+    customAssetsHost: legacy.customAssetsHost || '',
+  };
+
   return config;
 }
 
@@ -242,7 +287,8 @@ export function loadConfig(): AppConfig {
     const raw = fs.readFileSync(filePath, 'utf-8');
     if (!raw.trim()) return { ...DEFAULTS };
     const parsed = yaml.load(raw) as Partial<AppConfig>;
-    const config = migrate({ ...DEFAULTS, ...parsed } as AppConfig);
+    // 用 mergeDeep 补齐嵌套默认值：旧配置文件缺少新键时不会变成 undefined
+    const config = migrate(mergeDeep(DEFAULTS, parsed) as AppConfig);
     config.version = CURRENT_VERSION;
     return config;
   } catch {

@@ -165,7 +165,9 @@ export function BackgroundLayer() {
       transition: "filter 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s ease-out",
     };
     const filters: string[] = [];
-    if (blur > 0) filters.push(`blur(${blur}px)`);
+    // 首页保持壁纸原样：背景模糊（主题与背景里的设置）只作用于内容页，
+    // 与内容模糊层同条件，避免首页壁纸被模糊。
+    if (blur > 0 && showContentBlur) filters.push(`blur(${blur}px)`);
     if (contentBlur) filters.push("blur(24px) saturate(120%)");
     if (filters.length) style.filter = filters.join(" ");
     if (type === "color") {

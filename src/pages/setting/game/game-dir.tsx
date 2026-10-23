@@ -1,24 +1,49 @@
-//  __         __     __   __     ______     __  __     ______        __   __     ______     ______
-// /\ \       /\ \   /\ "-.\ \   /\  ___\   /\ \/ /    /\  ___\      /\ "-.\ \   /\  ___\   /\__  _\
-// \ \ \____  \ \ \  \ \ \-.  \  \ \ \__ \  \ \  _"-.  \ \  __\      \ \ \-.  \  \ \  __\   \/_/\ \/
-//  \ \_____\  \ \_\  \ \_\\"\_\  \ \_____\  \ \_\ \_\  \ \_____\     \ \_\\"\_\  \ \_____\    \ \_\
-//   \/_____/   \/_/   \/_/ \/_/   \/_____/   \/_/\/_/   \/_____/      \/_/ \/_/   \/_____/     \/_/
-//
-// 所有权利归Lingke Network (china)所有 | dream_pep拥有其艺术改变权力
-// 未经允许的情况下删除此版权头可能会受到民事指控
-// 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
-
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Button, Skeleton } from "@heroui/react";
-import { RefreshCw, FolderOpen, Trash2, Search, Plus, CircleCheck, CircleAlert, Home, Check, Download, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@heroui/react";
+import {
+  FolderOpen,
+  FolderPlus,
+  FolderSearch,
+  RefreshCw,
+  Trash2,
+  Check,
+  Loader2,
+  Star,
+  AlertCircle,
+  Copy,
+  Link2,
+  HardDrive,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useConfigStore } from "@/stores/configStore";
 import { useInstanceStore } from "@/stores/instanceStore";
-import { listInstances, scanGameDir, selectFolder, importExistingInstance, type ScannedVersion } from "@/api/instance";
-import { SettingCard, SettingBadge, SettingListItem, PageHeader, SectionTitle, type SettingBadgeVariant } from "@/components/setting";
+import {
+  importExistingInstance,
+  listInstances,
+  selectFolder,
+  inspectGameFolder,
+  discoverGameFolders,
+  openPath,
+  type GameFolderInfo,
+  type GameFolderCandidate,
+  type DiscoveryResult,
+  type ImportMode,
+  type LauncherKind,
+  type ScannedVersion,
+} from "@/api/instance";
+import {
+  PageHeader,
+  SectionTitle,
+  SettingCard,
+  SettingBadge,
+  SettingListItem,
+  SettingRadioGroup,
+  SettingRow,
+  type SettingBadgeVariant as BadgeVariant,
+} from "@/components/setting";
 
-// 版本类型标签（统一徽章变体）
-const TYPE_BADGE: Record<string, { label: string; variant: SettingBadgeVariant }> = {
+// 版本类型徽章
+const TYPE_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
   release: { label: "正式版", variant: "success" },
   snapshot: { label: "预览版", variant: "warning" },
   old_alpha: { label: "Alpha", variant: "violet" },
@@ -26,402 +51,594 @@ const TYPE_BADGE: Record<string, { label: string; variant: SettingBadgeVariant }
   unknown: { label: "未知", variant: "neutral" },
 };
 
-// 加载器标签（统一徽章变体）
-const LOADER_BADGE: Record<string, { label: string; variant: SettingBadgeVariant }> = {
+// 加载器徽章
+const LOADER_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
   forge: { label: "Forge", variant: "warning" },
+  neoforge: { label: "NeoForge", variant: "warning" },
   fabric: { label: "Fabric", variant: "info" },
   quilt: { label: "Quilt", variant: "violet" },
   optifine: { label: "OptiFine", variant: "violet" },
 };
 
-function getBadge(type: string) {
-  return TYPE_BADGE[type] ?? TYPE_BADGE.unknown;
-}
+// 启动器（目录来源）识别结果
+const LAUNCHER_META: Record<LauncherKind, { label: string; variant: BadgeVariant }> = {
+  koring: { label: "Koring 启动器目录", variant: "primary" },
+  official: { label: "官方启动器目录", variant: "info" },
+  pcl: { label: "PCL2 目录", variant: "violet" },
+  hmcl: { label: "HMCL 目录", variant: "success" },
+  prism: { label: "Prism Launcher 目录", variant: "info" },
+  multimc: { label: "MultiMC 目录", variant: "info" },
+  unknown: { label: "未识别的目录", variant: "neutral" },
+};
 
-function formatTime(iso?: string): string {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return d.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+const KIND_LABEL: Record<GameFolderInfo["kind"], string> = {
+  "game-root": "游戏根目录",
+  "versions-dir": "versions 子目录",
+  "version-dir": "单个版本目录",
+  instance: "启动器实例目录",
+  unknown: "未识别",
+};
+
+function formatTime(time?: string): string {
+  if (!time) return "";
+  const date = new Date(time);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
 function FileStatus({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <SettingBadge variant={ok ? "success" : "error"}>
-      {ok ? <CircleCheck className="w-3 h-3" /> : <CircleAlert className="w-3 h-3" />}
-      {label}
-    </SettingBadge>
+    <span className={`text-[11px] ${ok ? "text-green-600 dark:text-green-400" : "text-red-500/80"}`}>
+      {ok ? "✓" : "✕"} {label}
+    </span>
   );
 }
 
 export function GameDirSetting() {
-  const game = useConfigStore((s) => s.config.game);
+  const gameDir = useConfigStore((s) => s.config.game.gameDir);
+  const gameDirs = useConfigStore((s) => s.config.game.gameDirs);
+  const resourceDir = useConfigStore((s) => s.config.game.resourceDir);
   const setGame = useConfigStore((s) => s.setGame);
+
+  const instances = useInstanceStore((s) => s.instances);
   const fetchInstances = useInstanceStore((s) => s.fetchInstances);
 
-  const [scanning, setScanning] = useState(false);
-  const [scanTarget, setScanTarget] = useState<string>("");
-  const [scanResults, setScanResults] = useState<ScannedVersion[] | null>(null);
-  const [importing, setImporting] = useState<string | null>(null); // 正在导入的版本 ID
-  const [importingBatch, setImportingBatch] = useState(false);
+  // 目录识别结果缓存：路径 → GameFolderInfo
+  const [infos, setInfos] = useState<Record<string, GameFolderInfo | null>>({});
+  const [scanning, setScanning] = useState<string | null>(null);
+  const [discovering, setDiscovering] = useState(false);
+  const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("reference");
+  const [importing, setImporting] = useState<Record<string, boolean>>({});
+  const [importingBatch, setImportingBatch] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const dirs = game.gameDirs ?? [];
-  const gameDir = game.gameDir || ".minecraft";
+  const mainDir = gameDir || ".minecraft";
+  const folders = useMemo(
+    () => Array.from(new Set([mainDir, ...(gameDirs || [])].filter((p) => !!p))),
+    [mainDir, gameDirs]
+  );
+  const importedNames = useMemo(() => new Set(instances.map((i) => i.name)), [instances]);
 
-  // 扫描指定目录
-  const handleScan = useCallback(async (targetPath?: string) => {
-    const scanPath = targetPath || gameDir;
-    setScanning(true);
-    setScanTarget(scanPath);
-    setScanResults(null);
+  // ---------- 识别 ----------
+  const recognize = useCallback(async (target: string) => {
+    setScanning(target);
     try {
-      const result = await scanGameDir(scanPath);
-      setScanResults(result.versions);
-      if (result.versions.length === 0) {
-        toast.info("未在 versions 目录下发现任何已安装版本");
-      } else {
-        toast.success(`已扫描到 ${result.versions.length} 个游戏版本`);
-      }
+      const { info } = await inspectGameFolder(target);
+      setInfos((prev) => ({ ...prev, [target]: info }));
+      return info;
     } catch (e: any) {
-      toast.error(`扫描失败: ${e.message}`);
+      setInfos((prev) => ({ ...prev, [target]: null }));
+      toast.error(`识别失败: ${e?.message || e}`);
+      return null;
+    } finally {
+      setScanning(null);
     }
-    setScanning(false);
-  }, [gameDir]);
-
-  // 组件挂载时自动扫描主目录
-  useEffect(() => {
-    handleScan(gameDir);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 主目录变化时自动重扫新目录（跳过首次挂载）
-  const firstRunRef = useRef(true);
+  // 挂载 / 目录变化时自动识别（PCL2 式：选中目录即识别）
   useEffect(() => {
-    if (firstRunRef.current) {
-      firstRunRef.current = false;
-      return;
-    }
-    handleScan(gameDir);
-  }, [gameDir, handleScan]);
-
-  // 导入单个版本（来源 = 当前扫描目录，实例建在主库）
-  const handleImport = async (versionId: string) => {
-    const source = scanTarget || gameDir;
-    setImporting(versionId);
-    try {
-      await importExistingInstance(versionId, gameDir, versionId, {
-        description: `Imported from ${source}`,
-        sourceGamePath: source,
-      });
-      await fetchInstances(gameDir);
-      toast.success(`已导入版本 ${versionId}`);
-    } catch (e: any) {
-      toast.error(`导入失败: ${e.message}`);
-    }
-    setImporting(null);
-  };
-
-  // 批量导入所有健康版本（幂等：已存在实例跳过）
-  const handleImportAll = async () => {
-    if (!scanResults || scanResults.length === 0) return;
-    const healthy = scanResults.filter((v) => v.healthy);
-    if (healthy.length === 0) {
-      toast.info("没有可导入的健康版本");
-      return;
-    }
-    const source = scanTarget || gameDir;
-    setImportingBatch(true);
-    let success = 0;
-    let failed = 0;
-    let skipped = 0;
-    // 已有实例名集合，避免重复导入全部失败
-    let existing = new Set<string>();
-    try {
-      const list = await listInstances(gameDir);
-      existing = new Set(list.map((i) => i.name));
-    } catch {}
-    for (const v of healthy) {
-      if (existing.has(v.id)) {
-        skipped++;
-        continue;
+    for (const folder of folders) {
+      if (!(folder in infos)) {
+        void recognize(folder);
       }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folders.join("|")]);
+
+  useEffect(() => {
+    void fetchInstances(mainDir).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainDir]);
+
+  // ---------- 目录管理 ----------
+  const handleAddFolder = useCallback(async () => {
+    const picked = await selectFolder();
+    if (!picked) return;
+
+    const pickedPath = picked.folderPath;
+    let info: GameFolderInfo | null = null;
+    try {
+      const result = await inspectGameFolder(pickedPath);
+      info = result.info;
+      const target = result.normalized.rootPath || pickedPath;
+
+      for (const warning of result.normalized.warnings) {
+        toast.warning(warning);
+      }
+
+      if (target === mainDir || (gameDirs || []).includes(target)) {
+        toast.info("该目录已在列表中");
+        setInfos((prev) => ({ ...prev, [target]: info }));
+        return;
+      }
+
+      setGame({ gameDirs: [...(gameDirs || []), target] });
+      setInfos((prev) => ({ ...prev, [target]: info }));
+
+      const meta = LAUNCHER_META[info.launcher];
+      const changed = result.normalized.rootPath && result.normalized.rootPath !== pickedPath;
+      toast.success(
+        `${changed ? "已从子目录上溯到游戏根目录：" : ""}识别为${meta.label}，共 ${info.versionCount} 个版本（${info.healthyCount} 个可用）`
+      );
+    } catch (e: any) {
+      toast.error(`识别失败: ${e?.message || e}`);
+    }
+  }, [gameDirs, mainDir, setGame]);
+
+  const handleRemoveDir = useCallback(
+    (target: string) => {
+      setGame({ gameDirs: (gameDirs || []).filter((d) => d !== target) });
+    },
+    [gameDirs, setGame]
+  );
+
+  const handleSetAsMain = useCallback(
+    (target: string) => {
+      const rest = folders.filter((f) => f !== target);
+      setGame({ gameDir: target, gameDirs: rest });
+      toast.success("已设为当前游戏目录");
+    },
+    [folders, setGame]
+  );
+
+  const handleOpen = useCallback(async (target: string) => {
+    try {
+      const { error } = await openPath(target);
+      if (error) toast.error(`无法打开目录: ${error}`);
+    } catch (e: any) {
+      toast.error(`无法打开目录: ${e?.message || e}`);
+    }
+  }, []);
+
+  const handleBrowseResourceDir = useCallback(async () => {
+    const picked = await selectFolder();
+    if (!picked) return;
+    setGame({ resourceDir: picked.folderPath });
+    toast.success("已设置共享资源目录");
+  }, [setGame]);
+
+  // ---------- 自动查找 ----------
+  const handleDiscover = useCallback(async () => {
+    setDiscovering(true);
+    try {
+      const result = await discoverGameFolders(folders);
+      setDiscovery(result);
+      if (result.candidates.length === 0) {
+        toast.info("未发现新的游戏目录，可手动添加");
+      } else {
+        toast.success(`发现 ${result.candidates.length} 个候选目录`);
+      }
+    } catch (e: any) {
+      toast.error(`查找失败: ${e?.message || e}`);
+    }
+    setDiscovering(false);
+  }, [folders]);
+
+  const handleAddCandidate = useCallback(
+    async (candidate: GameFolderCandidate) => {
+      if (folders.includes(candidate.path)) return;
+      setGame({ gameDirs: [...(gameDirs || []), candidate.path] });
+      toast.success(`已添加 ${candidate.label}`);
+      void recognize(candidate.path);
+    },
+    [folders, gameDirs, setGame, recognize]
+  );
+
+  // ---------- 导入 ----------
+  const handleImport = useCallback(
+    async (source: string, versionId: string) => {
+      setImporting((prev) => ({ ...prev, [versionId]: true }));
       try {
-        await importExistingInstance(v.id, gameDir, v.id, {
+        await importExistingInstance(versionId, mainDir, versionId, {
           description: `Imported from ${source}`,
           sourceGamePath: source,
+          mode: importMode,
         });
-        success++;
-      } catch {
-        failed++;
+        toast.success(`已导入实例「${versionId}」`);
+        await fetchInstances(mainDir).catch(() => {});
+      } catch (e: any) {
+        toast.error(`导入「${versionId}」失败: ${e?.message || e}`);
       }
-    }
-    await fetchInstances(gameDir);
-    setImportingBatch(false);
-    const parts = [`成功 ${success}`];
-    if (skipped > 0) parts.push(`跳过 ${skipped}`);
-    if (failed > 0) parts.push(`失败 ${failed}`);
-    if (failed === 0 && skipped === 0) {
-      toast.success(`成功导入 ${success} 个版本`);
-    } else if (failed === 0) {
-      toast.success(`导入完成：${parts.join('，')}`);
-    } else {
-      toast.warning(`导入完成：${parts.join('，')}`);
-    }
-  };
+      setImporting((prev) => ({ ...prev, [versionId]: false }));
+    },
+    [mainDir, importMode, fetchInstances]
+  );
 
-  // 浏览选择主目录
-  const handleBrowseMainDir = async () => {
-    try {
-      const result = await selectFolder();
-      if (result?.folderPath) {
-        setGame({ gameDir: result.folderPath });
-        toast.success(`已设置游戏目录为: ${result.folderPath}`);
-      }
-    } catch (e: any) {
-      toast.error(`选择目录失败: ${e.message}`);
-    }
-  };
-
-  // 手动添加目录
-  const handleAddFolder = async () => {
-    try {
-      const result = await selectFolder();
-      if (result?.folderPath) {
-        const p = result.folderPath;
-        const current = game.gameDirs ?? [];
-        if (current.includes(p)) {
-          toast.info("该目录已在列表中");
-          return;
+  const handleImportAll = useCallback(
+    async (source: string, versions: ScannedVersion[]) => {
+      setImportingBatch(source);
+      let ok = 0;
+      let skipped = 0;
+      let failed = 0;
+      try {
+        const existing = await listInstances(mainDir);
+        const names = new Set(existing.map((i) => i.name));
+        for (const version of versions) {
+          if (names.has(version.id)) {
+            skipped += 1;
+            continue;
+          }
+          try {
+            await importExistingInstance(version.id, mainDir, version.id, {
+              description: `Imported from ${source}`,
+              sourceGamePath: source,
+              mode: importMode,
+            });
+            names.add(version.id);
+            ok += 1;
+          } catch {
+            failed += 1;
+          }
         }
-        setGame({ gameDirs: [...current, p] });
-        toast.success(`已添加目录: ${p}`);
+        await fetchInstances(mainDir).catch(() => {});
+        toast.success(`批量导入完成：成功 ${ok} 个，跳过 ${skipped} 个，失败 ${failed} 个`);
+      } catch (e: any) {
+        toast.error(`批量导入失败: ${e?.message || e}`);
       }
-    } catch (e: any) {
-      toast.error(`选择目录失败: ${e.message}`);
-    }
-  };
-
-  // 删除已添加的目录
-  const handleRemoveDir = (dir: string) => {
-    setGame({ gameDirs: dirs.filter((d) => d !== dir) });
-    toast.success("已移除目录");
-  };
-
-  // 设为当前游戏目录
-  const handleSetAsMain = (dir: string) => {
-    setGame({ gameDir: dir });
-    toast.success(`已将 ${dir} 设为主游戏目录`);
-  };
-
-  // 可导入的健康版本数
-  const importableCount = scanResults?.filter((v) => v.healthy).length ?? 0;
+      setImportingBatch(null);
+    },
+    [mainDir, importMode, fetchInstances]
+  );
 
   return (
     <div>
-      <PageHeader title="游戏目录" desc="管理 Minecraft 游戏的存放位置与发现已安装版本" />
+      <PageHeader
+        title="游戏目录"
+        desc="识别并管理游戏版本文件夹（兼容官方启动器 / PCL2 / HMCL / Prism 等目录结构）"
+      />
 
       <div className="space-y-6">
-        {/* 主游戏目录配置 */}
+        {/* 自动查找 */}
         <div>
-          <SectionTitle>主游戏目录</SectionTitle>
+          <SectionTitle>自动查找</SectionTitle>
           <SettingCard>
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium font-mono text-foreground truncate">{gameDir}</p>
-                <p className="text-[12px] text-muted-foreground/70 mt-0.5">新实例默认安装到此目录</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button size="sm" variant="outline" onPress={handleBrowseMainDir}>
-                  <FolderOpen className="w-3.5 h-3.5" />
-                  浏览
+            <div className="space-y-3">
+              <SettingRow
+                label="扫描本机常见位置"
+                desc="查找 .minecraft、PCL / HMCL 数据目录、各盘符根目录下的游戏目录"
+              >
+                <Button size="sm" variant="outline" onPress={handleDiscover} isDisabled={discovering}>
+                  {discovering ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FolderSearch className="w-3.5 h-3.5" />
+                  )}
+                  {discovering ? "查找中..." : "自动查找"}
                 </Button>
-                <Button size="sm" variant="outline" onPress={() => handleScan(gameDir)} isDisabled={scanning}>
-                  {scanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  刷新
-                </Button>
-              </div>
-            </div>
+              </SettingRow>
 
-            {/* 扫描中骨架屏 */}
-            {scanning && scanTarget === gameDir && (
-              <div className="mt-4 space-y-2">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full rounded-lg" />
-                ))}
-              </div>
-            )}
-
-            {/* 扫描结果 */}
-            {scanResults !== null && scanTarget === gameDir && (
-              <div className="mt-4 border-t border-border/30 dark:border-white/[0.05] pt-4">
-                {scanResults.length === 0 ? (
-                  <p className="text-[13px] text-muted-foreground/70 text-center py-4">
-                    未在 versions 目录下发现版本，请确认 Minecraft 已下载到该目录
+              {discovery && (
+                <div className="space-y-1.5">
+                  <p className="text-[12px] text-muted-foreground/70">
+                    候选目录（已探测 {discovery.scanned} 个位置）
                   </p>
-                ) : (
-                  <>
-                    {/* 批量操作栏 */}
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-[12px] text-muted-foreground/70">
-                        发现 {scanResults.length} 个版本，{importableCount} 个可导入
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onPress={handleImportAll}
-                        isDisabled={scanning || importingBatch || importableCount === 0}
-                      >
-                        {importingBatch ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Download className="w-3.5 h-3.5" />
-                        )}
-                        全部导入
-                      </Button>
-                    </div>
-
-                    {/* 版本列表 */}
-                    <div className="flex flex-col gap-1.5 max-h-80 overflow-y-auto scroll-area pr-1">
-                      {scanResults.map((v) => {
-                        const badge = getBadge(v.type);
-                        const isImporting = importing === v.id;
-                        return (
-                          <SettingListItem key={v.id}>
-                            {/* 版本图标 */}
-                            <div className="w-7 h-7 rounded-lg bg-foreground/[0.05] dark:bg-white/[0.05] flex items-center justify-center shrink-0">
-                              <Home className="w-3.5 h-3.5 text-muted-foreground/70" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-[13px] font-mono font-semibold text-foreground">{v.id}</p>
-                                <SettingBadge variant={badge.variant}>{badge.label}</SettingBadge>
-                                {/* 加载器标签 */}
-                                {v.loaders.map((loader) => {
-                                  const lb = LOADER_BADGE[loader];
-                                  return lb ? (
-                                    <SettingBadge key={loader} variant={lb.variant}>
-                                      {lb.label}
-                                    </SettingBadge>
-                                  ) : null;
-                                })}
-                                <span className="text-[11px] text-muted-foreground/60">{formatTime(v.releaseTime)}</span>
-                              </div>
-                              <div className="flex items-center gap-3 mt-1">
-                                <FileStatus ok={v.hasJson} label="JSON" />
-                                <FileStatus ok={v.hasJar} label="JAR" />
-                                {v.loaders.length > 0 && (
-                                  <span className="text-[11px] text-muted-foreground/50">
-                                    {v.loaders.length} 个加载器
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            {/* 导入按钮 */}
-                            <Button
-                              size="sm"
-                              variant={v.healthy ? "outline" : "ghost"}
-                              className="min-w-0 shrink-0"
-                              onPress={() => handleImport(v.id)}
-                              isDisabled={isImporting || !v.healthy}
-                            >
-                              {isImporting ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Download className="w-3.5 h-3.5" />
-                              )}
-                              导入
-                            </Button>
-                          </SettingListItem>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+                  {discovery.candidates.length === 0 ? (
+                    <p className="text-[12px] text-muted-foreground">没有发现新的游戏目录</p>
+                  ) : (
+                    discovery.candidates.map((candidate) => (
+                      <SettingListItem key={candidate.path}>
+                        <HardDrive className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground">{candidate.label}</p>
+                            <SettingBadge variant={LAUNCHER_META[candidate.launcher].variant}>
+                              {LAUNCHER_META[candidate.launcher].label}
+                            </SettingBadge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground/60 mt-0.5 font-mono truncate">
+                            {candidate.path}
+                          </p>
+                        </div>
+                        <span className="text-[12px] text-muted-foreground shrink-0">
+                          {candidate.versionCount} 个版本
+                          {candidate.healthyCount < candidate.versionCount &&
+                            `（${candidate.healthyCount} 可用）`}
+                        </span>
+                        <Button size="sm" variant="outline" onPress={() => handleAddCandidate(candidate)}>
+                          添加
+                        </Button>
+                      </SettingListItem>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </SettingCard>
         </div>
 
-        {/* 已添加的目录列表 */}
-        <div className="flex items-center justify-between">
-          <SectionTitle>已添加目录（{dirs.length}）</SectionTitle>
-          <Button size="sm" variant="outline" onPress={handleAddFolder}>
-            <Plus className="w-3.5 h-3.5" />
-            手动添加
-          </Button>
+        {/* 主目录 + 共享资源目录 */}
+        <div>
+          <SectionTitle>目录设置</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              <div className="space-y-3">
+                <SettingRow
+                  label="当前游戏目录"
+                  desc="实例创建、导入与启动都以该目录为基准（instances/ 与 versions/ 位于其中）"
+                >
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onPress={() => handleOpen(mainDir)}>
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      打开
+                    </Button>
+                    <Button size="sm" variant="outline" onPress={handleAddFolder}>
+                      <FolderPlus className="w-3.5 h-3.5" />
+                      添加目录
+                    </Button>
+                  </div>
+                </SettingRow>
+                <p className="text-[12px] text-muted-foreground font-mono break-all">{mainDir}</p>
+              </div>
+            </SettingCard>
+
+            <SettingCard>
+              <div className="space-y-3">
+                <SettingRow
+                  label="共享资源目录"
+                  desc="留空则实例自带 versions / libraries / assets；填写后实例缺少资源时回退到该目录（适合与官方启动器共用）"
+                >
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onPress={handleBrowseResourceDir}>
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      选择
+                    </Button>
+                    {resourceDir && (
+                      <>
+                        <Button size="sm" variant="outline" onPress={() => handleOpen(resourceDir)}>
+                          打开
+                        </Button>
+                        <Button size="sm" variant="outline" onPress={() => setGame({ resourceDir: "" })}>
+                          清除
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </SettingRow>
+                <p className="text-[12px] text-muted-foreground font-mono break-all">
+                  {resourceDir || "未设置（实例自包含）"}
+                </p>
+              </div>
+            </SettingCard>
+          </div>
         </div>
 
-        {dirs.length === 0 ? (
+        {/* 导入方式 */}
+        <div>
+          <SectionTitle>导入方式</SectionTitle>
           <SettingCard>
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <FolderOpen className="w-7 h-7 text-muted-foreground/25" />
-              <p className="text-[13px] text-muted-foreground/70">还没有添加任何游戏目录</p>
-              <p className="text-[12px] text-muted-foreground/50">
-                使用主目录的"扫描"功能发现已安装版本，或点击"手动添加"选择文件夹
+            <div className="space-y-3">
+              <SettingRadioGroup
+                value={importMode}
+                horizontal
+                onChange={(v) => setImportMode(v as ImportMode)}
+                options={[
+                  { value: "reference", label: "引用源目录（推荐）" },
+                  { value: "copy", label: "复制到实例目录" },
+                ]}
+              />
+              <p className="text-[12px] text-muted-foreground flex items-center gap-1.5">
+                {importMode === "reference" ? (
+                  <>
+                    <Link2 className="w-3.5 h-3.5" />
+                    不复制文件，实例直接使用源目录的版本 / 库 / 资源文件，占用最少；源目录被删除后实例将无法启动
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    复制版本文件到实例目录，必要目录以链接方式共享；占用更多空间，但实例可独立使用
+                  </>
+                )}
               </p>
             </div>
           </SettingCard>
-        ) : (
-          <div className="space-y-2">
-            {dirs.map((dir) => (
-              <SettingCard key={dir}>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-mono font-medium text-foreground truncate">{dir}</p>
-                      {dir === gameDir && (
-                        <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium shrink-0">
-                          <Check className="w-2.5 h-2.5" />
-                          当前
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[12px] text-muted-foreground/70 mt-0.5">已连接的游戏目录</p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {dir !== gameDir && (
-                      <Button size="sm" variant="ghost" className="min-w-0 h-8 text-[11px] text-muted-foreground" onPress={() => handleSetAsMain(dir)}>
-                        <Home className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                    <Button size="sm" variant="ghost" className="min-w-0 h-8 text-[11px] text-muted-foreground" onPress={() => handleScan(dir)} isDisabled={scanning}>
-                      <Search className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button size="sm" variant="danger" className="min-w-0 shrink-0" onPress={() => handleRemoveDir(dir)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
+        </div>
 
-                {/* 该目录的扫描结果 */}
-                {scanning && scanTarget === dir && (
-                  <div className="mt-3 space-y-2">
-                    {Array.from({ length: 2 }).map((_, i) => (
-                      <Skeleton key={i} className="h-8 w-full rounded-lg" />
-                    ))}
-                  </div>
-                )}
-                {scanResults !== null && scanTarget === dir && scanTarget !== gameDir && (
-                  <div className="mt-3 border-t border-border/30 dark:border-white/[0.05] pt-3">
-                    {scanResults.length === 0 ? (
-                      <p className="text-[12px] text-muted-foreground/60 py-2">未发现版本文件</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {scanResults.map((v) => {
-                          const badge = getBadge(v.type);
-                          return (
-                            <SettingBadge key={v.id} variant={badge.variant}>
-                              {v.id}
+        {/* 目录列表 */}
+        <div>
+          <SectionTitle>已添加的目录</SectionTitle>
+          <div className="space-y-3">
+            {folders.map((folder) => {
+              const info = infos[folder];
+              const isMain = folder === mainDir;
+              const isLoading = scanning === folder;
+              const versions = info?.versions ?? [];
+              const shown = versions.slice(0, expanded[folder] ? versions.length : 12);
+              const meta = info ? LAUNCHER_META[info.launcher] : null;
+
+              return (
+                <SettingCard key={folder}>
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-foreground font-mono break-all">{folder}</p>
+                          {isMain && (
+                            <SettingBadge variant="success">
+                              <Star className="w-3 h-3" />
+                              当前
                             </SettingBadge>
+                          )}
+                          {meta && <SettingBadge variant={meta.variant}>{meta.label}</SettingBadge>}
+                          {info && info.kind !== "game-root" && (
+                            <SettingBadge variant="neutral">{KIND_LABEL[info.kind]}</SettingBadge>
+                          )}
+                        </div>
+
+                        {isLoading ? (
+                          <p className="text-[12px] text-muted-foreground mt-1 flex items-center gap-1">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            正在识别目录结构...
+                          </p>
+                        ) : info ? (
+                          <div className="mt-1 space-y-1">
+                            <p className="text-[12px] text-muted-foreground">
+                              共 {info.versionCount} 个版本
+                              <span className="text-green-600 dark:text-green-400"> · {info.healthyCount} 个可用</span>
+                              {info.summary.broken > 0 && (
+                                <span className="text-red-500/80"> · {info.summary.broken} 个缺少文件</span>
+                              )}
+                              {info.hasLibraries && " · 含 libraries"}
+                              {info.hasAssets && " · 含 assets"}
+                            </p>
+                            {Object.keys(info.summary.loaders).length > 0 && (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {Object.entries(info.summary.loaders).map(([loader, count]) => (
+                                  <SettingBadge key={loader} variant={LOADER_BADGE[loader]?.variant ?? "neutral"}>
+                                    {LOADER_BADGE[loader]?.label ?? loader} × {count}
+                                  </SettingBadge>
+                                ))}
+                              </div>
+                            )}
+                            {info.warnings.map((warning) => (
+                              <p key={warning} className="text-[12px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                {warning}
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[12px] text-red-500/80 mt-1">目录不可用或无法识别</p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button size="sm" variant="outline" onPress={() => recognize(folder)} isDisabled={isLoading}>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          重新识别
+                        </Button>
+                        <Button size="sm" variant="outline" onPress={() => handleOpen(folder)}>
+                          <FolderOpen className="w-3.5 h-3.5" />
+                          打开
+                        </Button>
+                        {!isMain && (
+                          <>
+                            <Button size="sm" variant="outline" onPress={() => handleSetAsMain(folder)}>
+                              设为当前
+                            </Button>
+                            <Button size="sm" variant="outline" onPress={() => handleRemoveDir(folder)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 版本列表 */}
+                    {info && versions.length > 0 && (
+                      <div className="space-y-1.5 pt-1 border-t border-border/40 dark:border-white/[0.06]">
+                        <div className="flex items-center justify-between pt-2">
+                          <p className="text-[12px] text-muted-foreground/70">
+                            版本列表（{versions.length}）
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            isDisabled={importingBatch === folder || versions.length === 0}
+                            onPress={() => handleImportAll(folder, versions)}
+                          >
+                            {importingBatch === folder ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                            全部导入
+                          </Button>
+                        </div>
+
+                        {shown.map((version) => {
+                          const type = TYPE_BADGE[version.type] ?? TYPE_BADGE.unknown;
+                          const imported = importedNames.has(version.id);
+                          const busy = !!importing[version.id];
+                          return (
+                            <SettingListItem key={version.id} selected={imported}>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-medium text-foreground font-mono">{version.id}</p>
+                                  <SettingBadge variant={type.variant}>{type.label}</SettingBadge>
+                                  {version.loaders.map((loader) => (
+                                    <SettingBadge key={loader} variant={LOADER_BADGE[loader]?.variant ?? "neutral"}>
+                                      {LOADER_BADGE[loader]?.label ?? loader}
+                                    </SettingBadge>
+                                  ))}
+                                  {!version.healthy && (
+                                    <SettingBadge variant="error">
+                                      文件不完整
+                                    </SettingBadge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 mt-0.5">
+                                  <span className="text-[11px] text-muted-foreground/60">
+                                    {formatTime(version.releaseTime)}
+                                  </span>
+                                  <FileStatus ok={version.hasJson} label="JSON" />
+                                  <FileStatus ok={version.hasJar} label="JAR" />
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant={imported ? "primary" : "outline"}
+                                className="shrink-0"
+                                isDisabled={imported || busy}
+                                onPress={() => handleImport(folder, version.id)}
+                              >
+                                {busy ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : imported ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5" />
+                                    已导入
+                                  </>
+                                ) : (
+                                  "导入"
+                                )}
+                              </Button>
+                            </SettingListItem>
                           );
                         })}
+
+                        {versions.length > 12 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="w-full"
+                            onPress={() => setExpanded((prev) => ({ ...prev, [folder]: !prev[folder] }))}
+                          >
+                            {expanded[folder] ? "收起" : `展开全部 ${versions.length} 个版本`}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </SettingCard>
-            ))}
+                </SettingCard>
+              );
+            })}
           </div>
-        )}
+        </div>
+
+        <p className="text-[12px] text-muted-foreground/70">
+          提示：导入的实例会出现在「实例管理」中，可直接启动；若实例依赖源目录的资源，请在启动前保持源目录可用。
+        </p>
       </div>
     </div>
   );

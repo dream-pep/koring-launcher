@@ -1,113 +1,157 @@
 import { useConfigStore } from "@/stores/configStore";
-import { Slider, RadioGroup, Radio, Input } from "@heroui/react";
-import { SettingCard, PageHeader, SectionTitle, fieldCls } from "@/components/setting";
+import {
+  SettingCard,
+  PageHeader,
+  SectionTitle,
+  SettingRadioGroup,
+  SettingNumberField,
+  SettingInput,
+  SettingBadge,
+} from "@/components/setting";
 
-const downloadSources = [
-  { value: "mirror", label: "尽量使用镜像源（推荐国内用户）" },
-  { value: "official", label: "优先使用官方源" },
-  { value: "official-only", label: "仅使用官方源" },
+/**
+ * 下载源设置。
+ *
+ * 与主进程 electron/core/download-options.ts 保持一致：
+ * - source：official（官方源）/ bmclapi（BMCLAPI 镜像）/ custom（自定义镜像）
+ * - threads：并发下载线程数（1–64），同时作用于 libraries 与 assets
+ * - 不再提供「限速」选项：@xmcl/file-transfer 没有带宽限制能力，保留会变成假设置
+ */
+
+const SOURCE_OPTIONS = [
+  { value: "bmclapi", label: "BMCLAPI 镜像（默认，国内推荐）" },
+  { value: "official", label: "Mojang 官方源（海外网络）" },
+  { value: "custom", label: "自定义镜像地址" },
 ];
+
+/** 官方地址（用于展示「实际生效地址」） */
+const OFFICIAL = {
+  manifest: "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+  maven: "https://libraries.minecraft.net",
+  assets: "https://resources.download.minecraft.net",
+};
+
+const BMCLAPI = {
+  manifest: "https://bmclapi2.bangbang93.com/mc/game/version_manifest.json",
+  maven: "https://bmclapi2.bangbang93.com/maven",
+  assets: "https://bmclapi2.bangbang93.com/assets",
+};
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-1.5">
+      <span className="text-[13px] text-muted-foreground shrink-0">{label}</span>
+      <span className="text-[12px] font-mono text-foreground/80 truncate" title={value}>
+        {value || "—"}
+      </span>
+    </div>
+  );
+}
 
 export function DownloadSetting() {
   const dl = useConfigStore((s) => s.config.download);
   const setDownload = useConfigStore((s) => s.setDownload);
 
+  const isCustom = dl.source === "custom";
+  const isMirror = dl.source === "bmclapi";
+
+  const manifest = isCustom
+    ? dl.customVersionManifest
+    : isMirror
+      ? BMCLAPI.manifest
+      : OFFICIAL.manifest;
+  const maven = isCustom ? dl.customMavenHost : isMirror ? BMCLAPI.maven : OFFICIAL.maven;
+  const assets = isCustom ? dl.customAssetsHost : isMirror ? BMCLAPI.assets : OFFICIAL.assets;
+
   return (
     <div>
-      <PageHeader title="下载" desc="配置游戏资源下载源、并发数与存储路径" />
+      <PageHeader title="下载" desc="配置游戏资源下载源与并发数" />
 
       <div className="space-y-6">
         <div>
           <SectionTitle>下载源</SectionTitle>
           <div className="space-y-3">
             <SettingCard>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">文件下载源</p>
-                <p className="text-[13px] text-muted-foreground">游戏文件（jar、lib）的下载来源</p>
-                <RadioGroup
-                  value={dl.fileSource}
-                  onChange={(v) => setDownload({ fileSource: String(v) })}
-                  className="mt-2 space-y-2"
-                >
-                  {downloadSources.map((opt) => (
-                    <Radio key={opt.value} value={opt.value}>
-                      <Radio.Content>{opt.label}</Radio.Content>
-                    </Radio>
-                  ))}
-                </RadioGroup>
-              </div>
+              <SettingRadioGroup
+                value={dl.source}
+                options={SOURCE_OPTIONS}
+                onChange={(v) => setDownload({ source: v })}
+              />
             </SettingCard>
 
-            <SettingCard>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">版本列表源</p>
-                <p className="text-[13px] text-muted-foreground">获取可用游戏版本列表的来源</p>
-                <RadioGroup
-                  value={dl.versionSource}
-                  onChange={(v) => setDownload({ versionSource: String(v) })}
-                  className="mt-2 space-y-2"
-                >
-                  {downloadSources.map((opt) => (
-                    <Radio key={opt.value} value={opt.value}>
-                      <Radio.Content>{opt.label}</Radio.Content>
-                    </Radio>
-                  ))}
-                </RadioGroup>
-              </div>
-            </SettingCard>
-          </div>
-        </div>
-
-        <div>
-          <SectionTitle>并发控制</SectionTitle>
-          <div className="space-y-3">
-            <SettingCard>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">最大下载线程数</p>
-                    <p className="text-[13px] text-muted-foreground mt-0.5">同时下载的文件数量，过高可能导致不稳定</p>
+            {isCustom && (
+              <SettingCard>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">自定义镜像地址</p>
+                    <SettingBadge variant="warning">留空则回退到官方地址</SettingBadge>
                   </div>
-                  <span className="text-[13px] text-muted-foreground tabular-nums shrink-0 ml-4">{dl.threads}</span>
+                  <SettingInput
+                    label="版本清单"
+                    desc="version_manifest 的完整地址"
+                    value={dl.customVersionManifest}
+                    onChange={(v) => setDownload({ customVersionManifest: v })}
+                    placeholder="https://example.com/mc/game/version_manifest.json"
+                    mono
+                    width="w-80"
+                  />
+                  <SettingInput
+                    label="Maven 仓库"
+                    desc="libraries / 加载器安装包的下载地址"
+                    value={dl.customMavenHost}
+                    onChange={(v) => setDownload({ customMavenHost: v })}
+                    placeholder="https://example.com/maven"
+                    mono
+                    width="w-80"
+                  />
+                  <SettingInput
+                    label="Assets 地址"
+                    desc="资源文件（音效、语言文件、贴图）的下载地址"
+                    value={dl.customAssetsHost}
+                    onChange={(v) => setDownload({ customAssetsHost: v })}
+                    placeholder="https://example.com/assets"
+                    mono
+                    width="w-80"
+                  />
                 </div>
-                <Slider
-                  value={dl.threads}
-                  onChange={(v) => setDownload({ threads: typeof v === "number" ? v : v[0] })}
-                  minValue={1}
-                  maxValue={64}
-                  step={1}
-                >
-                  <Slider.Track>
-                    <Slider.Fill />
-                    <Slider.Thumb />
-                  </Slider.Track>
-                </Slider>
-                <div className="flex justify-between mt-1">
-                  <span className="text-[11px] text-muted-foreground/50">1</span>
-                  <span className="text-[11px] text-muted-foreground/50">64</span>
-                </div>
-              </div>
+              </SettingCard>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <SectionTitle>并发与重试</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              <SettingNumberField
+                label="并发下载线程数"
+                desc="同时下载的文件数量，范围 1–64；过高在部分网络下反而更容易失败"
+                value={dl.threads}
+                min={1}
+                max={64}
+                suffix="线程"
+                onChange={(v) => setDownload({ threads: v })}
+              />
             </SettingCard>
           </div>
         </div>
 
         <div>
-          <SectionTitle>速度限制</SectionTitle>
+          <SectionTitle>当前生效地址</SectionTitle>
           <div className="space-y-3">
             <SettingCard>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">下载速度上限</p>
-                <p className="text-[13px] text-muted-foreground">单位 KB/s，0 表示不限速</p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={String(dl.speedLimit)}
-                    onChange={(e) => setDownload({ speedLimit: Number(e.target.value) })}
-                    className={`w-28 ${fieldCls}`}
-                  />
-                  <span className="text-[13px] text-muted-foreground">KB/s</span>
-                </div>
+              <div className="divide-y divide-border/30 dark:divide-white/[0.06]">
+                <PreviewRow label="版本清单" value={manifest} />
+                <PreviewRow label="Maven 仓库" value={maven} />
+                <PreviewRow label="Assets 资源" value={assets} />
               </div>
+            </SettingCard>
+            <SettingCard>
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                下载源在每次安装 / 修复实例时生效，无需重启启动器。安装过程中若中途失败，
+                可在实例详情页点击「修复」，已下载的文件不会重复下载。
+                带宽限速暂不支持（底层下载库无此能力），因此设置里不再提供该选项。
+              </p>
             </SettingCard>
           </div>
         </div>
