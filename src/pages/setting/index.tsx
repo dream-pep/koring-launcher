@@ -4,6 +4,7 @@ import {
   Info,
   Copyright,
   Gamepad2,
+  Rocket,
   Cpu,
   FolderOpen,
   Settings,
@@ -26,6 +27,7 @@ import { HomeSetting } from "./general/home";
 // import { AccountSetting } from "./general/account";  // Koring 账户（暂时隐藏）
 import { AboutSetting } from "./general/about";
 import { CopyrightSetting } from "./general/copyright";
+import { GameSetting } from "./game/game";
 import { GameAccountSetting } from "./game/game-account";
 import { JavaMemSetting } from "./game/java-mem";
 import { GameDirSetting } from "./game/game-dir";
@@ -75,6 +77,7 @@ function buildMenuData(
     {
       title: "游戏",
       items: [
+        { key: "game", label: "游戏", icon: <Rocket className={iconCls} />, component: <GameSetting /> },
         { key: "game-account", label: "游戏账户&档案", icon: <Gamepad2 className={iconCls} />, component: <GameAccountSetting /> },
         { key: "java-mem", label: "Java虚拟机与内存", icon: <Cpu className={iconCls} />, component: <JavaMemSetting /> },
         { key: "game-dir", label: "游戏目录", icon: <FolderOpen className={iconCls} />, component: <GameDirSetting /> },

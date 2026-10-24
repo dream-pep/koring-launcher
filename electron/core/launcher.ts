@@ -67,6 +67,7 @@ export async function launchGame(options: LaunchGameOptions): Promise<GameLaunch
   const javaPath = await resolveJavaPath(config.java.javaPath, {
     auto: config.java.autoJavaPath !== false,
     minecraftVersion: instance.config.runtime.minecraft,
+    useJavaExe: config.java.useJavaExe === true,
   });
 
   // 4. 配置 → LaunchOption（version 覆盖为已解析版本）

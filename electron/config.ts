@@ -53,6 +53,11 @@ export interface GameConfig {
   resourceDir: string;
   /** 已添加的游戏目录列表 */
   gameDirs: string[];
+  /**
+   * 目录显示名（重命名）：key = 规范化后的绝对路径，value = 用户自定义名称。
+   * 仅影响设置页/启动器展示，不改变磁盘路径。
+   */
+  dirAliases: Record<string, string>;
 }
 
 export interface JavaConfig {
@@ -61,6 +66,14 @@ export interface JavaConfig {
   autoJavaPath: boolean;
   memMode: string;
   memGB: number;
+  /** 初始内存 -Xms（GB）；0 = 不主动设置（沿用实例的最小内存） */
+  initialMemGB: number;
+  /** 锁定内存：令 -Xms = -Xmx，固定堆大小（减少延迟抖动，代价是全程占用接近最大分配） */
+  lockMemory: boolean;
+  /** IP 协议偏好：ipv4 / default / ipv6 → 追加 -Djava.net.preferIPv4Stack / preferIPv6Stack */
+  preferredIpStack: string;
+  /** 用 java.exe 替代 javaw.exe（能看到控制台输出，便于排查启动问题） */
+  useJavaExe: boolean;
   gc: string;
   jvmArgs: string;
 }
@@ -203,8 +216,19 @@ const DEFAULTS: AppConfig = {
   theme: { darkMode: 'auto', parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 },
-  game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [] },
-  java: { javaPath: '', autoJavaPath: true, memMode: 'auto', memGB: 4, gc: 'auto', jvmArgs: '' },
+  game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [], dirAliases: {} },
+  java: {
+    javaPath: '',
+    autoJavaPath: true,
+    memMode: 'auto',
+    memGB: 4,
+    initialMemGB: 0,
+    lockMemory: false,
+    preferredIpStack: 'default',
+    useJavaExe: false,
+    gc: 'auto',
+    jvmArgs: '',
+  },
   advanced: { afterLaunch: 'close', winMode: 'default', customWidth: 854, customHeight: 480, gameArgs: '', preLaunchCmd: '', debugMode: false, server: { ip: '', port: 25565 } },
   download: { source: 'bmclapi', threads: 16, customVersionManifest: '', customMavenHost: '', customAssetsHost: '' },
   network: { securityId: { enabled: false, authUrl: '' } },

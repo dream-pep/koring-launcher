@@ -62,7 +62,7 @@ export function CrashPage() {
       >
         <div className="flex items-center pl-3 shrink-0" style={{ WebkitAppRegion: "no-drag" as React.CSSProperties["WebkitAppRegion"] }}>
           <span className="text-sm font-semibold tracking-wide text-foreground/80">
-            Koring Launcher
+            Koring Launcher Boom!
           </span>
         </div>
 
@@ -97,10 +97,10 @@ export function CrashPage() {
           {/* 标题 */}
           <div className="space-y-2">
             <h1 className="text-xl font-bold text-foreground">
-              程序发生崩溃
+              (っ °Д °;)っ Boom! 启动器炸了
             </h1>
             <p className="text-sm text-muted-foreground">
-              我们已记录此错误，接下来您想做什么？
+              我们已记录此错误，接下来要不做些什么？
             </p>
           </div>
 

@@ -3,21 +3,47 @@ import { launchGame, diagnoseVersion } from '../core/launcher';
 import { resolveGamePath } from '../core/paths';
 import { getConfig, type AppConfig } from '../config';
 
-const { ipcMain } = electron;
+const { ipcMain, app } = electron;
 
 interface WinRef {
   mainWindow: electron.BrowserWindow | null;
 }
 
-// 游戏窗口就绪后按配置处理启动器窗口（afterLaunch）
+/**
+ * 游戏窗口就绪后按配置处理启动器窗口（afterLaunch）：
+ * - close      启动后立即关闭启动器
+ * - minimize   最小化到任务栏
+ * - keep       保持不变
+ * - hide       隐藏（游戏退出后手动恢复）
+ * - hide-exit  隐藏，游戏退出后自动退出启动器
+ * - hide-reopen 隐藏，游戏退出后重新显示启动器
+ */
 function applyAfterLaunch(config: AppConfig, win: WinRef): void {
   const mode = config.advanced?.afterLaunch ?? 'close';
+  const main = win.mainWindow;
+  if (!main) return;
   if (mode === 'close') {
-    win.mainWindow?.close();
+    main.close();
   } else if (mode === 'minimize') {
-    win.mainWindow?.minimize();
+    main.minimize();
+  } else if (mode === 'hide' || mode === 'hide-exit' || mode === 'hide-reopen') {
+    main.hide();
   }
   // 'keep' → 无操作
+}
+
+/** 游戏进程退出后的启动器处理（仅 hide-exit / hide-reopen 有额外行为） */
+function applyGameExit(config: AppConfig, win: WinRef): void {
+  const mode = config.advanced?.afterLaunch ?? 'close';
+  if (mode === 'hide-exit') {
+    app.quit();
+  } else if (mode === 'hide-reopen') {
+    const main = win.mainWindow;
+    if (main && !main.isDestroyed()) {
+      main.show();
+      main.focus();
+    }
+  }
 }
 
 export function registerLaunchHandlers(win: WinRef) {
@@ -44,9 +70,11 @@ export function registerLaunchHandlers(win: WinRef) {
         profile: payload.profile,
         server,
         onEvent: (event) => {
-          // afterLaunch 副作用：窗口就绪后关闭/最小化启动器
+          // afterLaunch 副作用：窗口就绪后关闭/最小化/隐藏启动器；游戏退出后按模式恢复或退出
           if (event.event === 'window-ready') {
             applyAfterLaunch(config, win);
+          } else if (event.event === 'exit') {
+            applyGameExit(config, win);
           }
           win.mainWindow?.webContents.send('launch:event', { requestId, ...event });
         },

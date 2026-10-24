@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import {
   FolderOpen,
@@ -13,6 +13,9 @@ import {
   Copy,
   Link2,
   HardDrive,
+  Pencil,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfigStore } from "@/stores/configStore";
@@ -98,6 +101,7 @@ export function GameDirSetting() {
   const gameDir = useConfigStore((s) => s.config.game.gameDir);
   const gameDirs = useConfigStore((s) => s.config.game.gameDirs);
   const resourceDir = useConfigStore((s) => s.config.game.resourceDir);
+  const dirAliases = useConfigStore((s) => s.config.game.dirAliases);
   const setGame = useConfigStore((s) => s.setGame);
 
   const instances = useInstanceStore((s) => s.instances);
@@ -112,6 +116,9 @@ export function GameDirSetting() {
   const [importing, setImporting] = useState<Record<string, boolean>>({});
   const [importingBatch, setImportingBatch] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  /** 正在重命名的目录（显示名）与新名称 */
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const mainDir = gameDir || ".minecraft";
   const folders = useMemo(
@@ -200,6 +207,35 @@ export function GameDirSetting() {
       toast.success("已设为当前游戏目录");
     },
     [folders, setGame]
+  );
+
+  /** 目录显示名（只改展示，不改磁盘路径）；空值 = 恢复显示路径 */
+  const handleRename = useCallback(
+    (target: string, value: string) => {
+      const next: Record<string, string> = { ...(dirAliases || {}) };
+      const trimmed = value.trim();
+      if (trimmed) next[target] = trimmed;
+      else delete next[target];
+      setGame({ dirAliases: next });
+      setRenaming(null);
+      setRenameValue("");
+      toast.success(trimmed ? "已重命名目录" : "已恢复显示路径");
+    },
+    [dirAliases, setGame]
+  );
+
+  /** 上移 / 下移（当前目录固定首位，只重排额外目录） */
+  const handleMove = useCallback(
+    (target: string, direction: -1 | 1) => {
+      const list = folders.filter((folder) => folder !== mainDir);
+      const index = list.indexOf(target);
+      const swapIndex = index + direction;
+      if (index < 0 || swapIndex < 0 || swapIndex >= list.length) return;
+      const next = [...list];
+      [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      setGame({ gameDirs: next });
+    },
+    [folders, mainDir, setGame]
   );
 
   const handleOpen = useCallback(async (target: string) => {
@@ -465,6 +501,8 @@ export function GameDirSetting() {
               const versions = info?.versions ?? [];
               const shown = versions.slice(0, expanded[folder] ? versions.length : 12);
               const meta = info ? LAUNCHER_META[info.launcher] : null;
+              const extraDirs = folders.filter((f) => f !== mainDir);
+              const pos = extraDirs.indexOf(folder);
 
               return (
                 <SettingCard key={folder}>
@@ -472,7 +510,31 @@ export function GameDirSetting() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-foreground font-mono break-all">{folder}</p>
+                          {renaming === folder ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                value={renameValue}
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                placeholder="显示名称（留空恢复路径）"
+                                autoFocus
+                                className="h-7 w-52 rounded-md border border-border/40 bg-white/60 px-2 text-[12px] text-foreground dark:border-white/[0.08] dark:bg-black/30"
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") handleRename(folder, renameValue);
+                                  if (event.key === "Escape") setRenaming(null);
+                                }}
+                              />
+                              <Button size="sm" variant="outline" className="h-7 px-2 text-[11px]" onPress={() => handleRename(folder, renameValue)}>
+                                保存
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onPress={() => setRenaming(null)}>
+                                取消
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-sm font-medium text-foreground break-all">
+                              {dirAliases?.[folder] || folder}
+                            </p>
+                          )}
                           {isMain && (
                             <SettingBadge variant="success">
                               <Star className="w-3 h-3" />
@@ -484,6 +546,10 @@ export function GameDirSetting() {
                             <SettingBadge variant="neutral">{KIND_LABEL[info.kind]}</SettingBadge>
                           )}
                         </div>
+
+                        {dirAliases?.[folder] && renaming !== folder && (
+                          <p className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground/60">{folder}</p>
+                        )}
 
                         {isLoading ? (
                           <p className="text-[12px] text-muted-foreground mt-1 flex items-center gap-1">
@@ -533,6 +599,29 @@ export function GameDirSetting() {
                         </Button>
                         {!isMain && (
                           <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              aria-label="重命名（仅显示名）"
+                              onPress={() => {
+                                setRenaming(folder);
+                                setRenameValue(dirAliases?.[folder] ?? "");
+                              }}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button size="sm" variant="outline" aria-label="上移" isDisabled={pos <= 0} onPress={() => handleMove(folder, -1)}>
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              aria-label="下移"
+                              isDisabled={pos < 0 || pos >= extraDirs.length - 1}
+                              onPress={() => handleMove(folder, 1)}
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </Button>
                             <Button size="sm" variant="outline" onPress={() => handleSetAsMain(folder)}>
                               设为当前
                             </Button>
@@ -643,3 +732,4 @@ export function GameDirSetting() {
     </div>
   );
 }
+

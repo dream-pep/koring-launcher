@@ -538,3 +538,169 @@ news:types { refresh? } → string[]   // Java / Bedrock / Dungeons / DungeonsII
 
 - 参考项目 `D:\github-code-plan\Aurora.Craft` **没有**资讯功能（全仓 grep 与 git 全量路径均无 `news`/资讯），因此按官方内容接口自建，未移植其代码。
 - 平台筛选项由渲染端从数据动态推导（排除无意义的 `News page`），新增平台无需改代码。
+
+---
+
+## 12. 实例页（对齐 PCL-CE 结构，2026-10-25）
+
+标题：实例页（版本管理）
+内容：按 `D:\github-code-plan\PCL-CE` 的版本管理页结构（只读参考，不复制其代码/素材）重做实例页：左侧版本列表 + 右侧详情 + 6 个页签；同时补齐实例内模组/存档/截图/资源包的本地管理接口。
+进度：主体 100%；整合包安装、崩溃分析、版本导出/快捷方式未做（见「未做」）。
+
+### 页面结构（`src/pages/instance/`）
+
+| 文件 | 职责 |
+|---|---|
+| `index.tsx` | 页面容器：左栏（搜索/排序/收藏/分类/新建/列表）+ 右侧详情；安装与修复事件、启动、删除确认 |
+| `InstanceIcon.tsx` | 实例图标（logo.png → 图片，否则手柄图标） |
+| `CreateDialog.tsx` | 新建实例三步向导：基本信息（名称实时校验/显示名/安装位置）→ 版本与加载器（`instance:version-list` + `loader-catalog`）→ 内存与确认（可选创建后立即下载） |
+| `InstanceDetail.tsx` | 右侧详情：头部（图标/名称/版本/加载器/路径、启动/修复/体检/打开目录/收藏/删除）+ 不完整提示 + 页签（概览/设置/模组/存档/截图/资源包） |
+| `tabs/ModsTab.tsx` | 模组：启用/禁用清单、搜索、批量启停/删除、逐项开关、jar 元数据展示 |
+| `tabs/SavesTab.tsx` | 存档：图标/LevelName/大小/时间、备份、删除、打开目录 |
+| `tabs/ScreenshotsTab.tsx` | 截图：320px 缩略图网格、点开系统看图、删除 |
+| `tabs/ResourcePacksTab.tsx` | 资源包 / 光影包：只读列表（`.disabled`/`.old` 视为禁用）、打开目录 |
+
+路由：`src/App.tsx` 的 `gallery` 路由由 `GalleryPlaceholder` 改为 `InstancePage`（路由 key 仍为 `gallery`，顶栏标签仍是「实例」）。
+
+### 新增 IPC 契约
+
+```
+instance:mods-list          { instancePath } → { mods: LocalModInfo[], disabled: LocalModInfo[] }
+instance:mods-set-enabled   { instancePath, fileNames, enabled } → { changed: string[], skipped: string[] }
+instance:mods-delete        { instancePath, fileNames } → { changed: string[], skipped: string[] }
+
+instance:saves-list         { instancePath } → SaveInfo[]
+instance:saves-delete       { instancePath, dirNames } → { deleted: string[], failed: {name,error}[] }
+instance:saves-backup       { instancePath, dirNames } → string[]   // 备份目录路径
+instance:screenshots-list   { instancePath } → ScreenshotInfo[]
+instance:screenshots-delete { instancePath, fileNames } → { deleted: string[], failed: {name,error}[] }
+instance:resourcepacks-list { instancePath } → ResourcePackInfo[]
+```
+
+类型（渲染端 `src/api/instance-mods.ts` / `src/api/instance-assets.ts`）：
+
+- `LocalModInfo { fileName, filePath, enabled, sizeBytes, displayName, version, modLoader, description, metaParsed, iconDataUrl? }`
+- `SaveInfo { dirName, dirPath, levelName, hasLevelDat, sizeBytes, lastModified, iconDataUrl }`
+- `ScreenshotInfo { fileName, filePath, sizeBytes, mtime, thumbDataUrl }`
+- `ResourcePackInfo { fileName, rawFileName, filePath, kind: 'resourcepack'|'shaderpack', sizeBytes, enabled, mtime }`
+
+### 关键实现要点
+
+- **启用/禁用语义（对齐 PCL-CE）**：禁用 = 文件名追加 `.disabled`；`.old` 也视为禁用；启用 = 去掉后缀。依据 `PageInstanceCompResource.xaml.cs:2054-2061`、`ModLocalComp.cs:415-425`。目标重名时跳过不覆盖。
+- **jar 元数据解析不引依赖**：Node 内置 `fs` 读 zip 中央目录 + `zlib.inflateRawSync` 解目标条目，支持 fabric/quilt JSON、`mods.toml`、`neoforge.mods.toml`、`mcmod.info`，zip64/损坏回退文件名。
+- **图片不落渲染端**：图标/存档图标/截图缩略图都由主进程 `nativeImage` 压到 64/96/320px 后转 dataURL，避免把 8MB 原图塞进渲染端。
+- **存档名**：内置极简 NBT 读取器取 `Data.LevelName`（gzip 自动识别），失败回退目录名。
+- **安全**：所有文件名/目录名一律 `basename` 校验并归一化，拒绝路径穿越；缺失文件按空处理不抛错。
+
+### 验证
+
+- `npx tsc -p tsconfig.electron.json --noEmit`：通过（0 输出）
+- `npx tsc -p tsconfig.json --noEmit`：23 条既有报错不变，新增文件零报错
+- `npx vite build`：通过
+- 模组接口自测：67 项断言（清单解析、`.disabled`/`.old` 归属、启停往返、重名冲突、路径穿越、删除幂等）
+- 资产接口自测：50 项断言 + 真实 Electron IPC 往返 9/9（通道名与返回结构）
+- 主进程启动：`npx electron .` 正常完成「IPC handlers / 资源协议 / 渲染日志桥注册完成」，无重复 handler 报错
+
+### 未做（后续可接）
+
+1. 整合包安装（`.mrpack` / CurseForge zip）与导出整合包；
+2. 崩溃分析 / 日志查看 —— **已在第 13 节实现**（实例页「日志」页签）；
+3. 资源包/光影的启停写入（当前只读，按 `.disabled`/`.old` 判定）；
+4. 版本复制 / 创建快捷方式 / 存档导入导出；
+5. 快捷键（PCL 的部分交互细节）；右键菜单已实现（启动 / 打开目录 / 复制实例 ID / 收藏 / 删除）；
+6. 模组依赖检查与更新检测（需要 Modrinth 版本比对）。
+
+---
+
+## 13. 崩溃分析 + 任务队列展示对齐（2026-10-25）
+
+标题：崩溃分析（对齐 PCL 能力）
+内容：主进程纯本地规则匹配实例的 `crash-reports/` 与 `logs/`，经 IPC 提供给实例页「日志」页签，展示「一句结论 + 证据 + 建议 + 环境信息 + 日志尾部」。
+进度：100%（MVP，20 条规则；未做云端原因库与多日志级联）。
+
+### 新增文件
+
+| 文件 | 说明 |
+|---|---|
+| `electron/core/crash-analysis.ts` | 规则库（20 条）+ 崩溃报告头部元信息解析 + 大文件只读头尾（单个 4MB 上限）+ 日志尾部 80 行；导出 `listCrashLogFiles` / `analyzeInstanceCrash` |
+| `electron/handlers/crash-analysis.ts` | `registerCrashAnalysisHandlers()` → `instance:crash-analysis` |
+| `src/api/crash-analysis.ts` | 类型（`CrashAnalysisResult` / `CrashFinding` / `CrashMeta` 等）+ `analyzeInstanceCrash()` |
+| `src/pages/instance/tabs/LogsTab.tsx` | 结论卡、结论列表（严重度配色 + 置信度 + 证据 + 建议）、环境信息、文件切换、日志尾部折叠、复制结论 |
+| `src/pages/instance/InstanceDetail.tsx` | 新增「日志」页签 |
+| `electron/main.ts` | 注册 `registerCrashAnalysisHandlers()` |
+
+### 规则覆盖（20 条）
+
+内存不足、32 位 Java 内存上限、Java 过低、Java 过高（与「过低」互斥，避免自相矛盾）、Mixin 注入失败、缺 Mixin 引导、重复模组、缺前置/版本不匹配、模组类缺失、模组初始化失败、Fabric 加载错误、Forge/NeoForge 加载错误、OpenGL 不可用、像素格式不支持、显卡驱动访问冲突、文件校验失败、权限拒绝、资源包过大、OptiFine 与 Forge 冲突、ShadersMod 与 OptiFine 冲突；全部不命中时给 `unknown` 兜底建议。
+
+### IPC 契约
+
+```
+instance:crash-analysis { instancePath, fileName? }
+  → { files: CrashLogFile[], source: string | null, summary: string,
+      findings: [{ id, title, severity, confidence, evidence: string[], suggestion }],
+      meta: { minecraftVersion?, javaVersion?, memory?, loader?, description?, causedBy?, exitCode? },
+      tail: string[], elapsedMs: number }
+```
+
+### 任务队列（PCL 展示对齐）
+
+- 已有：状态徽标、进度百分比、阶段文案、日志展开、暂停/继续/取消/重试/移除；
+- 本次补：阶段行追加 `current/total` 计数（即 PCL 的「正在下载 xxx 3/120」效果，`src/components/task/TaskCard.tsx`）。
+
+### 验证
+
+- `npx tsc -p tsconfig.electron.json --noEmit`：通过
+- `npx tsc -p tsconfig.json --noEmit`：23 条既有报错不变，新文件零报错
+- `npx vite build`：通过
+- Electron 运行时自测 21 项断言全过：优先分析崩溃报告、OOM 规则排第一、Mixin 失败命中、meta 解析（MC/Java/内存/加载器/退出码）、指定 `latest.log`、空实例、未知兜底、误报收敛（不再同时报 Java 过新/过旧、Fabric 版本行不再误报）
+
+---
+
+## 14. 设置 →「游戏」五页对齐 PCL（2026-10-25）
+
+标题：设置-游戏分页对齐 PCL 启动设置
+内容：按 `plans/pclce-game-settings-spec.md`（498 行分析规格）重做「设置 → 游戏」五个分页；选择器与开关统一改用 shadcn/ui（`@base-ui/react`）组件；补齐 PCL 对应设置项并在启动链真实接线。
+进度：100%（可兑现项）；无法兑现项以「暂不支持」说明卡呈现，不做假设置。
+
+### 页面结构（`src/pages/setting/game/`）
+
+| 分页 | 文件 | 内容 |
+|---|---|---|
+| 游戏（新增） | `game.tsx` | 启动器行为（6 档，含隐藏/退出后关闭/重开）、窗口大小（默认/全屏/自定义+宽高）、快速进服（地址+端口）、IP 协议偏好、暂不支持项说明 |
+| 游戏账户&档案 | `game-account.tsx` | 原有账户/档案/登录方式 + 新增「正版验证方式（设备代码流，固定）」说明卡 |
+| Java虚拟机与内存 | `java-mem.tsx` | 自动 Java / 预览 / 手动路径 / 扫描列表；新增 `-Xms` 初始内存滑块、锁定内存开关、`java.exe` 开关；内存滑块改用 shadcn Slider（上限 32G） |
+| 游戏目录 | `game-dir.tsx` | 原有自动查找/当前目录/共享资源目录/版本导入；新增**目录重命名（显示名）**与**上移/下移排序**，当前目录固定首位 |
+| 高级设置 | `advanced.tsx` | 游戏参数尾部、启动前命令、调试模式、暂不支持项说明、危险区「重置本页」；启动器行为/窗口/进服已迁到「游戏」页，不重复 |
+
+侧边栏：`src/pages/setting/index.tsx` 的「游戏」分组新增首项「游戏」（Rocket 图标），共 5 页。
+
+### 组件统一（shadcn/ui）
+
+- `src/components/setting/controls.tsx`：`SettingSelect` 由 HeroUI Select 改为 `@/components/ui/select`（shadcn 风格，`@base-ui/react`），`SettingSwitch` 继续用 `@/components/ui/switch`；
+- `src/components/ui/select.tsx`：修掉 `Select` 根组件多余的 `className` 类型（顺带消除 2 条历史 TS 报错，渲染端报错 23 → 21）；
+- 内存滑块改用 `@/components/ui/slider`。
+
+### 新增配置字段（主进程 + 渲染端 + store 三处同步）
+
+| 字段 | 类型 | 默认 | 接线点 |
+|---|---|---|---|
+| `java.initialMemGB` | number | 0（不设置） | `launch-options.ts`：自定义模式下 `-Xms = min(initialMemGB, memGB)` |
+| `java.lockMemory` | boolean | false | `launch-options.ts`：为真时 `-Xms = -Xmx` |
+| `java.preferredIpStack` | `ipv4` / `default` / `ipv6` | default | `launch-options.ts`：追加 `-Djava.net.preferIPv4Stack=true` / `preferIPv6Stack=true` |
+| `java.useJavaExe` | boolean | false | `resolveJavaPath()` 末尾把 `javaw.exe` 换成 `java.exe` |
+| `game.dirAliases` | `Record<string,string>` | `{}` | 设置页目录显示名（仅展示，不改路径） |
+
+同时修正两处类型不一致：`src/api/config.ts` 的 `UiConfig` 补 `homeTitleDetail` / `showQuickActions`；`GameConfig` 去掉主进程没有的 `savesDir` / `instancesDir`。
+`advanced.afterLaunch` 扩到 6 档（新增 `hide` / `hide-exit` / `hide-reopen`），`electron/handlers/launch.ts` 在 `window-ready` 隐藏窗口、`exit` 时按模式退出或重新显示。
+
+### 不做（写进页面说明，避免假设置）
+
+默认实例隔离档位、游戏窗口标题/左下角版本信息、进程优先级、高性能显卡、渲染器、正版验证方式切换、JLW/LegacyFix/LWJGL Unsafe Agent、下载限速与单文件连接数 —— 均因架构或依赖缺失无法兑现，已在对应分页的「暂不支持」卡片写明原因。
+
+### 验证
+
+- `npx tsc -p tsconfig.electron.json --noEmit`：通过
+- `npx tsc -p tsconfig.json --noEmit`：21 条历史报错（比之前少 2 条），新文件零报错
+- `npx vite build`：✓ built in 17.19s
+- Electron 运行时自测（launch-options）：初始内存 2G / 最大 8G、锁定内存 `-Xms=-Xmx=8G`、`-Xms` 回退 `min(2,memGB)`、IPv4/IPv6 参数注入、default 不注入 —— 6 项断言全过

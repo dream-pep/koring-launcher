@@ -122,8 +122,15 @@ export function TaskCard({ task }: TaskCardProps) {
                 >
                   <ProgressValue className="text-[11px]" />
                 </Progress>
-                {task.progress?.stage && (
-                  <p className="text-[11px] text-muted-foreground mt-1">{task.progress.stage}</p>
+                {task.progress && (task.progress.stage || task.progress.total > 0) && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {task.progress.stage}
+                    {task.progress.total > 0 && (
+                      <span className="ml-1 tabular-nums text-muted-foreground/70">
+                        {task.progress.current}/{task.progress.total}
+                      </span>
+                    )}
+                  </p>
                 )}
               </div>
             )}

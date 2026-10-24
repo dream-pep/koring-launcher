@@ -23,10 +23,10 @@ export interface GameConfig {
   gameDir: string;
   /** 共享资源目录（可选）：versions / libraries / assets 从该目录读取；留空表示各实例自包含 */
   resourceDir: string;
-  savesDir: string;
-  instancesDir: string;
   /** 已添加的游戏目录列表 */
   gameDirs: string[];
+  /** 目录显示名（重命名）：key = 规范化路径，value = 自定义名称；只影响展示 */
+  dirAliases: Record<string, string>;
 }
 
 export interface JavaConfig {
@@ -35,6 +35,14 @@ export interface JavaConfig {
   autoJavaPath: boolean;
   memMode: string;
   memGB: number;
+  /** 初始内存 -Xms（GB）；0 = 不主动设置 */
+  initialMemGB: number;
+  /** 锁定内存：-Xms = -Xmx */
+  lockMemory: boolean;
+  /** IP 协议偏好：ipv4 / default / ipv6 */
+  preferredIpStack: string;
+  /** 用 java.exe 替代 javaw.exe */
+  useJavaExe: boolean;
   gc: string;
   jvmArgs: string;
 }
@@ -66,6 +74,10 @@ export interface UiConfig {
   showInstanceTitle: boolean;
   /** 标题栏任务队列按钮显示 */
   showTaskButton: boolean;
+  /** 首页实例标题下的副信息：version（版本）/ loader（加载器）/ playtime（游玩时长）/ none */
+  homeTitleDetail: string;
+  /** 首页启动按钮下方的快捷入口（选择实例 / 打开目录） */
+  showQuickActions: boolean;
 }
 
 /** 激活状态（OOBE / 启动校验结果，见 electron/config.ts 同名段） */

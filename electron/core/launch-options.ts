@@ -80,12 +80,25 @@ export function buildLaunchOptions(
     const gb = Math.max(1, Math.min(16, java.memGB || 4));
     minMemory = Math.min(2, gb) * 1024;
     maxMemory = gb * 1024;
+    // 初始内存 -Xms：0 = 不主动设置（沿用上面的最小内存）
+    if ((java.initialMemGB ?? 0) > 0) {
+      minMemory = Math.min(java.initialMemGB, gb) * 1024;
+    }
+  }
+  // 锁定内存：-Xms 跟随 -Xmx，固定堆大小（PCL 同名开关）
+  if (java.lockMemory) {
+    minMemory = maxMemory;
   }
 
   // ---- JVM 参数 ----
   const extraJVMArgs: string[] = [];
   if (java.gc === 'zgc') extraJVMArgs.push('-XX:+UseZGC');
   else if (java.gc === 'g1') extraJVMArgs.push('-XX:+UseG1GC');
+  if (java.preferredIpStack === 'ipv4') {
+    extraJVMArgs.push('-Djava.net.preferIPv4Stack=true');
+  } else if (java.preferredIpStack === 'ipv6') {
+    extraJVMArgs.push('-Djava.net.preferIPv6Stack=true');
+  }
   if (java.jvmArgs?.trim()) {
     extraJVMArgs.push(...parseArgs(java.jvmArgs));
   }
@@ -214,24 +227,29 @@ export async function planJavaForVersion(minecraftVersion: string): Promise<Java
  */
 export async function resolveJavaPath(
   configuredPath: string,
-  options?: { auto?: boolean; minecraftVersion?: string }
+  options?: { auto?: boolean; minecraftVersion?: string; useJavaExe?: boolean }
 ): Promise<string> {
+  // java.exe 偏好：把 javaw.exe 换成 java.exe（能看到控制台输出）
+  const finalize = (resolved: string): string => {
+    if (!options?.useJavaExe) return resolved;
+    return resolved.replace(/javaw(\.exe)?$/i, 'java$1');
+  };
   if (options?.auto && options.minecraftVersion) {
     const picked = await pickJavaForVersion(options.minecraftVersion);
-    if (picked) return picked;
+    if (picked) return finalize(picked);
   }
   if (configuredPath?.trim()) {
     const info = await resolveJava(configuredPath.trim()).catch(() => undefined);
-    if (info) return info.path;
+    if (info) return finalize(info.path);
   }
   try {
     const locations = await getPotentialJavaLocations();
     for (const loc of locations) {
       const info = await resolveJava(loc).catch(() => undefined);
-      if (info) return info.path;
+      if (info) return finalize(info.path);
     }
   } catch {
     // 扫描失败则继续回退
   }
-  return 'java';
+  return finalize('java');
 }

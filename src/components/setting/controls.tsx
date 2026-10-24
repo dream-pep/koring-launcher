@@ -5,17 +5,21 @@ import { useState, type ReactNode } from "react";
 import {
   Button,
   Input,
-  ListBox,
-  ListBoxItem,
   NumberField,
   Radio,
   RadioGroup,
-  Select,
   TextArea,
 } from "@heroui/react";
-import { Check, ChevronDown, FolderOpen, FolderSearch, Loader2 } from "lucide-react";
+import { Check, FolderOpen, FolderSearch, Loader2 } from "lucide-react";
 import { ipcInvoke } from "@/api/ipc";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SettingRow } from "./SettingRow";
 
 export interface SettingOption {
@@ -29,7 +33,7 @@ export interface SettingOption {
 export const fieldCls =
   "rounded-lg border border-border/40 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 text-[13px] text-foreground placeholder:text-muted-foreground/50 focus:border-primary/40 transition-colors";
 
-// ---------- 下拉选择 ----------
+// ---------- 下拉选择（shadcn/ui Select，基于 @base-ui/react） ----------
 export function SettingSelect({
   label,
   desc,
@@ -47,49 +51,25 @@ export function SettingSelect({
   placeholder?: string;
   className?: string;
 }) {
-  const selectedKey = options.some((o) => o.value === value) ? value : "__none__";
   return (
     <SettingRow label={label} desc={desc}>
-      <Select.Root
-        aria-label={label}
-        selectedKey={selectedKey}
-        onSelectionChange={(keys) => {
-          // RAC 单选时可能传 Key | null，也可能传 Set<Key>；两种形状都兼容
-          let v: string | undefined;
-          if (keys === null || keys === undefined) {
-            v = undefined;
-          } else if (typeof keys === "string" || typeof keys === "number") {
-            v = String(keys);
-          } else if ((keys as unknown) instanceof Set) {
-            const arr = Array.from(keys);
-            v = arr.length > 0 ? String(arr[0]) : undefined;
-          }
-          if (v && v !== "__none__") onChange(v);
+      <Select
+        value={value}
+        onValueChange={(next) => {
+          if (typeof next === "string" && next) onChange(next);
         }}
-        className={className}
       >
-        <Select.Trigger className="h-8 rounded-lg border border-border/40 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 hover:border-primary/30 transition-colors">
-          <Select.Value className="text-[13px] text-foreground">
-            {options.find((o) => o.value === value)?.label ?? placeholder}
-          </Select.Value>
-          <Select.Indicator>
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/60" />
-          </Select.Indicator>
-        </Select.Trigger>
-        <Select.Popover className="z-50 rounded-xl border border-border/50 dark:border-white/[0.08] bg-background shadow-xl p-1.5 min-w-[10rem]">
-          <ListBox className="max-h-72 overflow-y-auto scroll-area outline-none">
-            {options.map((opt) => (
-              <ListBoxItem
-                key={opt.value}
-                id={opt.value}
-                className="text-[13px] py-1.5 px-2.5 rounded-lg data-[selected=true]:bg-primary/10 data-[selected=true]:text-primary outline-none cursor-pointer"
-              >
-                {opt.label}
-              </ListBoxItem>
-            ))}
-          </ListBox>
-        </Select.Popover>
-      </Select.Root>
+        <SelectTrigger aria-label={label} className={className ?? "w-56"}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </SettingRow>
   );
 }

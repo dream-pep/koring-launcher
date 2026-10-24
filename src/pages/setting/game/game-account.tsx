@@ -272,6 +272,24 @@ export function GameAccountSetting() {
                 </Button>
               </div>
             </SettingCard>
+
+            {/* 正版验证方式（对齐 PCL 设置项，当前固定设备代码流） */}
+            <SettingCard>
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.05] dark:bg-white/[0.05]">
+                  <ShieldQuestion className="h-4 w-4 text-muted-foreground/70" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">正版验证方式</p>
+                    <SettingBadge variant="neutral">设备代码流（固定）</SettingBadge>
+                  </div>
+                  <p className="mt-0.5 text-[12px] text-muted-foreground/70">
+                    微软登录目前固定使用设备代码流；PCL 的「Web 账户管理器」依赖额外组件，暂不提供切换。
+                  </p>
+                </div>
+              </div>
+            </SettingCard>
           </div>
         </div>
       </div>

@@ -7,6 +7,9 @@ import { registerInstallHandlers } from './handlers/install';
 import { registerLaunchHandlers } from './handlers/launch';
 import { registerModsHandlers } from './handlers/mods';
 import { registerInstanceHandlers } from './handlers/instance';
+import { registerInstanceModsHandlers } from './handlers/instance-mods';
+import { registerInstanceAssetsHandlers } from './handlers/instance-assets';
+import { registerCrashAnalysisHandlers } from './handlers/crash-analysis';
 import { registerBackgroundHandlers } from './handlers/background';
 import { registerTaskHandlers } from './handlers/task';
 import { registerSystemHandlers } from './handlers/system';
@@ -169,7 +172,7 @@ function createMainWindow(): electron.BrowserWindow {
   const iconPath = getWindowIconPath();
 
   const main = new electron.BrowserWindow({
-    width: 1000,
+    width: 1100,
     height: 700,
     minWidth: 800,
     minHeight: 600,
@@ -226,6 +229,9 @@ function registerAllHandlers() {
   registerModsHandlers();
   registerInstanceHandlers(win);
   registerBackgroundHandlers();
+  registerInstanceModsHandlers();
+  registerInstanceAssetsHandlers();
+  registerCrashAnalysisHandlers();
   registerTaskHandlers(win);
   registerSystemHandlers();
   registerWindowHandlers(win);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button, Slider } from "@heroui/react";
+import { Button } from "@heroui/react";
+import { Slider } from "@/components/ui/slider";
 import { Cpu, Loader2, RefreshCw, Check, AlertCircle, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useConfigStore } from "@/stores/configStore";
@@ -295,33 +296,72 @@ export function JavaMemSetting() {
                 />
                 {java.memMode === "auto" ? (
                   <p className="text-[12px] text-muted-foreground">
-                    自动配置由启动器按实例默认值分配：最小 1 GB、最大 4 GB（实例可单独覆盖）。
+                    自动配置由启动器按实例默认值分配：最小 1 GB、最大 4 GB（实例可单独覆盖）。需要精确控制时切到「自定义」。
                   </p>
                 ) : (
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[13px] text-muted-foreground">分配内存</span>
-                      <span className="text-[13px] text-muted-foreground tabular-nums">{java.memGB} GB</span>
+                  <div className="space-y-4">
+                    {/* 最大内存 -Xmx */}
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[13px] text-muted-foreground">最大内存（-Xmx）</span>
+                        <span className="text-[13px] tabular-nums text-muted-foreground">{java.memGB} GB</span>
+                      </div>
+                      <Slider
+                        value={[java.memGB]}
+                        onValueChange={(v) => setJava({ memGB: Array.isArray(v) ? v[0] : v })}
+                        min={1}
+                        max={32}
+                        step={1}
+                      />
+                      <div className="mt-1 flex justify-between">
+                        <span className="text-[11px] text-muted-foreground/50">1 GB</span>
+                        <span className="text-[11px] text-muted-foreground/50">32 GB</span>
+                      </div>
                     </div>
-                    <Slider
-                      value={java.memGB}
-                      onChange={(v) => setJava({ memGB: typeof v === "number" ? v : v[0] })}
-                      minValue={1}
-                      maxValue={16}
-                      step={1}
-                    >
-                      <Slider.Track>
-                        <Slider.Fill />
-                        <Slider.Thumb />
-                      </Slider.Track>
-                    </Slider>
-                    <div className="flex justify-between mt-1">
-                      <span className="text-[11px] text-muted-foreground/50">1 GB</span>
-                      <span className="text-[11px] text-muted-foreground/50">16 GB</span>
+
+                    {/* 初始内存 -Xms（PCL：0 = 不主动设置；锁定内存时跟随 -Xmx） */}
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[13px] text-muted-foreground">初始内存（-Xms）</span>
+                        <span className="text-[13px] tabular-nums text-muted-foreground">
+                          {java.lockMemory
+                            ? `跟随最大内存（${java.memGB} GB）`
+                            : java.initialMemGB > 0
+                              ? `${Math.min(java.initialMemGB, java.memGB)} GB`
+                              : "不主动设置"}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[java.initialMemGB]}
+                        onValueChange={(v) => setJava({ initialMemGB: Array.isArray(v) ? v[0] : v })}
+                        min={0}
+                        max={java.memGB}
+                        step={1}
+                        disabled={java.lockMemory}
+                      />
+                      <div className="mt-1 flex justify-between">
+                        <span className="text-[11px] text-muted-foreground/50">不设置</span>
+                        <span className="text-[11px] text-muted-foreground/50">{java.memGB} GB</span>
+                      </div>
                     </div>
-                    <p className="text-[12px] text-muted-foreground mt-2">
-                      实际参数：<code className="font-mono text-foreground/80">
-                        -Xms{Math.min(2, java.memGB)}G -Xmx{java.memGB}G
+
+                    <SettingSwitch
+                      label="锁定内存（-Xms = -Xmx）"
+                      desc="固定堆大小，减少延迟抖动（对 ZGC 尤其有效）；代价是全程占用接近最大分配"
+                      checked={java.lockMemory}
+                      onChange={(v) => setJava({ lockMemory: v })}
+                    />
+
+                    <p className="text-[12px] text-muted-foreground">
+                      实际参数：
+                      <code className="font-mono text-foreground/80">
+                        -Xms
+                        {java.lockMemory
+                          ? java.memGB
+                          : java.initialMemGB > 0
+                            ? Math.min(java.initialMemGB, java.memGB)
+                            : Math.min(2, java.memGB)}
+                        G -Xmx{java.memGB}G
                       </code>
                     </p>
                   </div>
@@ -344,6 +384,14 @@ export function JavaMemSetting() {
                 rows={3}
                 placeholder="可选，留空使用默认参数"
               />
+              <div className="mt-3">
+                <SettingSwitch
+                  label="使用 java.exe 而非 javaw.exe"
+                  desc="让游戏进程有标准输入输出，便于排查「窗口迟迟不出现」；可能失去 HDR 等特性"
+                  checked={java.useJavaExe}
+                  onChange={(v) => setJava({ useJavaExe: v })}
+                />
+              </div>
             </SettingCard>
           </div>
         </div>
