@@ -29,10 +29,11 @@ interface ModCardProps {
 export function ModCard({ mod, actionLabel = "安装", onOpen }: ModCardProps) {
   return (
     <div
-      className="group relative flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150
+      className="group relative flex items-center gap-4 px-4 py-3 rounded-xl
+        transition-[transform,box-shadow,border-color] duration-200 ease-spring-soft
         bg-white/85 dark:bg-black/45
         border border-black/[0.06] dark:border-white/[0.07]
-        hover:shadow-md hover:border-primary/25 dark:hover:border-primary/25
+        hover:-translate-y-0.5 hover:shadow-md hover:border-primary/25 dark:hover:border-primary/25
         cursor-pointer"
       onClick={() => onOpen(mod)}
     >

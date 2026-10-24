@@ -19,7 +19,7 @@ import {
   Wrench,
 } from "lucide-react";
 import clsx from "clsx";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   diagnoseInstance,
   openPath,
@@ -478,8 +478,8 @@ export function InstanceDetail({
         })}
       </div>
 
-      {/* 内容 */}
-      <div className="flex-1 px-6 py-5">
+      {/* 内容：key 随页签变化 → 重放 tab-in 进入动效 */}
+      <div key={tab} className="flex-1 px-6 py-5 animate-tab-in">
         {tab === "overview" && (
           <div className="space-y-4">
             <section className="rounded-xl border border-border/40 p-4 dark:border-white/[0.08]">

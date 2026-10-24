@@ -144,12 +144,22 @@ export function BackgroundLayer() {
   );
 
   useEffect(() => {
+    const bg = bgRef.current;
     if (!parallax) {
-      if (bgRef.current) bgRef.current.style.transform = "";
+      // 视差关闭：清掉 transform 与 will-change，避免常驻合成层
+      if (bg) {
+        bg.style.transform = "";
+        bg.style.willChange = "";
+      }
       return;
     }
+    // 视差开启：提前提升为合成层，translate 走 GPU 不触发重绘
+    if (bg) bg.style.willChange = "transform";
     window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      if (bg) bg.style.willChange = "";
+    };
   }, [parallax, handleMouseMove]);
 
   const contentBlur = showContentBlur && !forceDisableContentBlur;
@@ -162,7 +172,7 @@ export function BackgroundLayer() {
       zIndex: 0,
       pointerEvents: "none",
       opacity,
-      transition: "filter 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s ease-out",
+      transition: "filter 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 200ms ease-out",
     };
     const filters: string[] = [];
     // 首页保持壁纸原样：背景模糊（主题与背景里的设置）只作用于内容页，

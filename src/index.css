@@ -59,6 +59,30 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ============================================
+   动效基线 — 苹果式 spring / iOS 曲线
+   由 Tailwind v4 生成 ease-* 与 animate-* 工具类
+   ============================================ */
+@theme {
+    /* 页面/大面板：不回弹的 iOS 缓动 */
+    --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+    /* 弹层/按钮/通知：可见回弹 */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* 轻回弹收尾（不做夸张过冲） */
+    --ease-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --animate-pop-in: pop-in 320ms var(--ease-spring) both;
+    --animate-pop-out: pop-out 180ms ease-in both;
+    --animate-overlay-in: overlay-in 220ms var(--ease-out-quint) both;
+    --animate-overlay-out: overlay-out 160ms ease-in both;
+    --animate-menu-in: menu-in 160ms var(--ease-spring) both;
+    --animate-tab-in: tab-in 220ms var(--ease-spring-soft) both;
+    --animate-list-item-in: list-item-in 280ms var(--ease-spring-soft) both;
+    --animate-sheet-in: sheet-in 280ms var(--ease-spring-soft) both;
+    --animate-sheet-out: sheet-out 200ms ease-in both;
+}
+
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
@@ -188,7 +212,8 @@
 }
 
 /* ============================================
-   View Transitions — 页面切换动效
+   View Transitions — 页面切换动效（方向化）
+   前进：旧页向左退场，新页从右进入；后退完全镜像
    ============================================ */
 
 /* root 转场：禁用，只让内容区参与动画 */
@@ -199,53 +224,153 @@
 
 /* 内容区转场：前进方向 */
 ::view-transition-old(content) {
-  animation: 0.3s cubic-bezier(0.4, 0, 0.2, 1) both page-out-forward;
+  animation: 260ms var(--ease-ios) both page-out-forward;
   pointer-events: none;
 }
 ::view-transition-new(content) {
-  animation: 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s both page-in-forward;
+  animation: 320ms var(--ease-ios) 30ms both page-in-forward;
   pointer-events: auto;
 }
 
-/* 设置子页面转场（已弃用 View Transitions，改用 keyframe） */
-
-/* 内容区转场：后退方向 */
+/* 内容区转场：后退方向（镜像） */
 :root[data-transition-dir="backward"] ::view-transition-old(content) {
   animation-name: page-out-backward;
-  pointer-events: none;
 }
 :root[data-transition-dir="backward"] ::view-transition-new(content) {
   animation-name: page-in-backward;
-  animation-delay: 0.05s;
-  pointer-events: auto;
+}
+
+/* 同层级切换（顶部导航之间 / 同一父页的子页之间）：不做左右位移，交叉淡化 + 极轻微缩放 */
+:root[data-transition-dir="sibling"] ::view-transition-old(content) {
+  animation: 200ms var(--ease-ios) both page-out-sibling;
+}
+:root[data-transition-dir="sibling"] ::view-transition-new(content) {
+  animation: 280ms var(--ease-ios) both page-in-sibling;
 }
 
 @keyframes page-out-forward {
-  from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.97); }
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to   { opacity: 0; transform: translate3d(-12px, -4px, 0) scale(0.985); }
 }
 @keyframes page-in-forward {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: translate3d(24px, 6px, 0) scale(0.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes page-out-backward {
-  from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.97); }
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to   { opacity: 0; transform: translate3d(12px, -4px, 0) scale(0.985); }
 }
 @keyframes page-in-backward {
-  from { opacity: 0; transform: scale(0.97); }
+  from { opacity: 0; transform: translate3d(-24px, 6px, 0) scale(0.985); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes page-out-sibling {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.992); }
+}
+@keyframes page-in-sibling {
+  from { opacity: 0; transform: scale(1.004); }
   to   { opacity: 1; transform: scale(1); }
 }
 
 /* ============================================
-   设置子页面切换 — keyframe 动画（仅内容区）
+   通用动效 keyframes（配合 @theme 的 animate-*）
+   transform-origin 统一走 --origin-x / --origin-y
    ============================================ */
-.setting-page-enter {
-  animation: setting-page-in 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.94) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
-@keyframes setting-page-in {
+@keyframes pop-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.96) translateY(4px); }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.94) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes tab-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes list-item-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sheet-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes sheet-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ============================================
+   设置子页面切换 — 方向由侧边栏条目顺序决定
+   选择更靠下的条目：新页从下方进入、旧页向上退出；更靠上则镜像。
+   ============================================ */
+.setting-page-enter {
+  animation: setting-page-in 280ms var(--ease-spring-soft) both;
+}
+@keyframes setting-page-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.996); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.setting-page-enter-down {
+  animation: setting-page-in-down 300ms var(--ease-spring-soft) both;
+}
+.setting-page-exit-down {
+  animation: setting-page-out-down 220ms ease-in both;
+  pointer-events: none;
+}
+.setting-page-enter-up {
+  animation: setting-page-in-up 300ms var(--ease-spring-soft) both;
+}
+.setting-page-exit-up {
+  animation: setting-page-out-up 220ms ease-in both;
+  pointer-events: none;
+}
+
+@keyframes setting-page-in-down {
+  from { opacity: 0; transform: translateY(16px) scale(0.996); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes setting-page-out-down {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-12px) scale(0.998); }
+}
+@keyframes setting-page-in-up {
+  from { opacity: 0; transform: translateY(-16px) scale(0.996); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes setting-page-out-up {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(12px) scale(0.998); }
+}
+
+/* 指针来源（弹层从触发位置“长出来”） */
+.origin-pointer {
+  transform-origin: var(--origin-x, 50%) var(--origin-y, 50%);
+}
+
+/* 转场进行中：WebGL 画面在快照里容易变黑/闪烁，先隐藏；hover 态也不参与快照 */
+html[data-transitioning] .transition-hide {
+  visibility: hidden !important;
+}
+html[data-transitioning] .transition-flat,
+html[data-transitioning] .transition-flat:hover {
+  transform: none !important;
+  transition: none !important;
 }
 
 /* ============================================
@@ -290,8 +415,31 @@
   transition-duration: 0.01ms !important;
 }
 .reduce-motion ::view-transition-old(root),
-.reduce-motion ::view-transition-new(root) {
+.reduce-motion ::view-transition-new(root),
+.reduce-motion ::view-transition-old(content),
+.reduce-motion ::view-transition-new(content) {
   animation: none !important;
+}
+
+/* 系统级减少动画：即使没开设置页开关也降级 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(content),
+  ::view-transition-new(content) {
+    animation: none !important;
+  }
+  .origin-pointer {
+    transform-origin: 50% 50%;
+  }
 }
 
 /* ============================================
@@ -318,4 +466,140 @@
 }
 :root.dark .high-contrast {
   --foreground: oklch(1 0 0);
+}
+
+/* ============================================
+   通知（Sonner）— 玻璃表面 + 状态图标 + spring 进出
+   ============================================ */
+[data-sonner-toaster] {
+  --width: 340px;
+}
+
+.cn-toast {
+  width: 340px !important;
+  padding: 12px 14px !important;
+  gap: 10px !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--titlebar-border) !important;
+  background: color-mix(in oklch, var(--popover) 90%, transparent) !important;
+  color: var(--popover-foreground) !important;
+  box-shadow:
+    0 18px 40px -18px rgba(0, 0, 0, 0.35),
+    0 2px 10px -4px rgba(0, 0, 0, 0.18) !important;
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  transition:
+    transform 420ms var(--ease-spring),
+    opacity 260ms ease,
+    height 320ms ease !important;
+}
+
+.cn-toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.cn-toast[data-type="success"] .cn-toast-icon {
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+}
+.cn-toast[data-type="error"] .cn-toast-icon {
+  background: color-mix(in oklch, var(--destructive) 14%, transparent);
+  color: var(--destructive);
+}
+.cn-toast[data-type="warning"] .cn-toast-icon {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+.cn-toast[data-type="info"] .cn-toast-icon {
+  background: rgba(59, 130, 246, 0.14);
+  color: #2563eb;
+}
+.cn-toast[data-type="loading"] .cn-toast-icon {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+:root.dark .cn-toast[data-type="success"] .cn-toast-icon {
+  color: #34d399;
+}
+:root.dark .cn-toast[data-type="warning"] .cn-toast-icon {
+  color: #fbbf24;
+}
+:root.dark .cn-toast[data-type="info"] .cn-toast-icon {
+  color: #60a5fa;
+}
+
+.cn-toast-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--popover-foreground);
+}
+
+.cn-toast-desc {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+}
+
+.cn-toast-action {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  transition: filter 160ms ease, transform 160ms var(--ease-spring-soft);
+}
+.cn-toast-action:hover {
+  filter: brightness(1.06);
+}
+.cn-toast-action:active {
+  transform: scale(0.97);
+}
+
+.cn-toast-cancel {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  transition: background 160ms ease;
+}
+.cn-toast-cancel:hover {
+  background: color-mix(in oklch, var(--muted) 80%, var(--foreground));
+}
+
+.cn-toast-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  color: var(--muted-foreground);
+  background: transparent;
+  transition: background 160ms ease, color 160ms ease;
+}
+.cn-toast-close:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+/* 减少动画：通知只保留淡入淡出 */
+@media (prefers-reduced-motion: reduce) {
+  .cn-toast {
+    transition: opacity 160ms ease, height 160ms ease !important;
+  }
 }

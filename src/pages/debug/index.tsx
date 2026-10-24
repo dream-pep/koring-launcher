@@ -102,7 +102,7 @@ export function Debug() {
       {/* 打开浏览器调试工具（DevTools） */}
       <button
         onClick={() => window.electronAPI?.openDevTools()}
-        className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-transform cursor-pointer group mb-4"
+        className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-transform duration-200 ease-spring-soft cursor-pointer group mb-4"
       >
         <div className="flex items-center gap-4">
           <div className="p-2.5 rounded-xl bg-foreground/[0.08]">
@@ -121,7 +121,7 @@ export function Debug() {
           <button
             key={p.key}
             onClick={() => navigate(p.key)}
-            className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-transform cursor-pointer group"
+            className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-transform duration-200 ease-spring-soft cursor-pointer group"
           >
             <div className="flex items-center gap-4">
               <div className={`p-2.5 rounded-xl ${p.bg}`}>

@@ -73,16 +73,16 @@ export function VersionCard({
     if (clickable) navigate("update");
   };
 
-  // Silk（WebGL 动画）仅在卡片可见时运行：
-  // 设置子页 keep-alive 后隐藏页仍挂在 DOM，若动画照跑会白白占 GPU/rAF →
-  // 用 IntersectionObserver 按可见性挂载/卸载 Silk（隐藏/滚出视野即暂停，观感不变）
+  // 卡片可见性：设置子页 keep-alive 后隐藏页仍挂在 DOM（仅 `hidden`），
+  // 用 IntersectionObserver 按可见性决定是否挂载 Silk（隐藏/滚出视野即暂停 GPU/rAF），
+  // 同时作为共享元素过渡名的占用依据（隐藏卡片不占名）。
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const [silkVisible, setSilkVisible] = useState(true);
+  const [visible, setVisible] = useState(true);
   useEffect(() => {
     if (simple || !cardRef.current || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(
       (entries) => {
-        for (const en of entries) setSilkVisible(en.isIntersecting);
+        for (const en of entries) setVisible(en.isIntersecting);
       },
       { root: null, threshold: 0.02 },
     );
@@ -90,31 +90,37 @@ export function VersionCard({
     return () => io.disconnect();
   }, [simple]);
 
+  // 共享元素过渡名：同一页面同一时刻只允许一个元素持有 "version-card"。
+  // 设置页 keep-alive 会同时保活「主页」「关于」两张卡，因此由设置页把非活动卡片
+  // 传成 noViewTransition（只让当前子页的卡片带名字），避免重名导致转场被浏览器中止、
+  // 卡片快照叠影/穿模。更新页、OOBE 等页面各自只有一张卡，保持默认带名。
+  const sharedTransitionName = noViewTransition ? undefined : "version-card";
+
   return (
     <div
       ref={cardRef}
       className={clsx(
-        "relative overflow-hidden rounded-xl border border-white/10 min-h-[200px]",
-        clickable && "cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-transform",
+        // isolate：为 Silk 的 mix-blend-soft-light 建立独立 stacking context，避免与页面背景/相邻卡片串色
+        // overflow-clip：裁剪 Silk 画布，防止其溢出圆角
+        "group isolate relative overflow-clip rounded-xl border border-white/10 min-h-[200px]",
+        clickable &&
+          "cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-[transform] duration-200 ease-spring",
         className,
       )}
       onClick={handleCardClick}
       // 共享元素过渡：路由切换时（startViewTransition），新旧页面中同名 view-transition-name
       // 的元素会从上一个位置平滑移动/形变到当前页面的位置。
-      // 浮层/弹窗复用（noViewTransition）时关闭，避免与页面卡片重名打断过渡。
-      style={
-        noViewTransition
-          ? undefined
-          : ({ viewTransitionName: "version-card" } as React.CSSProperties)
-      }
+      // 隐藏/浮层复用（noViewTransition）时关闭，保证全页面最多一个同名元素。
+      style={sharedTransitionName ? { viewTransitionName: sharedTransitionName } : undefined}
     >
       {/* 背景层 */}
       <div className="absolute inset-0" style={{ background: gradient }} />
 
-      {/* Silk 动画层 (非 simple 模式；仅卡片可见时挂载，隐藏即暂停) */}
-      {!simple && silkVisible && (
+      {/* Silk 动画层 (非 simple 模式；仅卡片可见时挂载，隐藏即暂停)
+          pointer-events-none：不拦截整卡点击；transition-hide：转场期间隐藏 WebGL 画面（避免快照变黑） */}
+      {!simple && visible && (
         <Suspense fallback={null}>
-          <div className="absolute inset-0 opacity-60 mix-blend-soft-light">
+          <div className="absolute inset-0 opacity-60 mix-blend-soft-light pointer-events-none transition-hide">
             <Silk speed={3} scale={1.2} color={color} noiseIntensity={1.2} rotation={0.3} />
           </div>
         </Suspense>

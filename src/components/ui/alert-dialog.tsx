@@ -3,6 +3,7 @@ import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { originStyleFor } from "@/lib/pointer-origin"
 
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props) {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
@@ -28,7 +29,52 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Backdrop
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-black/10 supports-backdrop-filter:backdrop-blur-xs data-open:animate-overlay-in data-closed:animate-overlay-out",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+type AlertDialogContentProps = AlertDialogPrimitive.Popup.Props & {
+  size?: "default" | "sm"
+}
+
+/**
+ * 挂载在 Portal 内的真实 Popup：只有弹窗真正挂载时才会渲染，
+ * 这样 useLayoutEffect 能在挂载当帧（paint 前）按最近指针位置算出 transform-origin。
+ */
+function AlertDialogPopup({
+  className,
+  size = "default",
+  style,
+  ...props
+}: AlertDialogContentProps) {
+  const popupRef = React.useRef<HTMLDivElement>(null)
+
+  // 调用方显式钉住 --origin-x / --origin-y 时（如启动弹窗从底部升起）不覆盖
+  const pinnedOrigin =
+    style != null &&
+    ("--origin-x" in (style as Record<string, unknown>) ||
+      "--origin-y" in (style as Record<string, unknown>))
+
+  React.useLayoutEffect(() => {
+    const element = popupRef.current
+    if (!element || pinnedOrigin) return
+    const origin = originStyleFor(element) as Record<string, string>
+    element.style.setProperty("--origin-x", origin["--origin-x"] ?? "50%")
+    element.style.setProperty("--origin-y", origin["--origin-y"] ?? "50%")
+  }, [pinnedOrigin])
+
+  return (
+    <AlertDialogPrimitive.Popup
+      ref={popupRef}
+      data-slot="alert-dialog-content"
+      data-size={size}
+      style={style}
+      className={cn(
+        "group/alert-dialog-content fixed inset-0 z-50 m-auto grid h-fit max-h-[calc(100dvh-2rem)] w-full gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-popover-foreground ring-1 ring-foreground/10 outline-none origin-pointer data-open:animate-pop-in data-closed:animate-pop-out data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm",
         className
       )}
       {...props}
@@ -40,21 +86,11 @@ function AlertDialogContent({
   className,
   size = "default",
   ...props
-}: AlertDialogPrimitive.Popup.Props & {
-  size?: "default" | "sm"
-}) {
+}: AlertDialogContentProps) {
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
-      <AlertDialogPrimitive.Popup
-        data-slot="alert-dialog-content"
-        data-size={size}
-        className={cn(
-          "group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-[size=default]:max-w-xs data-[size=sm]:max-w-xs data-[size=default]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
-        )}
-        {...props}
-      />
+      <AlertDialogPopup className={className} size={size} {...props} />
     </AlertDialogPortal>
   )
 }

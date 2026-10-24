@@ -17,7 +17,7 @@ import {
   ChevronUp,
   ChevronDown,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useConfigStore } from "@/stores/configStore";
 import { useInstanceStore } from "@/stores/instanceStore";
 import {

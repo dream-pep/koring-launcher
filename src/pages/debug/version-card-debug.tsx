@@ -1,6 +1,5 @@
 import { useDevStore } from "@/stores/devStore";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { VersionCard } from "@/components/VersionCard";
 import { checkForUpdates } from "@/api/update";
 import { GlassCard, PageHeader } from "./components";
@@ -23,17 +22,11 @@ export function VersionCardDebug() {
     setPreviewMode,
     previewUpdateState,
     setPreviewUpdateState,
-    overlayOpacity,
-    setOverlayOpacity,
-    blurAmount,
-    setBlurAmount,
   } = useDevStore();
 
   const resetPreview = () => {
     setPreviewMode(null);
     setPreviewUpdateState(null);
-    setOverlayOpacity(30);
-    setBlurAmount(12);
   };
 
   return (
@@ -44,8 +37,6 @@ export function VersionCardDebug() {
         className="mb-8"
         overrideMode={previewMode}
         overrideState={previewUpdateState}
-        overlayOpacity={overlayOpacity}
-        blurAmount={blurAmount}
       />
 
       <div className="space-y-6">
@@ -99,54 +90,6 @@ export function VersionCardDebug() {
 
         <div>
           <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3">
-            磨砂层参数
-          </h3>
-          <GlassCard>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[13px] text-muted-foreground">
-                    遮罩透明度
-                  </span>
-                  <span className="text-[13px] text-muted-foreground tabular-nums">
-                    {overlayOpacity}%
-                  </span>
-                </div>
-                <Slider
-                  value={[overlayOpacity]}
-                  onValueChange={(v) =>
-                    setOverlayOpacity(Array.isArray(v) ? v[0] : v)
-                  }
-                  min={0}
-                  max={100}
-                  step={1}
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[13px] text-muted-foreground">
-                    模糊强度
-                  </span>
-                  <span className="text-[13px] text-muted-foreground tabular-nums">
-                    {blurAmount}px
-                  </span>
-                </div>
-                <Slider
-                  value={[blurAmount]}
-                  onValueChange={(v) =>
-                    setBlurAmount(Array.isArray(v) ? v[0] : v)
-                  }
-                  min={0}
-                  max={40}
-                  step={1}
-                />
-              </div>
-            </div>
-          </GlassCard>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-semibold text-foreground/40 uppercase tracking-wider mb-3">
             快捷操作
           </h3>
           <GlassCard>
@@ -154,7 +97,7 @@ export function VersionCardDebug() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground">重置与检查</p>
                 <p className="text-[13px] text-muted-foreground mt-0.5">
-                  重置所有预览参数或强制检查更新
+                  重置模式与状态预览，或强制检查更新
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

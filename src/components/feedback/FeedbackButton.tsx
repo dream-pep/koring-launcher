@@ -2,7 +2,7 @@
 import { ComponentProps } from "react";
 import { Button } from "@heroui/react";
 import { MessageSquareHeart, ExternalLink } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 const FORM_DIRECT_URL = "https://lingke.youtrack.cloud/form/aa6a005d-2559-4e92-a0f5-d3898f377ef8";
 

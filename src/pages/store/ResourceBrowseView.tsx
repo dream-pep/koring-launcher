@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, ListBox, ListBoxItem, Select, Skeleton } from "@heroui/react";
 import { Search, ChevronDown, RotateCcw, Package, XCircle, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/input";
 import { useModsStore } from "@/stores/modsStore";
 import { getCategories, getGameVersions } from "@/api/mods";

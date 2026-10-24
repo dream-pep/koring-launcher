@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -93,7 +93,15 @@ export function UpdateAvailableDialog() {
     <AlertDialog open={open} onOpenChange={(o) => !o && hide()}>
       <AlertDialogContent
         className="gap-0 overflow-hidden rounded-2xl p-0"
-        style={{ width: "min(720px, calc(100vw - 2rem))", maxWidth: "min(720px, calc(100vw - 2rem))" }}
+        style={
+          {
+            width: "min(720px, calc(100vw - 2rem))",
+            maxWidth: "min(720px, calc(100vw - 2rem))",
+            // 启动弹窗没有触发元素：固定从底部居中升起（配合 AlertDialogContent 的 origin-pointer）
+            "--origin-x": "50%",
+            "--origin-y": "100%",
+          } as CSSProperties
+        }
       >
         {/* 统一内边距容器：卡片与正文共用同一水平宽度（安全区不粘连边框） */}
         <div className="flex flex-col p-2.5 sm:p-3">

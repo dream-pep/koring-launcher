@@ -1,6 +1,6 @@
 import { RotateCcw, AlertTriangle } from "lucide-react";
 import { Button } from "@heroui/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useConfigStore } from "@/stores/configStore";
 import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
 import {

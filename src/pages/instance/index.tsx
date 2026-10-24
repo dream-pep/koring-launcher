@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@heroui/react";
 import { Plus, Copy, FolderOpen, Play, RefreshCw, Search, Star, Trash2, X } from "lucide-react";
 import clsx from "clsx";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useConfigStore } from "@/stores/configStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -377,7 +377,8 @@ export function InstancePage() {
                   setMenu({ x: event.clientX, y: event.clientY, name: instance.name });
                 }}
                 className={clsx(
-                  "flex w-full items-center gap-2.5 rounded-xl border px-2 py-2 text-left transition-colors",
+                  "flex w-full items-center gap-2.5 rounded-xl border px-2 py-2 text-left transition-[transform,box-shadow,border-color,background-color] duration-200 ease-spring-soft",
+                  "hover:-translate-y-0.5 hover:shadow-md",
                   active
                     ? "border-primary/40 bg-primary/[0.08]"
                     : "border-transparent hover:bg-foreground/[0.04] dark:hover:bg-white/[0.04]"
@@ -477,8 +478,8 @@ export function InstancePage() {
               }}
             >
               <div
-                className="absolute w-44 overflow-hidden rounded-xl border border-border/50 bg-background/95 py-1 shadow-xl backdrop-blur-sm dark:border-white/[0.08]"
-                style={{ left, top }}
+                className="absolute w-44 origin-pointer animate-menu-in overflow-hidden rounded-xl border border-border/50 bg-background/95 py-1 shadow-xl backdrop-blur-sm dark:border-white/[0.08]"
+                style={{ left, top, "--origin-x": "0%", "--origin-y": "0%" } as CSSProperties}
                 onClick={(event) => event.stopPropagation()}
               >
                 {items.map((item) => {

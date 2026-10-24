@@ -66,4 +66,11 @@ declare global {
   }
 }
 
+// Electron 无边框窗口的拖拽区域（React 的 CSSProperties 未内置）
+declare module "react" {
+  interface CSSProperties {
+    WebkitAppRegion?: "drag" | "no-drag";
+  }
+}
+
 export {};

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import { AlertCircle, FolderOpen, Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { openPath } from "@/api/instance";
 import {
   deleteInstanceScreenshots,

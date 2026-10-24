@@ -26,27 +26,33 @@ export function TaskButton() {
       className="flex items-center justify-center w-[25px] h-[25px] rounded transition-colors cursor-default hover:bg-black/10 dark:hover:bg-white/15 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white"
       style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
     >
-      {running ? (
-        <svg className="w-4 h-4" viewBox="0 0 16 16">
-          <circle
-            cx="8"
-            cy="8"
-            r="6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeDasharray="37.7"
-            strokeDashoffset="9.4"
-            strokeLinecap="round"
-            className="animate-spin origin-center"
-            style={{ animationDuration: "1.2s" }}
-          />
-        </svg>
-      ) : paused ? (
-        <Pause className="w-3.5 h-3.5 text-amber-500" />
-      ) : (
-        <ListTodo className="w-3.5 h-3.5" />
-      )}
+      {/* key 随状态切换 → 重放 pop-in，图标变化不再是硬切 */}
+      <span
+        key={running ? "running" : paused ? "paused" : "idle"}
+        className="flex items-center justify-center animate-pop-in transition-[transform,opacity] duration-150 ease-spring"
+      >
+        {running ? (
+          <svg className="w-4 h-4" viewBox="0 0 16 16">
+            <circle
+              cx="8"
+              cy="8"
+              r="6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeDasharray="37.7"
+              strokeDashoffset="9.4"
+              strokeLinecap="round"
+              className="animate-spin origin-center"
+              style={{ animationDuration: "1.2s" }}
+            />
+          </svg>
+        ) : paused ? (
+          <Pause className="w-3.5 h-3.5 text-amber-500" />
+        ) : (
+          <ListTodo className="w-3.5 h-3.5" />
+        )}
+      </span>
     </button>
   );
 }

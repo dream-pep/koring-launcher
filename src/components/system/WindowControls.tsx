@@ -40,8 +40,8 @@ export function WindowControls({
   const handleMaximize = () => window.electronAPI?.maximize();
   const handleClose = () => window.electronAPI?.close();
 
-  const btnClass = "flex items-center justify-center w-[25px] h-[25px] rounded transition-colors cursor-default hover:bg-black/10 dark:hover:bg-white/15 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white";
-  const closeBtnClass = "flex items-center justify-center w-[25px] h-[25px] rounded transition-colors cursor-default hover:bg-red-500 text-black/70 dark:text-white/70 hover:text-white";
+  const btnClass = "flex items-center justify-center w-[25px] h-[25px] rounded transition-[background-color,color,transform] duration-150 active:scale-90 cursor-default hover:bg-black/10 dark:hover:bg-white/15 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white";
+  const closeBtnClass = "flex items-center justify-center w-[25px] h-[25px] rounded transition-[background-color,color,transform] duration-150 active:scale-90 cursor-default hover:bg-red-500 text-black/70 dark:text-white/70 hover:text-white";
   const noDrag: React.CSSProperties = { WebkitAppRegion: "no-drag" };
 
   const showBadge = BUILD_MODE !== "run";
@@ -66,7 +66,7 @@ export function WindowControls({
       )}
 
       <div
-        className="overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        className="overflow-hidden transition-[width,opacity,margin] duration-300 ease-spring"
         style={{
           width: showTask ? 27 : 0,
           opacity: showTask ? 1 : 0,
@@ -77,7 +77,7 @@ export function WindowControls({
       </div>
 
       <div
-        className="overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        className="overflow-hidden transition-[width,opacity,margin] duration-300 ease-spring"
         style={{
           width: showInfo ? 27 : 0,
           opacity: showInfo ? 1 : 0,

@@ -10,7 +10,7 @@ export function NextButton({ onClick, disabled = false }: NextButtonProps) {
       <button
         onClick={onClick}
         disabled={disabled}
-        className="w-12 h-12 rounded-full bg-foreground/[0.06] hover:bg-foreground/[0.12] flex items-center justify-center text-foreground/60 hover:text-foreground transition-all duration-200 text-xl disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-foreground/[0.06] disabled:hover:text-foreground/60"
+        className="w-12 h-12 rounded-full bg-foreground/[0.06] hover:bg-foreground/[0.12] flex items-center justify-center text-foreground/60 hover:text-foreground transition-[transform,background-color,color] duration-200 ease-spring-soft hover:scale-105 active:scale-95 text-xl disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100 disabled:hover:bg-foreground/[0.06] disabled:hover:text-foreground/60"
       >
         →
       </button>

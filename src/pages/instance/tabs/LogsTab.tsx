@@ -13,7 +13,7 @@ import {
   Terminal,
 } from "lucide-react";
 import clsx from "clsx";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   analyzeInstanceCrash,
   type CrashAnalysisResult,

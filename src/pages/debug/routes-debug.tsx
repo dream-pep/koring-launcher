@@ -90,7 +90,7 @@ export function RoutesDebug() {
                     onClick={() => navigate(route.key)}
                     disabled={active}
                     className={clsx(
-                      "glass-card w-full px-4 py-3 text-left flex items-center gap-3 transition-all",
+                      "glass-card w-full px-4 py-3 text-left flex items-center gap-3 transition-[transform,opacity,color] duration-200 ease-spring-soft",
                       !active &&
                         "hover:scale-[1.01] active:scale-[0.99] cursor-pointer group",
                       active && "opacity-80 cursor-default",

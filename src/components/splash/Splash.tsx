@@ -25,8 +25,8 @@ export default function Splash() {
         className="flex-1 flex items-center justify-center"
         style={{
           opacity: phase === "enter" ? 0 : 1,
-          transform: phase === "enter" ? "translateY(10px)" : "translateY(0)",
-          transition: "all 0.7s ease-out",
+          transform: phase === "enter" ? "translateY(10px) scale(0.97)" : "translateY(0) scale(1)",
+          transition: "opacity 600ms var(--ease-spring-soft), transform 600ms var(--ease-spring-soft)",
         }}
       >
         <img
@@ -38,7 +38,13 @@ export default function Splash() {
       </div>
 
       {/* Bottom bar */}
-      <div className="flex items-center justify-between px-6 pb-4 text-xs text-muted-foreground">
+      <div
+        className="flex items-center justify-between px-6 pb-4 text-xs text-muted-foreground"
+        style={{
+          opacity: phase === "enter" ? 0 : 1,
+          transition: "opacity 400ms var(--ease-spring-soft) 120ms",
+        }}
+      >
         <span>Provided by Lingke Koring Studio</span>
         <span className="flex items-center gap-1.5">
           {version && <span>v{version}</span>}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import clsx from "clsx";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   checkInstanceName,
   createInstance,
@@ -16,6 +16,7 @@ import {
   type LoaderType,
 } from "@/api/instance";
 import { fieldCls } from "@/components/setting";
+import { Modal } from "@/components/ui/modal";
 
 interface CreateDialogProps {
   isOpen: boolean;
@@ -199,17 +200,20 @@ export function CreateDialog({ isOpen, onClose, onCreated }: CreateDialogProps) 
     }
   }, [autoInstall, displayName, loaderType, loaderVersion, location, mcVersion, memory, name, onClose, onCreated]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={creating ? undefined : onClose} />
-      <div className="relative z-10 mx-4 w-full max-w-2xl overflow-hidden rounded-2xl border border-border/50 bg-background shadow-2xl dark:border-white/[0.08]">
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      closeOnBackdrop={!creating}
+      closeOnEscape={!creating}
+      labelledBy="create-instance-title"
+      className="max-w-2xl"
+    >
         {/* 头部 */}
         <div className="flex items-center justify-between border-b border-border/30 px-6 py-4 dark:border-white/[0.04]">
           <div className="flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold text-foreground">新建实例</h2>
+            <h2 id="create-instance-title" className="text-base font-semibold text-foreground">新建实例</h2>
           </div>
           <button
             type="button"
@@ -489,7 +493,6 @@ export function CreateDialog({ isOpen, onClose, onCreated }: CreateDialogProps) 
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

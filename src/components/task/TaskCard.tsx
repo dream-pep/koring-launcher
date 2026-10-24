@@ -205,7 +205,7 @@ export function TaskCard({ task }: TaskCardProps) {
                 className="p-1 rounded hover:bg-muted/50 transition-colors"
               >
                 <ChevronDown
-                  className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+                  className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ease-spring ${expanded ? "rotate-180" : ""}`}
                 />
               </button>
             )}
@@ -213,18 +213,26 @@ export function TaskCard({ task }: TaskCardProps) {
         </div>
       </div>
 
-      {/* Expandable logs */}
-      {expanded && hasLogs && (
-        <div className="px-4 py-2 max-h-[200px] overflow-y-auto bg-black/[0.03] dark:bg-white/[0.03]">
-          {task.logs.map((log, i) => (
-            <div key={i} className="flex items-start gap-2 py-0.5 text-[11px] leading-tight font-mono">
-              <span className="text-muted-foreground/50 shrink-0 tabular-nums">{formatTime(log.time)}</span>
-              <span className={`shrink-0 ${logLevelColor(log.level)}`}>
-                {log.level === "error" ? "ERR" : log.level === "warn" ? "WRN" : "INF"}
-              </span>
-              <span className="text-foreground/80 break-all">{log.message}</span>
+      {/* Expandable logs：grid 行高动画展开（保留 DOM，收起时也不卸载，避免高度跳变） */}
+      {hasLogs && (
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-spring-soft ${
+            expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="px-4 py-2 max-h-[200px] overflow-y-auto bg-black/[0.03] dark:bg-white/[0.03]">
+              {task.logs.map((log, i) => (
+                <div key={i} className="flex items-start gap-2 py-0.5 text-[11px] leading-tight font-mono">
+                  <span className="text-muted-foreground/50 shrink-0 tabular-nums">{formatTime(log.time)}</span>
+                  <span className={`shrink-0 ${logLevelColor(log.level)}`}>
+                    {log.level === "error" ? "ERR" : log.level === "warn" ? "WRN" : "INF"}
+                  </span>
+                  <span className="text-foreground/80 break-all">{log.message}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 /**
  * 主进程运行时提示（一次性，kind 去重）：
@@ -10,9 +10,8 @@ export function RuntimeNotices() {
     const unsub = window.electronAPI?.onRuntimeNotice?.((notice) => {
       if (!notice?.message) return;
       // id 固定 → 同一提示只出现一次（页面刷新也不会重复弹）
-      toast.warning(notice.message, {
+      toast.persistent(notice.message, {
         id: `runtime-notice:${notice.kind ?? "generic"}`,
-        duration: Infinity,
         closeButton: true,
       });
     });

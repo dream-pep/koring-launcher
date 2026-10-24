@@ -1,5 +1,5 @@
 import { Play, Settings, Package, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useRouteStore } from "@/stores/routeStore";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useConfigStore } from "@/stores/configStore";
@@ -42,7 +42,7 @@ export function StartCard() {
       {/* Settings button */}
       <button
         onClick={() => navigate("setting")}
-        className="flex items-center justify-center w-9 h-9 ml-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150 cursor-pointer shrink-0 rounded-full"
+        className="flex items-center justify-center w-9 h-9 ml-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 active:scale-95 transition-[transform,background-color,color] duration-150 ease-spring-soft cursor-pointer shrink-0 rounded-full"
         aria-label="设置"
       >
         <Settings className="w-4 h-4" />
@@ -52,7 +52,7 @@ export function StartCard() {
       <button
         onClick={handleLaunch}
         disabled={launching}
-        className="flex items-center justify-center h-9 rounded-full cursor-pointer shrink-0 active:scale-[0.97] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-70"
+        className="flex items-center justify-center h-9 rounded-full cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.97] transition-[transform,background-color,color] duration-150 ease-spring disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
       >
         <span className="flex items-center gap-1.5 px-4 h-7 rounded-full font-medium text-sm text-primary bg-primary/10 hover:bg-primary/20 transition-colors">
           {launching ? (
@@ -67,7 +67,7 @@ export function StartCard() {
       {/* Instance button */}
       <button
         onClick={() => navigate("gallery")}
-        className="flex items-center justify-center w-9 h-9 mr-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-150 cursor-pointer shrink-0 rounded-full"
+        className="flex items-center justify-center w-9 h-9 mr-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 active:scale-95 transition-[transform,background-color,color] duration-150 ease-spring-soft cursor-pointer shrink-0 rounded-full"
         aria-label="选择实例"
       >
         <Package className="w-4 h-4" />

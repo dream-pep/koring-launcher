@@ -8,11 +8,11 @@ export function OobeWelcome() {
   const navigate = useRouteStore((s) => s.navigate);
   const user = useKoringAuthStore((s) => s.user);
   const [showBtn, setShowBtn] = useState(false);
-  const [animClass, setAnimClass] = useState("scale-90 opacity-0");
+  const [animClass, setAnimClass] = useState("translate-y-2 scale-[0.98] opacity-0");
 
   useEffect(() => {
     requestAnimationFrame(() => {
-      setAnimClass("scale-100 opacity-100");
+      setAnimClass("translate-y-0 scale-100 opacity-100");
     });
   }, []);
 
@@ -27,7 +27,7 @@ export function OobeWelcome() {
     <OobeLayout>
       <div className="flex flex-col items-center gap-4">
         <h2
-          className={`text-4xl font-bold text-foreground transition-all duration-700 ease-out ${animClass}`}
+          className={`text-4xl font-bold text-foreground transition-[opacity,transform] duration-500 ease-spring ${animClass}`}
         >
           欢迎回来，{displayName}。
         </h2>

@@ -1,9 +1,35 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
 
+/**
+ * 全局二次确认弹窗（RootLayout 挂载，useConfirmDialogStore 驱动）。
+ *
+ * - 复用 AlertDialog 原语：统一的 pop-in/pop-out、遮罩淡入淡出、指针 origin；
+ * - 保留倒计时禁用逻辑（危险操作防误触）与「先关弹窗再执行 onConfirm」的顺序；
+ * - 调用方只依赖 useConfirmDialogStore().openDialog，无需改动。
+ */
 export function ConfirmDialog() {
-  const { open, title, description, confirmLabel, countdown: initCountdown, showCountdown, onConfirm, closeDialog } =
-    useConfirmDialogStore();
+  const {
+    open,
+    title,
+    description,
+    confirmLabel,
+    countdown: initCountdown,
+    showCountdown,
+    onConfirm,
+    closeDialog,
+  } = useConfirmDialogStore();
+
   const [countdown, setCountdown] = useState(initCountdown);
 
   useEffect(() => {
@@ -17,31 +43,40 @@ export function ConfirmDialog() {
     return () => clearTimeout(timer);
   }, [open, showCountdown, countdown]);
 
-  if (!open) return null;
-
   const canConfirm = !showCountdown || countdown <= 0;
+  const label =
+    showCountdown && countdown > 0 ? `${confirmLabel} (${countdown}s)` : confirmLabel;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
-      <div className="glass-card w-[380px] p-6 space-y-4">
-        <h3 className="text-base font-bold text-foreground">{title}</h3>
-        <p className="text-[13px] text-muted-foreground leading-relaxed">{description}</p>
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            onClick={closeDialog}
-            className="px-4 py-1.5 rounded-md text-[13px] font-medium bg-foreground/[0.06] hover:bg-foreground/[0.12] text-foreground/60 hover:text-foreground transition-colors"
-          >
-            取消
-          </button>
-          <button
-            onClick={() => { closeDialog(); onConfirm(); }}
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) closeDialog();
+      }}
+    >
+      {/* z-[200]：保持覆盖页面内其他浮层（原自定义遮罩即 200），避免被 Sheet/更新弹窗盖住 */}
+      <AlertDialogContent className="z-[200] max-w-[380px] gap-4 p-6">
+        <AlertDialogHeader className="place-items-start gap-1.5 text-left">
+          <AlertDialogTitle className="text-base font-bold">{title}</AlertDialogTitle>
+          <AlertDialogDescription className="text-[13px] leading-relaxed">
+            {description}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="-mx-6 -mb-6 flex-row justify-end gap-2 rounded-b-xl border-t-0 bg-transparent px-6 py-4">
+          <AlertDialogCancel onClick={closeDialog}>取消</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
             disabled={!canConfirm}
-            className="px-4 py-1.5 rounded-md text-[13px] font-medium bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            onClick={() => {
+              // 先关闭（让弹层开始退场），再执行真正的操作
+              closeDialog();
+              onConfirm();
+            }}
           >
-            {showCountdown && countdown > 0 ? `${confirmLabel} (${countdown}s)` : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+            {label}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

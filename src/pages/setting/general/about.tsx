@@ -14,7 +14,7 @@ import {
   setUpdateChannel,
   type UpdateChannelDef,
 } from "@/api/update";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { getDeviceId, type DeviceIdentity } from "@/api/system";
 import {
   AlertDialog,
@@ -43,7 +43,12 @@ const FALLBACK_CHANNELS: UpdateChannelDef[] = [
   { key: "runner", label: "跑步模式", desc: "可获取预览版（测试版）更新", allowPrerelease: true },
 ];
 
-export function AboutSetting() {
+interface AboutSettingProps {
+  /** 当前子页是否处于活动状态：只有活动的版本卡参与共享元素过渡，避免 keep-alive 下重名 */
+  sharedTransition?: boolean;
+}
+
+export function AboutSetting({ sharedTransition = true }: AboutSettingProps) {
   const [open, setOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const canConfirm = countdown <= 0;
@@ -133,8 +138,9 @@ export function AboutSetting() {
       <PageHeader title="关于" desc="查看版本信息、更新状态与项目相关链接" />
 
       <div className="space-y-6">
-        {/* 设置页：整卡可点击跳转更新页，显示「查看更新」 */}
-        <VersionCard isSettingPage />
+        {/* 设置页：整卡可点击跳转更新页，显示「查看更新」。
+            keep-alive 下只有活动子页的卡带 view-transition-name（见 home.tsx 同款处理）。 */}
+        <VersionCard isSettingPage noViewTransition={!sharedTransition} />
 
         <div>
           <SectionTitle>项目信息</SectionTitle>

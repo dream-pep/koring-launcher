@@ -11,12 +11,6 @@ interface DevState {
 
   previewUpdateState: PreviewUpdateState | null;
   setPreviewUpdateState: (v: PreviewUpdateState | null) => void;
-
-  overlayOpacity: number;
-  setOverlayOpacity: (v: number) => void;
-
-  blurAmount: number;
-  setBlurAmount: (v: number) => void;
 }
 
 export const useDevStore = create<DevState>((set) => ({
@@ -28,10 +22,4 @@ export const useDevStore = create<DevState>((set) => ({
 
   previewUpdateState: null,
   setPreviewUpdateState: (v) => set({ previewUpdateState: v }),
-
-  overlayOpacity: 30,
-  setOverlayOpacity: (v) => set({ overlayOpacity: v }),
-
-  blurAmount: 12,
-  setBlurAmount: (v) => set({ blurAmount: v }),
 }));

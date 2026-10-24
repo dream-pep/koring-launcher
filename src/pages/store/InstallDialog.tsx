@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button, Input, Modal } from "@heroui/react";
 import { Loader2, Box, Check } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useConfigStore } from "@/stores/configStore";
 import { useTaskStore } from "@/stores/taskStore";
 import type { InstanceRuntime } from "@/api/instance";

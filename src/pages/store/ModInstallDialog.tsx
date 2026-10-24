@@ -9,14 +9,14 @@
 // 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
 
 import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { Button } from "@heroui/react";
 import { X, Loader2, Download, FolderOpen, Package } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { ModSearchResult, ModVersionResult } from "@/api/mods";
 import { useModsStore } from "@/stores/modsStore";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useConfigStore } from "@/stores/configStore";
+import { Modal } from "@/components/ui/modal";
 
 interface ModInstallDialogProps {
   mod: ModSearchResult | null;
@@ -29,6 +29,13 @@ export function ModInstallDialog({ mod, gameVersion, loader, onClose }: ModInsta
   const { modVersions, getVersions, install, installing, clearError } = useModsStore();
   const { instances, fetchInstances } = useInstanceStore();
   const gameDir = useConfigStore((s) => s.config.game.gameDir);
+
+  // 关闭时父组件立刻把 mod 置 null，这里保留最后一份数据，让退场动画期间内容不消失
+  const [displayMod, setDisplayMod] = useState(mod);
+  useEffect(() => {
+    if (mod) setDisplayMod(mod);
+  }, [mod]);
+  const activeMod = mod ?? displayMod;
 
   const [selectedVersion, setSelectedVersion] = useState<ModVersionResult | null>(null);
   const [selectedInstance, setSelectedInstance] = useState<string>("");
@@ -66,7 +73,7 @@ export function ModInstallDialog({ mod, gameVersion, loader, onClose }: ModInsta
     });
   }, [modVersions, gameVersion, loader]);
 
-  if (!mod) return null;
+  if (!activeMod) return null;
 
   const handleInstall = async () => {
     if (!selectedVersion) { toast.warning("请先选择一个 Mod 版本"); return; }
@@ -74,20 +81,23 @@ export function ModInstallDialog({ mod, gameVersion, loader, onClose }: ModInsta
     const target = instances.find((i) => i.name === selectedInstance);
     if (!target) { toast.warning("目标实例不存在"); return; }
 
-    await install(mod.id, selectedVersion.id, target.path, mod.source);
+    await install(activeMod.id, selectedVersion.id, target.path, activeMod.source);
     const { error } = useModsStore.getState();
     if (error) { toast.error(`安装失败: ${error}`); clearError(); }
-    else { toast.success(`「${mod.name}」已安装到 ${target.config.description || target.name}`); onClose(); }
+    else { toast.success(`「${activeMod.name}」已安装到 ${target.config.description || target.name}`); onClose(); }
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-xl mx-4 bg-background border border-border/50 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden">
+  return (
+    <Modal
+      open={Boolean(mod)}
+      onClose={onClose}
+      labelledBy="mod-install-title"
+      className="max-w-xl"
+    >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border/30 dark:border-white/[0.04]">
           <div className="flex items-center gap-3 min-w-0">
-            {mod.iconUrl ? (
-              <img src={mod.iconUrl} alt={mod.name} className="w-9 h-9 rounded-lg object-cover shrink-0"
+            {activeMod.iconUrl ? (
+              <img src={activeMod.iconUrl} alt={activeMod.name} className="w-9 h-9 rounded-lg object-cover shrink-0"
                 onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
             ) : (
               <div className="w-9 h-9 rounded-lg bg-foreground/[0.05] dark:bg-white/[0.05] flex items-center justify-center shrink-0">
@@ -95,8 +105,8 @@ export function ModInstallDialog({ mod, gameVersion, loader, onClose }: ModInsta
               </div>
             )}
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-foreground truncate">{mod.name}</h2>
-              <p className="text-[11px] text-muted-foreground truncate">{mod.description}</p>
+              <h2 id="mod-install-title" className="text-base font-semibold text-foreground truncate">{activeMod.name}</h2>
+              <p className="text-[11px] text-muted-foreground truncate">{activeMod.description}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-md hover:bg-foreground/[0.06] transition-colors shrink-0"><X className="w-4 h-4 text-muted-foreground" /></button>
@@ -156,8 +166,6 @@ export function ModInstallDialog({ mod, gameVersion, loader, onClose }: ModInsta
             </Button>
           </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

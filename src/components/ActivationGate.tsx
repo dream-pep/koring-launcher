@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useRouteStore } from "@/stores/routeStore";
 import { useConfigStore } from "@/stores/configStore";
 import { useDeveloperModeStore, refreshDeveloperMode } from "@/stores/developerModeStore";
@@ -16,19 +16,21 @@ type Phase = "checking" | "ok" | "blocked" | "upgrade" | "error";
 /** 「重试」最小间隔：避免连点/重挂载把 device_service 的共享限流桶打满 */
 const MIN_RETRY_INTERVAL_MS = 1500;
 
-/** 通知级别 → sonner 呈现（文档 §6.2 的建议配色语义） */
+/** 启动公告：常驻通知（不自动消失，需用户看到并处理；文档 §6.2 的公告语义） */
 function showNotification(n: LauncherNotification) {
   const text = [n.publisher ? `${n.publisher}` : "", n.content ?? ""].filter(Boolean).join(" · ");
   const options = {
     // 固定 id 只用于同一次启动内去重（渲染进程每次启动都会重新挂载 → 每次启动都会弹）
     id: `startup-notice:${n.id}`,
     description: text || undefined,
+    // 常驻 + 可关闭：公告不能被自动收起，但必须给用户关闭/处理入口
     duration: Infinity,
     closeButton: true,
     action: n.link_url
       ? { label: "查看详情", onClick: () => window.electronAPI?.openExternal(n.link_url as string) }
       : undefined,
   };
+  // 保留级别配色语义：危险/漏洞 → error，警告 → warning，其余 → info
   switch (n.level) {
     case "danger":
     case "vulnerability":
@@ -36,9 +38,6 @@ function showNotification(n: LauncherNotification) {
       break;
     case "warning":
       toast.warning(n.title, options);
-      break;
-    case "event":
-      toast.info(n.title, options);
       break;
     default:
       toast.info(n.title, options);

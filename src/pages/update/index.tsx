@@ -20,7 +20,7 @@ import {
 } from "@/api/update";
 import { ExternalLink, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Link } from "@heroui/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -300,7 +300,7 @@ export function UpdatePage() {
           阅读时向下滚动自动收起（translate-y-full），向上滚动/回顶恢复 */}
       <div
         className={clsx(
-          "fixed bottom-0 left-0 right-0 z-20 transition-transform duration-300",
+          "fixed bottom-0 left-0 right-0 z-20 transition-[transform,opacity] duration-300 ease-spring-soft",
           barVisible ? "translate-y-0" : "translate-y-full",
         )}
         style={{

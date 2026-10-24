@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import { AlertCircle, Loader2, Package, Search, Trash2, X } from "lucide-react";
 import clsx from "clsx";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   deleteInstanceMods,
   listInstanceMods,

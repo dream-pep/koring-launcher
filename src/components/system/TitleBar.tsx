@@ -158,7 +158,7 @@ export function TitleBar({
       <div className="flex items-center pl-3 shrink-0 relative z-10" style={{ WebkitAppRegion: "no-drag" }}>
         {/* 返回按钮 */}
         <div
-          className="overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          className="overflow-hidden transition-[width,opacity,margin] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
           style={{
             WebkitAppRegion: "no-drag",
             width: showBack ? 68 : 0,
@@ -178,7 +178,7 @@ export function TitleBar({
         </div>
 
         <span
-          className="text-sm font-semibold tracking-wide text-foreground/80 transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] whitespace-nowrap"
+          className="text-sm font-semibold tracking-wide text-foreground/80 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] whitespace-nowrap"
         >
           Koring Launcher
         </span>
@@ -200,15 +200,15 @@ export function TitleBar({
             style={{ touchAction: "none", WebkitAppRegion: "no-drag" }}
           >
             <div
-              className="absolute h-[28px] rounded-full"
+              className="absolute left-0 h-[28px] rounded-full"
               style={{
-                left: indicator.left,
+                transform: `translateX(${indicator.left}px)`,
                 width: indicator.width,
                 background: "var(--indicator-bg)",
                 boxShadow: "var(--indicator-shadow)",
                 transition: isDragging.current
                   ? "none"
-                  : "left 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                  : "transform 300ms var(--ease-spring), width 300ms var(--ease-spring)",
               }}
             />
 
@@ -220,7 +220,7 @@ export function TitleBar({
                   ref={(el) => { btnRefs.current[i] = el; }}
                   onClick={() => handleBtnClick(r.key)}
                   className={[
-                    "relative z-10 px-4 py-[5px] text-[13px] font-medium rounded-full transition-colors duration-200 cursor-default",
+                    "relative z-10 px-4 py-[5px] text-[13px] font-medium rounded-full transition-[color,transform] duration-200 cursor-default active:scale-95",
                     active
                       ? "text-foreground"
                       : "text-foreground/40 hover:text-foreground/60",

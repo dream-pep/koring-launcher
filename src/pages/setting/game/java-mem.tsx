@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@heroui/react";
 import { Slider } from "@/components/ui/slider";
 import { Cpu, Loader2, RefreshCw, Check, AlertCircle, Wand2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useConfigStore } from "@/stores/configStore";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { scanJava, resolveJava, getJavaPlan, type JavaInfo, type JavaPlan } from "@/api/java";

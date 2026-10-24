@@ -16,8 +16,8 @@ export function InstanceTitle() {
       className={clsx(
         "self-start pl-1 pr-1 py-1.5 rounded-lg cursor-pointer",
         "text-5xl font-bold tracking-tight text-white",
-        "hover:bg-black/20",
-        "transition-colors duration-200",
+        "hover:bg-black/20 hover:scale-[1.01] origin-left",
+        "transition-[transform,background-color] duration-200 ease-spring-soft",
         "select-none",
       )}
     >

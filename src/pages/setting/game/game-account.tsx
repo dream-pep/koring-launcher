@@ -12,7 +12,7 @@ import {
   Fingerprint,
   Container,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useInstanceStore } from "@/stores/instanceStore";
 import {

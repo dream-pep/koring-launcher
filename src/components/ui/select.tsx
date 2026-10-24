@@ -110,7 +110,7 @@ function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            "relative max-h-72 min-w-[10rem] overflow-y-auto scroll-area rounded-xl border border-border/50 bg-background p-1.5 text-[13px] text-foreground shadow-xl outline-none",
+            "relative max-h-72 min-w-[10rem] overflow-y-auto scroll-area rounded-xl border border-border/50 bg-background p-1.5 text-[13px] text-foreground shadow-xl outline-none origin-[var(--transform-origin)] transition-[scale,transform,opacity] duration-150 ease-spring-soft data-starting-style:opacity-0 data-starting-style:scale-95 data-ending-style:opacity-0 data-ending-style:scale-95",
             className
           )}
           {...props}

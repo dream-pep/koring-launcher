@@ -1,12 +1,13 @@
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { BackgroundLayer } from "@/components/background/BackgroundLayer";
 import { SystemLayer } from "@/components/system/SystemLayer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 import { RuntimeNotices } from "@/components/RuntimeNotices";
 import { ActivationGate } from "@/components/ActivationGate";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { useA11yStore } from "@/stores/a11yStore";
+import { installPointerOrigin } from "@/lib/pointer-origin";
 import clsx from "clsx";
 
 interface RootLayoutProps {
@@ -25,6 +26,11 @@ export function RootLayout({
   const { reduceMotion, reduceTransparency, highContrast, contentBlurOpacity } = useA11yStore();
 
   const blurOpacity = reduceTransparency ? 0 : contentBlurOpacity;
+
+  // 记录最近指针位置：弹层「从触发位置长出来」的 transform-origin 依赖它
+  useEffect(() => {
+    installPointerOrigin();
+  }, []);
 
   return (
     <div
@@ -67,13 +73,8 @@ export function RootLayout({
       {/* 启动通知（设备 + 版本）与激活门禁（黑名单 / 禁激活 / 强制升级） */}
       <ActivationGate />
 
-      {/* Sonner toaster */}
-      <Toaster
-        position="bottom-right"
-        richColors
-        closeButton
-        duration={Infinity}
-      />
+      {/* Sonner toaster：样式与默认时长见 components/ui/sonner.tsx 与 lib/toast.ts */}
+      <Toaster />
     </div>
   );
 }

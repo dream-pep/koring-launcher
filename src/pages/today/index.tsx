@@ -2,7 +2,7 @@ import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useStat
 import { Button } from "@heroui/react";
 import { AlertCircle, ExternalLink, Newspaper, RefreshCw } from "lucide-react";
 import clsx from "clsx";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { getNews, getNewsTypes, type NewsEntry } from "@/api/news";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -73,9 +73,9 @@ const NewsCard = memo(function NewsCard({ entry }: NewsCardProps) {
       type="button"
       onClick={() => openLink(entry.readMoreLink)}
       className={clsx(
-        "group flex flex-col overflow-hidden rounded-2xl border text-left transition-colors",
+        "group flex flex-col overflow-hidden rounded-2xl border text-left transition-[transform,box-shadow,border-color] duration-250 ease-spring-soft",
         "border-border/40 dark:border-white/[0.08] bg-white/70 dark:bg-black/30 backdrop-blur-sm",
-        "hover:border-primary/40 dark:hover:border-primary/40"
+        "hover:-translate-y-0.5 hover:shadow-md hover:border-primary/40 dark:hover:border-primary/40"
       )}
     >
       <div className="relative aspect-[772/350] w-full overflow-hidden bg-foreground/[0.04] dark:bg-white/[0.04]">
@@ -86,7 +86,7 @@ const NewsCard = memo(function NewsCard({ entry }: NewsCardProps) {
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transition-transform duration-400 ease-spring-soft group-hover:scale-[1.03]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">

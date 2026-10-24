@@ -48,16 +48,19 @@ const shortcuts: ShortcutItem[] = [
 
 interface HomeSettingProps {
   onNavigate: (key: string) => void;
+  /** 当前子页是否处于活动状态：只有活动的版本卡参与共享元素过渡，避免 keep-alive 下重名 */
+  sharedTransition?: boolean;
 }
 
-export function HomeSetting({ onNavigate }: HomeSettingProps) {
+export function HomeSetting({ onNavigate, sharedTransition = true }: HomeSettingProps) {
   return (
     <div>
       <PageHeader title="主页" desc="版本信息与常用设置的快捷入口" />
 
       <div className="space-y-6">
-        {/* 与"关于"页使用相同的版本卡片；设置页整卡可点击跳转更新页 */}
-        <VersionCard isSettingPage />
+        {/* 与"关于"页使用相同的版本卡片；设置页整卡可点击跳转更新页。
+            keep-alive 时两张卡同时挂载，只有活动子页的卡带 view-transition-name。 */}
+        <VersionCard isSettingPage noViewTransition={!sharedTransition} />
 
         <div>
           <SectionTitle>常用设置</SectionTitle>
