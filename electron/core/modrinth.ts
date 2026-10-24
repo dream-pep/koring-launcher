@@ -18,7 +18,23 @@ interface ModSearchResult {
   versions?: string[];
   loaders?: string[];
   source: 'modrinth' | 'curseforge';
+  /** 以下为列表页/详情页展示用的补充字段 */
+  author?: string;
+  projectType?: string;
+  follows?: number;
+  latestVersion?: string;
+  license?: string;
+  gallery?: string[];
+  featuredGallery?: string;
+  color?: number | null;
+  clientSide?: string;
+  serverSide?: string;
+  dateCreated?: string;
+  dateModified?: string;
 }
+
+/** Modrinth 搜索排序方式 */
+export type ModSearchIndex = 'relevance' | 'downloads' | 'follows' | 'newest' | 'updated';
 
 interface ModSearchResponse {
   hits: ModSearchResult[];
@@ -54,7 +70,8 @@ async function searchModrinth(
   category?: string,
   projectType: string = 'mod',
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
+  index: ModSearchIndex = 'relevance'
 ): Promise<ModSearchResponse> {
   const facets: string[][] = [];
   if (gameVersion) facets.push([`versions:${gameVersion}`]);
@@ -65,6 +82,7 @@ async function searchModrinth(
     query: query || '',
     limit: String(limit),
     offset: String(offset),
+    index,
     project_type: projectType,
   });
 
@@ -79,15 +97,25 @@ async function searchModrinth(
     total_hits: number;
     hits: Array<{
       project_id: string;
+      project_type?: string;
       slug: string;
       title: string;
       description: string;
       downloads: number;
+      follows?: number;
+      author?: string;
       icon_url?: string;
       categories?: string[];
       versions?: string[];
+      latest_version?: string;
+      license?: string;
+      gallery?: string[];
+      featured_gallery?: string | null;
+      color?: number | null;
       client_side?: string;
       server_side?: string;
+      date_created?: string;
+      date_modified?: string;
     }>;
   };
 
@@ -102,6 +130,18 @@ async function searchModrinth(
       categories: hit.categories,
       versions: hit.versions,
       source: 'modrinth' as const,
+      author: hit.author,
+      projectType: hit.project_type,
+      follows: hit.follows,
+      latestVersion: hit.latest_version,
+      license: hit.license,
+      gallery: hit.gallery,
+      featuredGallery: hit.featured_gallery ?? undefined,
+      color: hit.color,
+      clientSide: hit.client_side,
+      serverSide: hit.server_side,
+      dateCreated: hit.date_created,
+      dateModified: hit.date_modified,
     })),
     total: data.total_hits,
     limit,
@@ -128,10 +168,11 @@ export async function searchMods(
   projectType: string = 'mod',
   limit?: number,
   offset?: number,
-  source: 'modrinth' | 'curseforge' = 'modrinth'
+  source: 'modrinth' | 'curseforge' = 'modrinth',
+  index: ModSearchIndex = 'relevance'
 ): Promise<ModSearchResponse> {
   if (source === 'modrinth') {
-    return searchModrinth(query, gameVersion, loader, category, projectType, limit, offset);
+    return searchModrinth(query, gameVersion, loader, category, projectType, limit, offset, index);
   }
   return searchCurseForge(query, gameVersion, loader, limit, offset);
 }
@@ -184,11 +225,22 @@ export async function getModDetail(
       slug: string;
       title: string;
       description: string;
+      project_type?: string;
       downloads: number;
+      followers?: number;
       icon_url?: string;
       categories?: string[];
       versions?: string[];
+      license?: { id?: string; name?: string };
+      gallery?: Array<{ url: string; featured?: boolean }>;
+      color?: number | null;
+      client_side?: string;
+      server_side?: string;
+      published?: string;
+      updated?: string;
     };
+
+    const galleries = data.gallery ?? [];
 
     return {
       id: data.id,
@@ -200,6 +252,17 @@ export async function getModDetail(
       categories: data.categories,
       versions: data.versions,
       source: 'modrinth',
+      projectType: data.project_type,
+      follows: data.followers,
+      latestVersion: data.versions?.[0],
+      license: data.license?.name ?? data.license?.id,
+      gallery: galleries.map((item) => item.url),
+      featuredGallery: galleries.find((item) => item.featured)?.url,
+      color: data.color,
+      clientSide: data.client_side,
+      serverSide: data.server_side,
+      dateCreated: data.published,
+      dateModified: data.updated,
     };
   }
 

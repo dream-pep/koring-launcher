@@ -345,6 +345,105 @@ export async function getQuiltVersionList(mcVersion?: string): Promise<string[]>
   return ipcInvoke<string[]>('instance:quilt-version-list', { mcVersion });
 }
 
+export async function getNeoForgeVersionList(mcVersion?: string): Promise<string[]> {
+  return ipcInvoke<string[]>('instance:neoforge-version-list', { mcVersion });
+}
+
+// ==================== 安装表单所需的元数据接口 ====================
+
+/** 实例名预检结果 */
+export type InstanceNameProblemCode =
+  | 'empty'
+  | 'too-long'
+  | 'invalid-char'
+  | 'reserved-name'
+  | 'exists'
+  | 'location-missing';
+
+export interface InstanceNameCheck {
+  /** 原始输入 */
+  name: string;
+  /** 去掉首尾空白后的名称（落盘用这个） */
+  normalized: string;
+  /** 实例目录绝对路径 */
+  path: string;
+  available: boolean;
+  code: InstanceNameProblemCode | null;
+  /** 不可用时的原因（可直接展示给用户） */
+  reason: string;
+  /** 大小写不敏感的同名目录 */
+  conflicts: string[];
+}
+
+/** 实例名预检（格式 + 目录占用） */
+export async function checkInstanceName(name: string, gamePath: string): Promise<InstanceNameCheck> {
+  return ipcInvoke<InstanceNameCheck>('instance:check', { name, gamePath });
+}
+
+/** 一个安装位置 = 一个游戏根目录（instances/ 的父目录） */
+export interface InstallLocation {
+  /** 配置中的原始值（可能是相对路径） */
+  path: string;
+  /** 解析后的绝对路径 */
+  resolvedPath: string;
+  /** 展示名：默认目录为「默认」，其余取目录名 */
+  label: string;
+  isDefault: boolean;
+  exists: boolean;
+  /** 是否可写（决定能否在此新建实例） */
+  writable: boolean;
+  /** 该位置下已有实例数 */
+  instanceCount: number;
+  /** 该位置下已安装版本数（>0 说明可复用 libraries/assets） */
+  versionCount: number;
+}
+
+/** 列出所有可用安装位置（默认目录在首位） */
+export async function getInstallLocations(): Promise<InstallLocation[]> {
+  return ipcInvoke<InstallLocation[]>('instance:locations');
+}
+
+/** 带归属信息的实例（多安装位置聚合后的条目） */
+export interface InstanceWithLocation extends InstanceInfo {
+  /** 实例所属游戏根目录（绝对路径） */
+  gamePath: string;
+  /** 所属安装位置的展示名 */
+  locationLabel: string;
+  isDefaultLocation: boolean;
+}
+
+/** 跨安装位置聚合实例列表（按最近游玩时间倒序） */
+export async function listAllInstances(): Promise<{
+  locations: InstallLocation[];
+  instances: InstanceWithLocation[];
+}> {
+  return ipcInvoke('instance:list-all');
+}
+
+/** 安装表单可选的加载器类型 */
+export type LoaderType = 'none' | 'fabric' | 'quilt' | 'forge' | 'neoforged';
+
+/** 单个加载器的可用状态与版本列表 */
+export interface LoaderOption {
+  type: LoaderType;
+  label: string;
+  /** 是否还需要用户选择具体版本 */
+  requiresVersion: boolean;
+  /** 当前实现是否支持自动安装 */
+  supported: boolean;
+  /** 可选版本（新 → 旧）；拉取失败时为空数组 */
+  versions: string[];
+  /** 默认选中版本（通常最新）；无可用版本时为 null */
+  latest: string | null;
+  /** 降级说明（拉取失败 / 无可用版本） */
+  note?: string;
+}
+
+/** 加载器目录：一次拿到所有加载器类型、可用性与版本列表 */
+export async function getLoaderCatalog(mcVersion?: string): Promise<LoaderOption[]> {
+  return ipcInvoke<LoaderOption[]>('instance:loader-catalog', { mcVersion });
+}
+
 // Event listeners
 export type InstallChannel = 'install' | 'repair';
 

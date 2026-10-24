@@ -13,6 +13,8 @@ export function registerModsHandlers() {
     limit?: number;
     offset?: number;
     source: string;
+    /** 排序方式：relevance / downloads / follows / newest / updated */
+    index?: string;
   }) => {
     try {
       const data = await searchMods(
@@ -23,7 +25,13 @@ export function registerModsHandlers() {
         payload.projectType,
         payload.limit,
         payload.offset,
-        payload.source as 'modrinth' | 'curseforge'
+        payload.source as 'modrinth' | 'curseforge',
+        (payload.index ?? 'relevance') as
+          | 'relevance'
+          | 'downloads'
+          | 'follows'
+          | 'newest'
+          | 'updated'
       );
       return { success: true, data, error: null };
     } catch (e: unknown) {

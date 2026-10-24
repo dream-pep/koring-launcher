@@ -16,6 +16,7 @@ import { registerKoringAuthHandlers } from './handlers/koring-auth';
 import { registerLauncherApiHandlers } from './handlers/launcher-api';
 import { startupCheck } from './core/launcher-api';
 import { registerJavaHandlers } from './handlers/java';
+import { registerNewsHandlers } from './handlers/news';
 import { registerUpdateHandlers } from './handlers/update';
 import { updateService } from './updater';
 import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
@@ -232,6 +233,7 @@ function registerAllHandlers() {
   registerKoringAuthHandlers();
   registerLauncherApiHandlers();
   registerJavaHandlers();
+  registerNewsHandlers();
   registerUpdateHandlers();
 }
 

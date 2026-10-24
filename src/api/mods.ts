@@ -11,7 +11,26 @@ export interface ModSearchResult {
   versions?: string[];
   loaders?: string[];
   source: 'modrinth' | 'curseforge';
+  /** 以下为列表 / 详情页展示用的补充字段 */
+  author?: string;
+  projectType?: string;
+  follows?: number;
+  latestVersion?: string;
+  license?: string;
+  gallery?: string[];
+  featuredGallery?: string;
+  color?: number | null;
+  clientSide?: string;
+  serverSide?: string;
+  dateCreated?: string;
+  dateModified?: string;
 }
+
+/** 搜索排序方式 */
+export type ModSearchIndex = 'relevance' | 'downloads' | 'follows' | 'newest' | 'updated';
+
+/** 内容类型：模组 / 整合包 / 资源包 / 光影 */
+export type ModProjectType = 'mod' | 'modpack' | 'resourcepack' | 'shader';
 
 export interface ModSearchResponse {
   hits: ModSearchResult[];
@@ -48,7 +67,8 @@ export async function searchMods(
   projectType: string = "mod",
   limit?: number,
   offset?: number,
-  source: 'modrinth' | 'curseforge' = 'modrinth'
+  source: 'modrinth' | 'curseforge' = 'modrinth',
+  index: ModSearchIndex = 'relevance'
 ): Promise<ModSearchResponse> {
   return ipcInvoke<ModSearchResponse>('mods:search', {
     query,
@@ -59,6 +79,7 @@ export async function searchMods(
     limit,
     offset,
     source,
+    index,
   });
 }
 

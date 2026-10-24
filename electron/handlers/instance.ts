@@ -12,6 +12,11 @@ import {
   getForgeVersionList,
   getFabricVersionList,
   getQuiltVersionList,
+  getNeoForgeVersionList,
+  getLoaderCatalog,
+  checkInstanceName,
+  listInstallLocations,
+  listAllInstances,
   importExistingInstance,
   inspectVersionLoaders,
   planInstanceLaunch,
@@ -226,6 +231,36 @@ export function registerInstanceHandlers(win: WinRef) {
     }
   });
 
+  /**
+   * 实例名预检：格式（非法字符 / 保留名 / 长度）+ 目录占用（含大小写冲突）。
+   * 供安装表单实时校验，避免提交后才失败。
+   */
+  ipcMain.handle('instance:check', async (_event, payload: { name: string; gamePath: string }) => {
+    try {
+      return ok(checkInstanceName(payload.name, payload.gamePath));
+    } catch (e: unknown) {
+      return fail(e);
+    }
+  });
+
+  /** 所有可用安装位置（默认目录 + 已添加的游戏目录） */
+  ipcMain.handle('instance:locations', async () => {
+    try {
+      return ok(listInstallLocations());
+    } catch (e: unknown) {
+      return fail(e);
+    }
+  });
+
+  /** 跨安装位置聚合实例列表（每条带所属 gamePath / 位置名） */
+  ipcMain.handle('instance:list-all', async () => {
+    try {
+      return ok(listAllInstances());
+    } catch (e: unknown) {
+      return fail(e);
+    }
+  });
+
   // 版本列表 APIs
   ipcMain.handle('instance:version-list', async (_event, payload: { type?: string }) => {
     try {
@@ -254,6 +289,23 @@ export function registerInstanceHandlers(win: WinRef) {
   ipcMain.handle('instance:quilt-version-list', async (_event, payload: { mcVersion?: string }) => {
     try {
       return ok(await getQuiltVersionList(payload?.mcVersion));
+    } catch (e: unknown) {
+      return fail(e);
+    }
+  });
+
+  ipcMain.handle('instance:neoforge-version-list', async (_event, payload: { mcVersion?: string }) => {
+    try {
+      return ok(await getNeoForgeVersionList(payload?.mcVersion));
+    } catch (e: unknown) {
+      return fail(e);
+    }
+  });
+
+  /** 加载器目录：类型 / 是否可用 / 版本列表 / 默认版本，供安装表单一次拿到 */
+  ipcMain.handle('instance:loader-catalog', async (_event, payload: { mcVersion?: string }) => {
+    try {
+      return ok(await getLoaderCatalog(payload?.mcVersion));
     } catch (e: unknown) {
       return fail(e);
     }

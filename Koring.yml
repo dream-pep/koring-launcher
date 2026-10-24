@@ -1,17 +1,18 @@
-appVersion: 1.2.6
+appVersion: 1.2.7
 oobe: false
 background:
-  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-opt-munsp44ab1ez86.png
-  blur: 12
-  opacity: 97
+  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-mvmjazzabmmc4x.png
 game:
   gameDir: C:\Users\ab090\AppData\Roaming\.minecraft
   gameDirs:
     - .minecraft
+java:
+  javaPath: C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot\bin\java.exe
 advanced:
   preLaunchCmd: '123'
+  debugMode: true
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1790758857700
-  version: 1.2.6
+  checkedAt: 1792855196829
+  version: 1.2.7

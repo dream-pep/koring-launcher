@@ -28,6 +28,7 @@ import {
   type DownloadSettings,
 } from './download-options';
 import { resolveJavaPath } from './launch-options';
+import { resolveGamePath } from './paths';
 import {
   LaunchError,
   checkDependencies,
@@ -233,6 +234,304 @@ function downloadSettings(explicit?: DownloadSettings): DownloadSettings {
   };
 }
 
+// ==================== 实例名校验 ====================
+
+/**
+ * Windows 保留设备名：作为目录名时无法创建（即使带扩展名）。
+ * 其他平台不拦，但统一提示可避免跨平台迁移时踩坑。
+ */
+const RESERVED_DEVICE_NAMES = new Set([
+  'CON',
+  'PRN',
+  'AUX',
+  'NUL',
+  ...Array.from({ length: 9 }, (_, i) => `COM${i + 1}`),
+  ...Array.from({ length: 9 }, (_, i) => `LPT${i + 1}`),
+]);
+
+/** 实例名长度上限（目录名，避免超过常见文件系统限制） */
+export const MAX_INSTANCE_NAME_LENGTH = 64;
+
+export type InstanceNameProblemCode =
+  | 'empty'
+  | 'too-long'
+  | 'invalid-char'
+  | 'reserved-name'
+  | 'exists'
+  | 'location-missing';
+
+export interface InstanceNameCheck {
+  /** 原始输入 */
+  name: string;
+  /** 去掉首尾空白的名称（落盘用这个） */
+  normalized: string;
+  /** 实例目录绝对路径 */
+  path: string;
+  available: boolean;
+  code: InstanceNameProblemCode | null;
+  /** 人类可读的原因（available 为 true 时为空串） */
+  reason: string;
+  /** 大小写不敏感的同名目录（Windows / macOS 上会真冲突） */
+  conflicts: string[];
+}
+
+/** 名称归一化：仅去掉首尾空白（内部空白是否替换由 UI 决定，核心不做二次加工） */
+export function normalizeInstanceName(raw: string): string {
+  return String(raw ?? '').trim();
+}
+
+/**
+ * 校验实例名的「格式合法性」（不查磁盘）。
+ * @returns 问题代码；合法时返回 null
+ */
+export function validateInstanceName(name: string): { code: InstanceNameProblemCode; reason: string } | null {
+  const raw = String(name ?? '');
+
+  if (!raw.trim()) {
+    return { code: 'empty', reason: '实例名不能为空' };
+  }
+  if (raw !== raw.trim()) {
+    return { code: 'invalid-char', reason: '实例名不能以空格开头或结尾' };
+  }
+  if (raw.length > MAX_INSTANCE_NAME_LENGTH) {
+    return { code: 'too-long', reason: `实例名不能超过 ${MAX_INSTANCE_NAME_LENGTH} 个字符` };
+  }
+  // 路径分隔符与 Windows 非法字符；控制字符一并拒绝
+  if (/[<>:"/\\|?*\u0000-\u001f]/.test(raw)) {
+    return { code: 'invalid-char', reason: '实例名不能包含 \\ / : * ? " < > | 等字符' };
+  }
+  if (raw === '.' || raw === '..') {
+    return { code: 'invalid-char', reason: '实例名不能是 . 或 ..' };
+  }
+  if (/[. ]$/.test(raw)) {
+    return { code: 'invalid-char', reason: '实例名不能以空格或点结尾' };
+  }
+  // 设备名判定只看主名（CON.txt 同样不可用）
+  const base = raw.split('.')[0].toUpperCase();
+  if (RESERVED_DEVICE_NAMES.has(base)) {
+    return { code: 'reserved-name', reason: `${base} 是系统保留名称，请换一个` };
+  }
+  return null;
+}
+
+/**
+ * 创建前的完整预检：格式校验 + 目录占用检查（含大小写不敏感的同名冲突）。
+ * 与 `createInstance` 的判定保持一致，供 UI 在提交前实时禁用「安装」按钮。
+ */
+export function checkInstanceName(name: string, gamePath: string): InstanceNameCheck {
+  const resolvedGamePath = resolveGamePath(gamePath);
+  const normalized = normalizeInstanceName(name);
+  const instancePath = path.join(resolvedGamePath, 'instances', normalized);
+
+  // 同名冲突（大小写不敏感），用于提示「已存在同名但大小写不同」的情况
+  let conflicts: string[] = [];
+  const root = path.join(resolvedGamePath, 'instances');
+  if (normalized && isDirectory(root)) {
+    try {
+      conflicts = fs
+        .readdirSync(root, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .filter((entry) => entry !== normalized && entry.toLowerCase() === normalized.toLowerCase());
+    } catch {
+      conflicts = [];
+    }
+  }
+
+  const invalid = validateInstanceName(name);
+  if (invalid) {
+    return {
+      name,
+      normalized,
+      path: instancePath,
+      available: false,
+      code: invalid.code,
+      reason: invalid.reason,
+      conflicts,
+    };
+  }
+
+  if (!resolvedGamePath) {
+    return {
+      name,
+      normalized,
+      path: instancePath,
+      available: false,
+      code: 'location-missing',
+      reason: '未指定游戏目录',
+      conflicts,
+    };
+  }
+
+  if (exists(instancePath)) {
+    return {
+      name,
+      normalized,
+      path: instancePath,
+      available: false,
+      code: 'exists',
+      reason: conflicts.length
+        ? `已存在同名实例（大小写不同：${conflicts.join('、')}）`
+        : '已存在同名实例',
+      conflicts,
+    };
+  }
+
+  return {
+    name,
+    normalized,
+    path: instancePath,
+    available: true,
+    code: null,
+    reason: '',
+    conflicts,
+  };
+}
+
+/** 落盘前的强校验：不合法直接抛错，防止创建出无法启动/无法迁移的目录 */
+function assertValidInstanceName(name: string): string {
+  const normalized = normalizeInstanceName(name);
+  const invalid = validateInstanceName(normalized);
+  if (invalid) {
+    throw new Error(invalid.reason);
+  }
+  return normalized;
+}
+
+// ==================== 安装位置（多游戏目录） ====================
+
+/**
+ * 一个「安装位置」= 一个游戏根目录（`instances/` 的父目录）。
+ * 默认位置取 `config.game.gameDir`，其余来自 `config.game.gameDirs`。
+ */
+export interface InstallLocation {
+  /** 配置中的原始值（可能是相对路径） */
+  path: string;
+  /** 解析后的绝对路径 */
+  resolvedPath: string;
+  /** 展示名：默认目录为「默认」，其余取目录名 */
+  label: string;
+  isDefault: boolean;
+  exists: boolean;
+  /** 是否可写（决定能否在此新建实例） */
+  writable: boolean;
+  /** 该位置下已有实例数 */
+  instanceCount: number;
+  /** 该位置下已安装版本数（>0 说明可复用 libraries/assets） */
+  versionCount: number;
+}
+
+function countSubdirectories(target: string): number {
+  if (!isDirectory(target)) return 0;
+  try {
+    return fs.readdirSync(target, { withFileTypes: true }).filter((entry) => entry.isDirectory()).length;
+  } catch {
+    return 0;
+  }
+}
+
+function isWritable(target: string): boolean {
+  try {
+    fs.accessSync(target, fs.constants.W_OK);
+    return true;
+  } catch {
+    // 目录不存在时，看父目录是否可写（安装时会自动创建）
+    try {
+      fs.accessSync(path.dirname(target), fs.constants.W_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function normalizeForCompare(target: string): string {
+  const resolved = path.resolve(target).replace(/[\\/]+$/, '');
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+/** 列出所有可用安装位置（默认目录在首位，按路径去重） */
+export function listInstallLocations(): InstallLocation[] {
+  const { game } = getConfig();
+  const entries: { path: string; isDefault: boolean }[] = [
+    { path: game.gameDir, isDefault: true },
+    ...(game.gameDirs ?? []).map((item) => ({ path: item, isDefault: false })),
+  ];
+
+  const seen = new Set<string>();
+  const result: InstallLocation[] = [];
+
+  for (const entry of entries) {
+    if (!entry.path) continue;
+    const resolvedPath = resolveGamePath(entry.path);
+    if (!resolvedPath) continue;
+    const key = normalizeForCompare(resolvedPath);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    result.push({
+      path: entry.path,
+      resolvedPath,
+      label: entry.isDefault ? '默认' : path.basename(resolvedPath) || resolvedPath,
+      isDefault: entry.isDefault,
+      exists: isDirectory(resolvedPath),
+      writable: isWritable(resolvedPath),
+      instanceCount: countSubdirectories(path.join(resolvedPath, 'instances')),
+      versionCount: countSubdirectories(path.join(resolvedPath, 'versions')),
+    });
+  }
+
+  return result;
+}
+
+/** 带归属信息的实例（多安装位置聚合后的条目） */
+export interface InstanceWithLocation extends InstanceInfo {
+  /** 实例所属游戏根目录（绝对路径） */
+  gamePath: string;
+  /** 所属安装位置的展示名 */
+  locationLabel: string;
+  isDefaultLocation: boolean;
+}
+
+/**
+ * 跨所有安装位置扫描实例。
+ * 单个位置损坏不影响其他位置；结果按最近游玩时间倒序。
+ */
+export function listAllInstances(): {
+  locations: InstallLocation[];
+  instances: InstanceWithLocation[];
+} {
+  const locations = listInstallLocations();
+  const instances: InstanceWithLocation[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const location of locations) {
+    let items: InstanceInfo[] = [];
+    try {
+      items = listInstances(location.resolvedPath);
+    } catch {
+      items = [];
+    }
+
+    for (const info of items) {
+      // 同一物理目录被两个位置同时收录时只保留第一个（默认位置优先）
+      const key = normalizeForCompare(info.path);
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+
+      instances.push({
+        ...info,
+        gamePath: location.resolvedPath,
+        locationLabel: location.label,
+        isDefaultLocation: location.isDefault,
+      });
+    }
+  }
+
+  instances.sort((a, b) => (b.config.lastPlayedDate || 0) - (a.config.lastPlayedDate || 0));
+  return { locations, instances };
+}
+
 // ==================== 实例 CRUD ====================
 
 export function createInstance(
@@ -255,9 +554,10 @@ export function createInstance(
     >
   >
 ): InstanceInfo {
+  assertValidInstanceName(name);
   const instancePath = path.join(gamePath, 'instances', name);
   if (exists(instancePath)) {
-    throw new Error(`Instance already exists: ${name}`);
+    throw new Error(`已存在同名实例：${name}`);
   }
 
   fs.mkdirSync(instancePath, { recursive: true });
@@ -746,6 +1046,168 @@ export async function getQuiltVersionList(mcVersion?: string): Promise<string[]>
     return artifacts.map((entry) => entry.loader.version);
   }
   return [];
+}
+
+// ==================== NeoForge 版本列表 ====================
+
+/**
+ * NeoForge 没有列表 API（@xmcl/installer 只提供安装），只能读 maven-metadata.xml。
+ * 优先 BMCLAPI 镜像，失败回退官方 maven。
+ */
+const NEOFORGE_MAVEN_BASES = [
+  'https://bmclapi2.bangbang93.com/maven',
+  'https://maven.neoforged.net/releases',
+];
+
+const MAVEN_CACHE_TTL = 10 * 60 * 1000;
+const mavenVersionCache = new Map<string, { at: number; versions: string[] }>();
+
+async function fetchMavenVersions(artifactPath: string): Promise<string[]> {
+  const cached = mavenVersionCache.get(artifactPath);
+  if (cached && Date.now() - cached.at < MAVEN_CACHE_TTL) return cached.versions;
+
+  for (const base of NEOFORGE_MAVEN_BASES) {
+    try {
+      const response = await fetch(`${base}/${artifactPath}/maven-metadata.xml`);
+      if (!response.ok) continue;
+      const xml = await response.text();
+      const versions = Array.from(xml.matchAll(/<version>([^<]+)<\/version>/g))
+        .map((match) => match[1].trim())
+        .filter(Boolean);
+      if (versions.length) {
+        mavenVersionCache.set(artifactPath, { at: Date.now(), versions });
+        return versions;
+      }
+    } catch {
+      // 换下一个源
+    }
+  }
+  return [];
+}
+
+/** 版本号倒序比较：纯数字段按数值比较，含非数字段时退回字符串比较 */
+function compareVersionDesc(a: string, b: string): number {
+  const pa = a.split(/[.+-]/);
+  const pb = b.split(/[.+-]/);
+  const length = Math.max(pa.length, pb.length);
+
+  for (let i = 0; i < length; i += 1) {
+    const na = Number(pa[i]);
+    const nb = Number(pb[i]);
+    if (!Number.isFinite(na) || !Number.isFinite(nb)) {
+      return b.localeCompare(a);
+    }
+    if (nb !== na) return nb - na;
+  }
+  return 0;
+}
+
+/**
+ * 按 Minecraft 版本推导 NeoForge 的 maven 坐标与版本前缀：
+ * - 1.20.1 及更早 → `net.neoforged:forge`，版本形如 47.x.x
+ * - 1.20.2+ → `net.neoforged:neoforge`，版本形如 `<minor>.<patch>.x`（1.20.4 → 20.4.x）
+ */
+function neoForgeArtifactFor(mcVersion: string): { artifact: string; prefix: string } | null {
+  const match = /^1\.(\d+)(?:\.(\d+))?$/.exec(mcVersion.trim());
+  if (!match) return null;
+
+  const minor = Number(match[1]);
+  const patch = Number(match[2] ?? 0);
+
+  if (minor < 20 || (minor === 20 && patch <= 1)) {
+    return { artifact: 'net/neoforged/forge', prefix: '47.' };
+  }
+  return { artifact: 'net/neoforged/neoforge', prefix: `${minor}.${patch}.` };
+}
+
+/**
+ * NeoForge 版本列表。
+ * - 传 mcVersion：返回该 Minecraft 版本对应的 NeoForge 版本（新 → 旧）
+ * - 不传：返回 `neoforge` 坐标下的全部版本
+ */
+export async function getNeoForgeVersionList(mcVersion?: string): Promise<string[]> {
+  if (!mcVersion) {
+    const all = await fetchMavenVersions('net/neoforged/neoforge');
+    return [...all].sort(compareVersionDesc);
+  }
+
+  const target = neoForgeArtifactFor(mcVersion);
+  if (!target) return [];
+
+  const all = await fetchMavenVersions(target.artifact);
+  return all.filter((version) => version.startsWith(target.prefix)).sort(compareVersionDesc);
+}
+
+// ==================== 加载器目录（安装表单元数据） ====================
+
+/** 安装表单可选的加载器类型 */
+export type LoaderType = 'none' | 'fabric' | 'quilt' | 'forge' | 'neoforged';
+
+export interface LoaderOption {
+  type: LoaderType;
+  label: string;
+  /** 是否还需要用户选择具体版本 */
+  requiresVersion: boolean;
+  /** 当前实现是否支持自动安装 */
+  supported: boolean;
+  /** 可选版本（新 → 旧）；拉取失败时为空数组 */
+  versions: string[];
+  /** 默认选中版本（通常是最新）；无可用版本时为 null */
+  latest: string | null;
+  /** 降级说明（拉取失败 / 无可用版本 / 特殊限制） */
+  note?: string;
+}
+
+/**
+ * 一次返回所有加载器的可用状态 + 版本列表，供安装表单直接渲染。
+ * 单个加载器拉取失败不影响其他加载器（该加载器 versions 为空并带 note）。
+ */
+export async function getLoaderCatalog(mcVersion?: string): Promise<LoaderOption[]> {
+  const settle = async (loader: () => Promise<string[]>): Promise<{ versions: string[]; failed: boolean }> => {
+    try {
+      return { versions: await loader(), failed: false };
+    } catch {
+      return { versions: [], failed: true };
+    }
+  };
+
+  const [fabric, quilt, forge, neoforged] = await Promise.all([
+    settle(() => getFabricVersionList(mcVersion)),
+    settle(() => getQuiltVersionList(mcVersion)),
+    settle(() => getForgeVersionList(mcVersion)),
+    settle(() => getNeoForgeVersionList(mcVersion)),
+  ]);
+
+  const build = (
+    type: LoaderType,
+    label: string,
+    result: { versions: string[]; failed: boolean }
+  ): LoaderOption => {
+    const option: LoaderOption = {
+      type,
+      label,
+      requiresVersion: true,
+      supported: true,
+      versions: result.versions,
+      latest: result.versions[0] ?? null,
+    };
+    if (result.failed) {
+      option.note = `${label} 版本列表获取失败，可手动填写版本号`;
+    } else if (!result.versions.length) {
+      option.note = mcVersion
+        ? `Minecraft ${mcVersion} 没有可用的 ${label} 版本`
+        : `未获取到 ${label} 版本`;
+    }
+    return option;
+  };
+
+  return [
+    { type: 'none', label: '原版', requiresVersion: false, supported: true, versions: [], latest: null },
+    build('fabric', 'Fabric', fabric),
+    build('quilt', 'Quilt', quilt),
+    build('forge', 'Forge', forge),
+    build('neoforged', 'NeoForge', neoforged),
+  ];
 }
 
 // ==================== 导入既有版本 ====================
