@@ -15,6 +15,10 @@ onlyBuiltDependencies:
   - esbuild
 
 # allowBuilds：pnpm 10.29+ / 11 的构建脚本最终授权（包名 → 是否允许执行 postinstall）
+# @vgpu/adapter-node / webgpu 是 Node 侧原生 WebGPU 适配器，Electron 渲染端用浏览器 WebGPU，
+# 不需要编译原生模块，显式拒绝即可（否则 pnpm 前置依赖检查会失败）。
 allowBuilds:
+  '@vgpu/adapter-node': false
   electron: true
   esbuild: true
+  webgpu: false

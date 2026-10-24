@@ -1,5 +1,7 @@
 appVersion: 1.2.7
 oobe: false
+background:
+  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-mvmpvy70ewd4hl.png
 game:
   gameDirs:
     - C:\Users\ab090\AppData\Roaming\.minecraft
@@ -10,5 +12,5 @@ java:
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1792864563006
+  checkedAt: 1792865872142
   version: 1.2.7

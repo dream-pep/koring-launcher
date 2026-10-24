@@ -21,9 +21,24 @@ interface RunOptions {
   element?: HTMLElement | null;
   /** 临时 view-transition-name，例如 "store-content" / "instance-tab-content" */
   name?: string;
+  /**
+   * 本次转场的「来、去」两侧是否都有版本卡片。
+   * 只有两侧都有卡片时，卡片上的 view-transition-name 才有真正的对应元素可做共享元素形变；
+   * 单侧有卡（例如首页 → 设置页）时应关闭命名，让卡片并入整页内容一起做进出场，
+   * 否则会变成孤立的命名快照，只做原地淡入（表现为「卡片不跟随页面动效、直接渐进出现」）。
+   */
+  cardPair?: boolean;
 }
 
 let activeTransition: ViewTransition | null = null;
+
+/** 转场进行中又被要求切换时，暂存「最新一次」切换意图，等当前转场收尾后重放 */
+interface PendingRun {
+  dir: TransitionDirection;
+  update: () => void;
+  options: RunOptions;
+}
+let pendingRun: PendingRun | null = null;
 
 function cleanup(element?: HTMLElement | null, name?: string) {
   if (element && name) element.style.viewTransitionName = "";
@@ -31,6 +46,43 @@ function cleanup(element?: HTMLElement | null, name?: string) {
   delete root.dataset.transitionDir;
   delete root.dataset.vtScope;
   delete root.dataset.transitioning;
+  delete root.dataset.vtCardPair;
+}
+
+function startTransition(dir: TransitionDirection, update: () => void, options: RunOptions) {
+  const { element = null, name, cardPair } = options;
+  const root = document.documentElement;
+  root.dataset.transitionDir = dir;
+  // route：转场作用于整个内容区；element：只作用于页内某个逻辑视图
+  root.dataset.vtScope = element && name ? "element" : "route";
+  // 转场期间隐藏 WebGL（Silk）画面，避免快照变黑
+  root.dataset.transitioning = "";
+  // 只有两侧都有版本卡片时才允许卡片作为共享元素参与转场（见 RunOptions.cardPair）
+  if (cardPair === false) root.dataset.vtCardPair = "off";
+  if (element && name) element.style.viewTransitionName = name;
+
+  let transition: ViewTransition;
+  try {
+    transition = document.startViewTransition(update);
+  } catch {
+    cleanup(element, name);
+    update();
+    return;
+  }
+
+  activeTransition = transition;
+  transition.ready.catch(() => {});
+  transition.updateCallbackDone.catch(() => {});
+  transition.finished
+    .catch(() => {})
+    .finally(() => {
+      if (activeTransition === transition) activeTransition = null;
+      cleanup(element, name);
+      // 转场期间被点击过：从已稳定的新状态立刻再转一次，避免「直接闪过去」
+      const next = pendingRun;
+      pendingRun = null;
+      if (next) startTransition(next.dir, next.update, next.options);
+    });
 }
 
 /**
@@ -40,37 +92,29 @@ function cleanup(element?: HTMLElement | null, name?: string) {
 export function runViewTransition(
   dir: TransitionDirection,
   update: () => void,
-  { disabled = false, element = null, name }: RunOptions = {},
+  { disabled = false, element = null, name, cardPair }: RunOptions = {},
 ) {
+  const options: RunOptions = { disabled, element, name, cardPair };
   const reduceMotion = disabled || useA11yStore.getState().reduceMotion;
-  if (reduceMotion || !document.startViewTransition || activeTransition) {
+  if (reduceMotion || !document.startViewTransition) {
     update();
     return;
   }
 
-  const root = document.documentElement;
-  root.dataset.transitionDir = dir;
-  // route：转场作用于整个内容区；element：只作用于页内某个逻辑视图
-  root.dataset.vtScope = element && name ? "element" : "route";
-  // 转场期间隐藏 WebGL（Silk）画面，避免快照变黑
-  root.dataset.transitioning = "";
-  if (element && name) element.style.viewTransitionName = name;
-
-  try {
-    const transition = document.startViewTransition(update);
-    activeTransition = transition;
-    transition.ready.catch(() => {});
-    transition.finished
-      .catch(() => {})
-      .finally(() => {
-        if (activeTransition === transition) activeTransition = null;
-        cleanup(element, name);
-      });
-  } catch {
-    activeTransition = null;
-    cleanup(element, name);
-    update();
+  // 转场进行中再次切换：记录最新的切换意图，并让当前转场立即收尾。
+  // 等 finished 后用新状态重开一次转场，表现是「反向/继续切换」也有动画，
+  // 而不是 aborted 之后直接跳到终点。
+  if (activeTransition) {
+    pendingRun = { dir, update, options };
+    try {
+      activeTransition.skipTransition();
+    } catch {
+      // 忽略：个别实现不支持 skipTransition 时由 finished 收尾逻辑重放
+    }
+    return;
   }
+
+  startTransition(dir, update, options);
 }
 
 /** 顺序列表里的方向：去更靠后的项 = forward，更靠前 = backward，相等 = sibling */

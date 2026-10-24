@@ -1,5 +1,7 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { GlassContent, GlassScene, GlassSurface } from "@glass-sdk/liquid-glass";
 import { useRouteStore, routes, allRoutes } from "@/stores/routeStore";
+import { useIsDark } from "@/hooks/useIsDark";
 import { WindowControls } from "./WindowControls";
 
 interface TitleBarProps {
@@ -8,21 +10,23 @@ interface TitleBarProps {
   showClose?: boolean;
 }
 
-/** 胶囊指示条拖出两端时的最大橡皮筋位移（px）；越拉阻力越大，最多到这里 */
+/** 胶囊指示条拖出两端时的最大橡皮筋位移（px）；到顶后不再继续移动 */
 const RUBBER_BAND_LIMIT = 75;
+/** 越界拖拽达到这个原始距离后，就拉满橡皮筋（约 220px），之后完全不再移动 */
+const RUBBER_BAND_PULL = 220;
 
 /**
- * 橡皮筋映射：在 [min, max] 内线性跟随，越界后位移按 1/(1+x) 衰减，
- * 无限拖动也只会无限逼近 limit，不会真的拉走。
+ * 橡皮筋映射：在 [min, max] 内线性跟随；越界后先快后慢（三次缓出），
+ * 越界拖动达到 RUBBER_BAND_PULL 时正好拉满 limit，再往后硬性停住。
  */
 function rubberBand(value: number, min: number, max: number, limit: number): number {
   if (value < min) {
-    const overshoot = min - value;
-    return min - limit * (1 - 1 / (overshoot / limit + 1));
+    const t = Math.min(1, (min - value) / RUBBER_BAND_PULL);
+    return min - limit * (1 - Math.pow(1 - t, 3));
   }
   if (value > max) {
-    const overshoot = value - max;
-    return max + limit * (1 - 1 / (overshoot / limit + 1));
+    const t = Math.min(1, (value - max) / RUBBER_BAND_PULL);
+    return max + limit * (1 - Math.pow(1 - t, 3));
   }
   return value;
 }
@@ -51,6 +55,11 @@ export function TitleBar({
   const navRef = useRef<HTMLDivElement>(null);
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+
+  // 跟随应用主题，让顶部选择器的玻璃 appearance 与背景一致
+  const isDark = useIsDark();
+  // 按压/拖拽时的液态形变（按钮盖在玻璃上，SDK 的 interactive 收不到指针，这里自己驱动）
+  const [dragging, setDragging] = useState(false);
 
   const isDragging = useRef(false);
   const hasDragged = useRef(false);
@@ -131,16 +140,29 @@ export function TitleBar({
     const onUp = () => {
       if (!isDragging.current) return;
       isDragging.current = false;
+      setDragging(false);
       const idx = routes.findIndex((r) => r.key === useRouteStore.getState().current);
       // 松手回弹：把越界位移弹回当前条目的真实位置（CSS transform 过渡是 spring）
       updateIndicator(idx < 0 ? 0 : idx);
     };
 
+    // 失焦/切窗口时也结束按住态，避免玻璃高光卡在开启状态
+    const onBlur = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      hasDragged.current = false;
+      setDragging(false);
+    };
+
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
+    window.addEventListener("blur", onBlur);
     return () => {
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("blur", onBlur);
     };
   }, [navigate, updateIndicator, isDefault]);
 
@@ -155,6 +177,8 @@ export function TitleBar({
       const btnRect = btn.getBoundingClientRect();
 
       isDragging.current = true;
+      // 按住就是液态玻璃，松开恢复平面（不等到开始移动）
+      setDragging(true);
       hasDragged.current = false;
       dragStartX.current = e.clientX;
       dragStartLeft.current = btnRect.left - navRect.left;
@@ -231,18 +255,44 @@ export function TitleBar({
             onPointerDown={handleNavPointerDown}
             style={{ touchAction: "none", WebkitAppRegion: "no-drag" }}
           >
+            {/* 液态玻璃选择器：SVG 位移折射 + 环形高光 + 镜面漂移（见 index.css .liquid-pill） */}
             <div
-              className="absolute left-0 h-[28px] rounded-full"
+              className="absolute left-0 h-[28px]"
               style={{
                 transform: `translateX(${indicator.left}px)`,
                 width: indicator.width,
-                background: "var(--indicator-bg)",
-                boxShadow: "var(--indicator-shadow)",
                 transition: isDragging.current
                   ? "none"
                   : "transform 300ms var(--ease-spring), width 300ms var(--ease-spring)",
               }}
-            />
+            >
+              {/* 液态玻璃选择器：GlassScene/GlassSurface 负责折射与边缘光学；
+                  GlassContent 不再铺任何底色（透出标题栏/壁纸），
+                  按压/拖拽的形变由 .liquid-pill.is-dragging 的 spring 负责 */}
+              <div
+                className={`liquid-pill relative h-full w-full overflow-hidden${
+                  dragging ? " is-dragging" : ""
+                }`}
+              >
+                <div className="liquid-pill__glass" aria-hidden>
+                  <GlassScene
+                    material="clear"
+                    appearance={isDark ? "dark" : "light"}
+                    style={{ position: "absolute", inset: 0 }}
+                  >
+                    <GlassContent />
+                    <GlassSurface
+                      material="clear"
+                      appearance={isDark ? "dark" : "light"}
+                      radius="capsule"
+                      interactive={false}
+                      refraction={12}
+                      style={{ position: "absolute", inset: 0 }}
+                    />
+                  </GlassScene>
+                </div>
+              </div>
+            </div>
 
             {routes.map((r, i) => {
               const active = current === r.key;

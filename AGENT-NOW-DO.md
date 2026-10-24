@@ -741,3 +741,69 @@ instance:crash-analysis { instancePath, fileName? }
 ### 未做
 
 - 未实机点击验证（需 `pnpm dev` 人工过一遍：实例页选择 → 返回首页看标题 → 启动；改名后回首页看标题是否同步）。
+
+---
+
+## 16. 版本卡片转场修复：丝绸保留 + 跟随页面动效（2026-10-25）
+
+标题：版本卡片在转场时保留 Silk、并跟随页面进出场
+内容：修两个动效问题——① 路由切换（尤其「设置 ↔ 更新日志」的共享元素形变）时卡片里的 Silk 会整个消失、只剩纯色渐变；② 从别的页面进入设置页时，卡片不跟随整页的 `page-in-*` 动效，而是原地单独淡入。
+进度：100%（代码 + 构建通过，视觉效果需人工确认）。
+
+### 根因
+
+- **丝绸消失**：`src/index.css` 里 `html[data-transitioning] .transition-hide { visibility: hidden !important }` 会在整个转场期间隐藏 WebGL（避免快照变黑），所以卡片在快照里只剩渐变底色。
+- **卡片不跟随页面**：`VersionCard` 一直携带 `view-transition-name: version-card`。当「来、去」两侧只有一侧有卡片（例如 首页 → 设置页），浏览器会把卡片当成**孤立的命名快照**，只做自身的交叉淡入，不参与 `content` 组的 `page-in-forward` 位移/缩放。
+
+### 改动
+
+- `src/components/silk/Silk.tsx`：新增 `onSnapshot?: (dataUrl: string) => void`；`SilkPlane` 在第 2/8/30 帧尝试 `gl.domElement.toDataURL("image/png")`，拿到 >2000 字符的图就回调（一次）。
+- `src/components/VersionCard.tsx`：
+  - 把内联 `style={{ viewTransitionName }}` 换成 CSS 类 `vt-card`（便于路由层统一开关）；
+  - 新增 `silkFrame` 状态，把 Silk 回调的静态帧渲染成 `img.silk-snapshot`（`opacity-60 mix-blend-soft-light`，与 WebGL 层同参数）；该层默认 `visibility:hidden`，仅在 `html[data-transitioning]` 期间可见——转场快照里用这一帧保留丝绸质感，转场结束恢复 WebGL 动画。
+- `src/lib/view-transition.ts`：`RunOptions` 新增 `cardPair?: boolean`；`false` 时在 `startViewTransition` 之前给 `<html>` 打 `data-vt-card-pair="off"`，`cleanup` 里清除。
+- `src/stores/routeStore.ts`：新增 `hasVersionCard(route)`（`setting` / `update`），`navigate` / `goBack` 传入 `cardPair: 两侧都有卡片`。
+- `src/index.css`：新增 `.vt-card { view-transition-name: version-card }`、`html[data-vt-card-pair="off"] .vt-card { view-transition-name: none }`、`.silk-snapshot` 的显隐规则。
+
+### 效果
+
+- 设置主页/关于 ↔ 更新日志：卡片仍是共享元素形变，形变过程中显示 Silk 静态帧（不再是纯色板）。
+- 首页/资讯/资源中心 → 设置页（以及反向）：卡片并入整页快照，跟着 `page-in-forward` / `page-out-*` 一起位移缩放，不再单独淡入。
+- 首次进入设置页时 Silk 尚未画出第一帧，转场快照里仍是纯色（约 360ms），转场结束后丝绸正常——属于 WebGL 首帧限制。
+
+### 验证
+
+- `npx tsc -p tsconfig.json --noEmit`：仅剩历史报错，`VersionCard` / `Silk` / `view-transition` / `routeStore` 零报错。
+- `npx vite build`：✓ built in 27.76s。
+- CDP 自动跑过一轮：首页点击「设置」后 `document.documentElement.dataset.vtCardPair === "off"`、方向 `forward`，证明路由层正确关闭了卡片命名；视觉帧抓取受运行中窗口被关闭影响未完成，故最终视觉效果需人工确认。
+
+---
+
+## 17. 转场打断修复：A→B 期间再切回 A 不再「直接闪过去」（2026-10-25）
+
+标题：View Transition 打断改为「收尾 + 重放」
+内容：转场进行中再次触发切换（例如 A→B 的动画里点回 A）原本会走 `activeTransition` 守卫，直接 `update()` 不上动画，表现就是「直接闪过去、动画消失」。
+进度：100%（构建通过，视觉需人工确认）。
+
+### 根因
+
+`src/lib/view-transition.ts` 的旧实现：`if (reduceMotion || !document.startViewTransition || activeTransition) { update(); return; }` —— 只要当前有转场在跑，新的切换就只改状态、不开新转场。
+
+### 改动（只动 `src/lib/view-transition.ts`）
+
+- 拆出 `startTransition(dir, update, options)`（原 `runViewTransition` 主体）。
+- 新增 `pendingRun`：转场进行中再次切换时，记下**最新一次**意图（方向/更新函数/选项），并调用 `activeTransition.skipTransition()` 让当前转场立即收尾（与浏览器处理连续导航的方式一致）。
+- `transition.finished` 的收尾回调里：清理 `data-transitioning` / 临时 name 后，若存在 `pendingRun` 就立刻用 `startTransition` 重放一次 → 新转场以「当前已稳定的状态」为旧快照，正常播放反方向/继续方向的动画。
+- 补 `transition.updateCallbackDone.catch(() => {})`，避免被打断时产生未处理的 Promise rejection。
+
+### 行为
+
+- A→B 途中点 A：当前转场立即走到 B 终态（`skipTransition`），随后立刻播放 B→A 的正式转场（旧内容先出、新内容再入），不再无动画直切。
+- 连续快速点多个页面：只保留最后一次点击，中间态不排队、不会累积一堆转场。
+- 设置页侧栏、资源中心侧栏、实例详情页签（element 级转场）同样受益。
+
+### 验证
+
+- `npx tsc -p tsconfig.json --noEmit`：`view-transition.ts` 零报错。
+- `npx vite build`：✓ built in 23.58s。
+- 打断后的视觉衔接需 `pnpm dev` 人工确认（转场 360ms 内连点两次）。

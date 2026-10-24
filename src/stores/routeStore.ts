@@ -208,6 +208,16 @@ function reverseDirection(dir: TransitionDirection): TransitionDirection {
   return "sibling";
 }
 
+/**
+ * 哪些路由会渲染「版本卡片」（VersionCard）：
+ * - setting：设置主页 / 关于页各有一张卡；
+ * - update：更新日志页顶部有一张卡。
+ * 路由转场时只有来往两侧都是这两类页面，卡片才应作为共享元素参与转场。
+ */
+function hasVersionCard(route: RouteKey): boolean {
+  return route === "setting" || route === "update";
+}
+
 interface RouteState {
   current: RouteKey;
   titleBarMode: TitleBarMode;
@@ -232,14 +242,18 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     if (prev === key) return;
     // 方向由页面层级决定：进入二级页 → forward；回到顶部页 → backward；同级 → sibling
     const direction = getTransitionDirection(prev, key);
-    runViewTransition(direction, () => {
-      set({
-        current: key,
-        titleBarMode: getRouteTitleBarMode(key),
-        direction,
-        history: [...get().history, prev],
-      });
-    });
+    runViewTransition(
+      direction,
+      () => {
+        set({
+          current: key,
+          titleBarMode: getRouteTitleBarMode(key),
+          direction,
+          history: [...get().history, prev],
+        });
+      },
+      { cardPair: hasVersionCard(prev) && hasVersionCard(key) },
+    );
   },
   setTitleBarMode: (mode) => set({ titleBarMode: mode }),
   setStoreSection: (section) => set({ storeSection: section }),
@@ -249,13 +263,17 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     const prev = history[history.length - 1];
     // 返回 = 反向重放来时的转场（深层→浅层 exact backwards，同级仍是交叉淡化）
     const direction = reverseDirection(getTransitionDirection(prev, current));
-    runViewTransition(direction, () => {
-      set({
-        current: prev,
-        titleBarMode: getRouteTitleBarMode(prev),
-        history: history.slice(0, -1),
-        direction,
-      });
-    });
+    runViewTransition(
+      direction,
+      () => {
+        set({
+          current: prev,
+          titleBarMode: getRouteTitleBarMode(prev),
+          history: history.slice(0, -1),
+          direction,
+        });
+      },
+      { cardPair: hasVersionCard(current) && hasVersionCard(prev) },
+    );
   },
 }));

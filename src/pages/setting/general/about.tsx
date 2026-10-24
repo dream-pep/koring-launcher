@@ -146,8 +146,13 @@ export function AboutSetting({ sharedTransition = true }: AboutSettingProps) {
           <SectionTitle>项目信息</SectionTitle>
           <div className="space-y-3">
             <SettingCard>
-              <SettingRow label="应用名称" desc="Koring Launcher">
+              <SettingRow label="应用名称" desc="Koring Launcher Community">
                 <span className="text-[13px] text-muted-foreground">Lingke Network 提供技术支持</span>
+              </SettingRow>
+            </SettingCard>
+            <SettingCard>
+              <SettingRow label="动画引擎版本" desc="Koring CraeKote Animation Engine">
+                <span className="text-[13px] text-muted-foreground">2.0.1</span>
               </SettingRow>
             </SettingCard>
             <SettingCard>

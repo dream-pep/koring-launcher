@@ -3,6 +3,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "sonner/dist/styles.css";
+@import "@glass-sdk/liquid-glass/styles.css";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/inter";
 
@@ -415,6 +416,49 @@
   transform-origin: var(--origin-x, 50%) var(--origin-y, 50%);
 }
 
+/* ============================================
+   顶部菜单选择器 — 液态玻璃（Liquid Glass）
+   玻璃本体由 @glass-sdk/liquid-glass 的 GlassScene / GlassSurface 渲染；
+   这里的 .liquid-pill 只负责定位、圆角、兜底底色与移动/变宽过渡。
+   ============================================ */
+/* 静止态 = 正常选择器：普通半透明胶囊，没有液态玻璃的高光 */
+.liquid-pill {
+  position: relative;
+  border-radius: 999px;
+  isolation: isolate;
+  background-color: var(--indicator-bg);
+  box-shadow: var(--indicator-shadow);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transform-origin: 50% 50%;
+  transition:
+    transform 320ms var(--ease-spring),
+    background-color 260ms ease,
+    box-shadow 260ms ease;
+}
+
+/* 玻璃层默认完全透明；只有拖动时才淡入（高光/折射只在拖动状态出现） */
+.liquid-pill__glass {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms ease;
+}
+
+/* 拖动态：胶囊拉伸压扁 + 玻璃淡入（玻璃若因 GPU 不可用降级，普通胶囊仍在） */
+.liquid-pill.is-dragging {
+  transform: scaleX(1.045) scaleY(0.92);
+}
+
+.liquid-pill.is-dragging .liquid-pill__glass {
+  opacity: 1;
+}
+
+/* 说明：高光完全由 SDK 的 GlassSurface 生成，不再叠加额外的 CSS 高光层。 */
+
 /* 转场进行中：WebGL 画面在快照里容易变黑/闪烁，先隐藏；hover 态也不参与快照 */
 html[data-transitioning] .transition-hide {
   visibility: hidden !important;
@@ -423,6 +467,28 @@ html[data-transitioning] .transition-flat,
 html[data-transitioning] .transition-flat:hover {
   transform: none !important;
   transition: none !important;
+}
+
+/* ============================================
+   版本卡片的共享元素转场
+   - .vt-card：携带 view-transition-name，路由切换时在「设置主页/关于 ↔ 更新页」之间
+     做位置/尺寸形变（由 CSS 承载而非内联 style，方便路由层统一开关）。
+   - html[data-vt-card-pair="off"]：本次转场只有一侧有卡片（例如首页 → 设置页），
+     关掉命名让卡片并入整页内容一起进出场，否则会变成孤立命名快照、只原地淡入。
+   - .silk-snapshot：Silk 的静态帧，仅在转场期间取代 WebGL 画面（WebGL 快照易变黑），
+     保证卡片快照里仍有丝绸质感，而不是退化成纯色渐变。
+   ============================================ */
+.vt-card {
+  view-transition-name: version-card;
+}
+html[data-vt-card-pair="off"] .vt-card {
+  view-transition-name: none;
+}
+.silk-snapshot {
+  visibility: hidden;
+}
+html[data-transitioning] .silk-snapshot {
+  visibility: visible;
 }
 
 /* ============================================

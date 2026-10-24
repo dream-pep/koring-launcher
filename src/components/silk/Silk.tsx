@@ -71,10 +71,18 @@ void main() {
 
 interface SilkPlaneProps {
   uniforms: Record<string, { value: number | Color }>;
+  /** 画面稳定后回调一帧静态 PNG（供 View Transition 快照期间替代 WebGL 画面） */
+  onSnapshot?: (dataUrl: string) => void;
 }
 
-const SilkPlane = forwardRef(function SilkPlane({ uniforms }: SilkPlaneProps, ref: React.Ref<Mesh>) {
-  const { viewport, invalidate } = useThree();
+const SilkPlane = forwardRef(function SilkPlane(
+  { uniforms, onSnapshot }: SilkPlaneProps,
+  ref: React.Ref<Mesh>,
+) {
+  const { viewport, invalidate, gl } = useThree();
+  const frameCount = useRef(0);
+  const captured = useRef(false);
+  const attempts = useRef(0);
 
   useLayoutEffect(() => {
     if (ref && typeof ref === "object" && ref.current) {
@@ -98,6 +106,27 @@ const SilkPlane = forwardRef(function SilkPlane({ uniforms }: SilkPlaneProps, re
       (ref.current.material as ShaderMaterial).uniforms.uTime.value += 0.1 * delta;
       invalidate();
     }
+    // 尽早抓一帧：路由转场的快照在切换当帧就生成，越早拿到越能命中；着色器在 uTime=0
+    // 时也已是完整的丝绸纹理。前几帧可能还没画出有效像素（返回近乎空白的 PNG），
+    // 因此按 2/8/30 帧依次尝试，拿到足够大的图就停（避免反复 toDataURL 拖慢渲染）。
+    if (onSnapshot && !captured.current) {
+      frameCount.current += 1;
+      const marks = [2, 8, 30];
+      if (attempts.current < marks.length && frameCount.current >= marks[attempts.current]) {
+        attempts.current += 1;
+        try {
+          if (gl.domElement.width > 0) {
+            const dataUrl = gl.domElement.toDataURL("image/png");
+            if (dataUrl.length > 2000) {
+              captured.current = true;
+              onSnapshot(dataUrl);
+            }
+          }
+        } catch {
+          // 拿不到像素（上下文丢失/隐私限制）就不提供静态帧，不影响正常渲染
+        }
+      }
+    }
   });
 
   return (
@@ -115,9 +144,18 @@ interface SilkProps {
   color?: string;
   noiseIntensity?: number;
   rotation?: number;
+  /** 画面稳定后回调一帧静态 PNG；用于在 View Transition 快照里保留丝绸质感 */
+  onSnapshot?: (dataUrl: string) => void;
 }
 
-const Silk = ({ speed = 5, scale = 1, color = "#7B7481", noiseIntensity = 1.5, rotation = 0 }: SilkProps) => {
+const Silk = ({
+  speed = 5,
+  scale = 1,
+  color = "#7B7481",
+  noiseIntensity = 1.5,
+  rotation = 0,
+  onSnapshot,
+}: SilkProps) => {
   const meshRef = useRef<Mesh>(null);
 
   const uniforms = useMemo(
@@ -145,7 +183,7 @@ const Silk = ({ speed = 5, scale = 1, color = "#7B7481", noiseIntensity = 1.5, r
       }}
       gl={{ antialias: false, alpha: true, premultipliedAlpha: true }}
     >
-      <SilkPlane ref={meshRef} uniforms={uniforms} />
+      <SilkPlane ref={meshRef} uniforms={uniforms} onSnapshot={onSnapshot} />
     </Canvas>
   );
 };

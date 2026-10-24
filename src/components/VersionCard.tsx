@@ -94,7 +94,13 @@ export function VersionCard({
   // 设置页 keep-alive 会同时保活「主页」「关于」两张卡，因此由设置页把非活动卡片
   // 传成 noViewTransition（只让当前子页的卡片带名字），避免重名导致转场被浏览器中止、
   // 卡片快照叠影/穿模。更新页、OOBE 等页面各自只有一张卡，保持默认带名。
-  const sharedTransitionName = noViewTransition ? undefined : "version-card";
+  // 名字由 CSS 类 .vt-card 承载（而非内联 style），这样路由层可以在「来往两侧只有一侧
+  // 有卡片」时通过 html[data-vt-card-pair="off"] 统一关掉命名。
+  const sharedTransition = !noViewTransition;
+
+  // Silk 的静态帧：WebGL 画面在 View Transition 快照里容易变黑，所以转场期间隐藏
+  // WebGL、改用这帧静态图（丝绸质感得以保留，不会退化成纯色渐变）。
+  const [silkFrame, setSilkFrame] = useState<string | null>(null);
 
   return (
     <div
@@ -103,15 +109,12 @@ export function VersionCard({
         // isolate：为 Silk 的 mix-blend-soft-light 建立独立 stacking context，避免与页面背景/相邻卡片串色
         // overflow-clip：裁剪 Silk 画布，防止其溢出圆角
         "group isolate relative overflow-clip rounded-xl border border-white/10 min-h-[200px]",
+        sharedTransition && "vt-card",
         clickable &&
           "cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-[transform] duration-200 ease-spring",
         className,
       )}
       onClick={handleCardClick}
-      // 共享元素过渡：路由切换时（startViewTransition），新旧页面中同名 view-transition-name
-      // 的元素会从上一个位置平滑移动/形变到当前页面的位置。
-      // 隐藏/浮层复用（noViewTransition）时关闭，保证全页面最多一个同名元素。
-      style={sharedTransitionName ? { viewTransitionName: sharedTransitionName } : undefined}
     >
       {/* 背景层 */}
       <div className="absolute inset-0" style={{ background: gradient }} />
@@ -121,9 +124,27 @@ export function VersionCard({
       {!simple && visible && (
         <Suspense fallback={null}>
           <div className="absolute inset-0 opacity-60 mix-blend-soft-light pointer-events-none transition-hide">
-            <Silk speed={3} scale={1.2} color={color} noiseIntensity={1.2} rotation={0.3} />
+            <Silk
+              speed={3}
+              scale={1.2}
+              color={color}
+              noiseIntensity={1.2}
+              rotation={0.3}
+              onSnapshot={setSilkFrame}
+            />
           </div>
         </Suspense>
+      )}
+
+      {/* 转场专用的 Silk 静态帧（仅 html[data-transitioning] 时可见），保持共享元素快照里的丝绸质感 */}
+      {!simple && silkFrame && (
+        <img
+          src={silkFrame}
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="silk-snapshot absolute inset-0 h-full w-full object-cover opacity-60 mix-blend-soft-light pointer-events-none"
+        />
       )}
 
       {/* 内容 */}
