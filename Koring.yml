@@ -5,6 +5,7 @@ background:
 game:
   gameDirs:
     - C:\Users\ab090\AppData\Roaming\.minecraft
+    - C:\Users\ab090\Desktop\VRCub1.1.1\.minecraft
   selectedInstance: 1.21.9
 java:
   javaPath: C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot\bin\java.exe
@@ -12,5 +13,5 @@ java:
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1792865872142
+  checkedAt: 1792868944323
   version: 1.2.7

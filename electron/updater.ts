@@ -512,16 +512,32 @@ class UpdateService {
       ...getMirrors().map((m) => ({ label: m, base: `${m}/` })),
     ];
 
-    for (const { label, base } of sources) {
+    // 并发 Ping 所有更新源（GitHub 官方 + 全部加速源），按首响应延迟从低到高排序使用
+    const probes = await Promise.all(sources.map((s) => this.probeSource(s.label, s.base)));
+    const reachable = probes.filter((p) => p.reachable).sort((a, b) => a.latencyMs - b.latencyMs);
+    log.info(
+      `[updater] 更新源延迟排序: ${probes
+        .map((p) => (p.reachable ? `${p.label}=${p.latencyMs}ms` : `${p.label}=不可用`))
+        .join(', ')}`,
+    );
+    if (reachable.length === 0) {
+      this.suppressErrors = false;
+      this.state = 'error';
+      this.error = '无法连接更新服务器（GitHub 与所有加速源均不可用），请稍后重试';
+      this.emit();
+      return this.buildPayload();
+    }
+
+    // 从延迟最低的源开始：候选不满足要求（该源数据旧/无更新）再退到下一个
+    for (const { label, base, candidates } of reachable) {
       try {
-        const candidates = await this.fetchCandidates(base);
         const tag = this.pickCandidate(candidates, allowPrerelease, preferredVersion);
         if (!tag) {
           log.info(`[updater] ${label}: 无符合条件的更新候选（通道/格式/版本序）`);
           continue; // 该源没有更新，尝试下一个源
         }
         const feedUrl = `${base}https://github.com/${OWNER}/${REPO}/releases/download/${tag}/`;
-        log.info(`[updater] 检查源 ${label}，命中 ${tag} (feed: ${feedUrl})`);
+        log.info(`[updater] 使用延迟最低可用源 ${label}，命中 ${tag} (feed: ${feedUrl})`);
         autoUpdater.setFeedURL({ provider: 'generic', url: feedUrl });
         // generic feed 取 latest.yml / latest-linux.yml；channel='latest' 同时开启 allowDowngrade，
         // 使 semver 门接受"编号更大但 semver 判定偏旧"的候选（如旧 -beta.N 当前 → 新格式）
@@ -544,11 +560,29 @@ class UpdateService {
       }
     }
 
+    // 有源可达但没有「比当前新」的版本 → 确认无更新（区别于全部不可用的 error）
     this.suppressErrors = false;
-    this.state = 'error';
-    this.error = '无法连接更新服务器（GitHub 与所有加速源均不可用），请稍后重试';
+    this.state = 'not-available';
+    this.version = undefined;
+    this.error = undefined;
     this.emit();
     return this.buildPayload();
+  }
+
+  /**
+   * 探测单个更新源（探活 + 抓候选）：并发调用，用「首次 HTTP 响应耗时」作为延迟，
+   * reachable=false 表示完全连不上（超时/网络错误）。
+   */
+  private async probeSource(
+    label: string,
+    base: string,
+  ): Promise<{ label: string; base: string; candidates: string[]; reachable: boolean; latencyMs: number }> {
+    try {
+      const probe = await this.fetchCandidates(base);
+      return { ...probe, label, base };
+    } catch {
+      return { label, base, candidates: [], reachable: false, latencyMs: Number.POSITIVE_INFINITY };
+    }
   }
 
   /**
@@ -556,8 +590,19 @@ class UpdateService {
    * base='' 为 GitHub 官方直连；否则 base=`${mirror}/`（加速源前缀，原样拼 https://）。
    * 组合：API 列表（含全部 release）+ /releases/latest 页面 HTML（兜底）。
    */
-  private async fetchCandidates(base: string): Promise<string[]> {
+  private async fetchCandidates(
+    base: string,
+  ): Promise<{ candidates: string[]; reachable: boolean; latencyMs: number }> {
     const candidates: string[] = [];
+    const started = Date.now();
+    let reachable = false;
+    let latencyMs = Number.POSITIVE_INFINITY;
+    const markReachable = () => {
+      if (!reachable) {
+        reachable = true;
+        latencyMs = Date.now() - started; // 首次 HTTP 响应耗时 ≈ 该源网络延迟
+      }
+    };
     const web = `${base}https://github.com/${OWNER}/${REPO}`;
     const api = `${base}https://api.github.com/repos/${OWNER}/${REPO}`;
     // 方式 1：/releases/latest 页面（最新非 prerelease release 的 tag，HTML 正则兜底）
@@ -566,6 +611,7 @@ class UpdateService {
         headers: { 'User-Agent': 'koring-launcher-updater' },
         signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
       });
+      markReachable();
       if (res.ok) {
         const html = await res.text();
         const m = html.match(/\/releases\/tag\/(v[^"<]+)/);
@@ -580,6 +626,7 @@ class UpdateService {
         headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'koring-launcher-updater' },
         signal: AbortSignal.timeout(DISCOVER_TIMEOUT_MS),
       });
+      markReachable();
       if (res.ok) {
         const releases: { draft?: boolean; tag_name?: string }[] = await res.json();
         for (const r of releases ?? []) {
@@ -590,7 +637,7 @@ class UpdateService {
     } catch {
       /* ignore */
     }
-    return candidates;
+    return { candidates, reachable, latencyMs };
   }
 
   /**
@@ -619,7 +666,7 @@ class UpdateService {
 
   /** 不限当前版本：返回某来源允许通道/格式的最新 tag（发布说明回退用）；没有返回 null */
   private async fetchBestCandidate(base: string, allowPrerelease: boolean): Promise<string | null> {
-    const candidates = await this.fetchCandidates(base);
+    const { candidates } = await this.fetchCandidates(base);
     const allowed = candidates.filter((c) => isCandidateAllowed(c, allowPrerelease));
     if (allowed.length === 0) return null;
     allowed.sort(compareVersionTags);
