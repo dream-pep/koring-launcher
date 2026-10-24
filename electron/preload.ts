@@ -66,8 +66,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const result = await ipcRenderer.invoke('dialog:openFile', {
       filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
     });
-    if (!result) return null;
-    const { srcPath } = result as { srcPath: string };
+    // dialog:openFile 现在统一返回 { success, data }
+    const picked = result?.success ? result.data : null;
+    if (!picked) return null;
+    const { srcPath } = picked as { srcPath: string };
     const imported = await ipcRenderer.invoke('background:import', {
       srcPath,
       maxEdge: computeMaxEdge(),

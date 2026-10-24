@@ -93,18 +93,21 @@ export function registerWindowHandlers(win: WinRef) {
     return { success: true };
   });
 
-  // File dialog — returns source path and extension for preload to handle
+  // File dialog — 统一走 { success, data } 包装，渲染端用 ipcInvoke 读取；
+  // preload 里的壁纸选择会取 result.data 再处理（见 preload.ts）。
   ipcMain.handle('dialog:openFile', async (_event, payload: {
     filters?: { name: string; extensions: string[] }[];
   }) => {
     const result = await dialog.showOpenDialog(win.mainWindow!, {
       properties: ['openFile'],
-      filters: payload.filters,
+      filters: payload?.filters,
     });
-    if (result.canceled || result.filePaths.length === 0) return null;
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, data: null };
+    }
     const srcPath = result.filePaths[0];
     const ext = path.extname(srcPath).toLowerCase() || '.png';
-    return { srcPath, ext };
+    return { success: true, data: { srcPath, ext } };
   });
 
   // Open external URL in system browser
@@ -112,12 +115,14 @@ export function registerWindowHandlers(win: WinRef) {
     await shell.openExternal(url);
   });
 
-  // Folder dialog — select a directory
+  // Folder dialog — select a directory（同样返回 { success, data }，供 ipcInvoke 读取）
   ipcMain.handle('dialog:openFolder', async () => {
     const result = await dialog.showOpenDialog(win.mainWindow!, {
       properties: ['openDirectory'],
     });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    return { folderPath: result.filePaths[0] };
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, data: null };
+    }
+    return { success: true, data: { folderPath: result.filePaths[0] } };
   });
 }

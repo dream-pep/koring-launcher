@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import {
   FolderOpen,
@@ -119,6 +119,9 @@ export function GameDirSetting() {
   /** 正在重命名的目录（显示名）与新名称 */
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  /** 手动输入目录路径（不依赖系统选择框） */
+  const [manualPath, setManualPath] = useState("");
+  const [addingManual, setAddingManual] = useState(false);
 
   const mainDir = gameDir || ".minecraft";
   const folders = useMemo(
@@ -160,7 +163,13 @@ export function GameDirSetting() {
 
   // ---------- 目录管理 ----------
   const handleAddFolder = useCallback(async () => {
-    const picked = await selectFolder();
+    let picked: { folderPath: string } | null = null;
+    try {
+      picked = await selectFolder();
+    } catch (e: any) {
+      toast.error(`打开目录选择器失败: ${e?.message || e}`);
+      return;
+    }
     if (!picked) return;
 
     const pickedPath = picked.folderPath;
@@ -192,6 +201,41 @@ export function GameDirSetting() {
       toast.error(`识别失败: ${e?.message || e}`);
     }
   }, [gameDirs, mainDir, setGame]);
+
+  /** 手动输入路径添加目录：先归一化/识别，再写入额外目录列表 */
+  const handleAddManualPath = useCallback(async () => {
+    const rawPath = manualPath.trim().replace(/^["']|["']$/g, "");
+    if (!rawPath) {
+      toast.warning("请输入目录路径");
+      return;
+    }
+    const normalizedInput = rawPath.replace(/[\\/]+$/, "");
+    if (normalizedInput === mainDir || (gameDirs || []).includes(normalizedInput)) {
+      toast.info("该目录已在列表中");
+      return;
+    }
+
+    setAddingManual(true);
+    try {
+      const result = await inspectGameFolder(normalizedInput);
+      const target = result.normalized.rootPath || normalizedInput;
+      if (target === mainDir || (gameDirs || []).includes(target)) {
+        toast.info("该目录已在列表中");
+        return;
+      }
+      setGame({ gameDirs: [...(gameDirs || []), target] });
+      setInfos((prev) => ({ ...prev, [target]: result.info }));
+      for (const warning of result.normalized.warnings) toast.warning(warning);
+      toast.success(
+        `已添加目录（识别到 ${result.info.versionCount} 个版本，${result.info.healthyCount} 个可用）`
+      );
+      setManualPath("");
+    } catch (e: any) {
+      toast.error(`无法添加目录: ${e?.message || e}`);
+    } finally {
+      setAddingManual(false);
+    }
+  }, [gameDirs, mainDir, manualPath, setGame]);
 
   const handleRemoveDir = useCallback(
     (target: string) => {
@@ -248,10 +292,14 @@ export function GameDirSetting() {
   }, []);
 
   const handleBrowseResourceDir = useCallback(async () => {
-    const picked = await selectFolder();
-    if (!picked) return;
-    setGame({ resourceDir: picked.folderPath });
-    toast.success("已设置共享资源目录");
+    try {
+      const picked = await selectFolder();
+      if (!picked) return;
+      setGame({ resourceDir: picked.folderPath });
+      toast.success("已设置共享资源目录");
+    } catch (e: any) {
+      toast.error(`打开目录选择器失败: ${e?.message || e}`);
+    }
   }, [setGame]);
 
   // ---------- 自动查找 ----------
@@ -425,6 +473,32 @@ export function GameDirSetting() {
                   </div>
                 </SettingRow>
                 <p className="text-[12px] text-muted-foreground font-mono break-all">{mainDir}</p>
+
+                {/* 手动添加目录：不依赖系统选择框，直接输入路径 */}
+                <div className="flex items-center gap-2">
+                  <input
+                    value={manualPath}
+                    onChange={(event) => setManualPath(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void handleAddManualPath();
+                    }}
+                    placeholder="手动输入目录路径，例如 D:\\Games\\.minecraft"
+                    className="h-8 min-w-0 flex-1 rounded-md border border-border/40 bg-white/60 px-2.5 text-[12px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:border-white/[0.08] dark:bg-black/30"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onPress={() => void handleAddManualPath()}
+                    isDisabled={addingManual}
+                  >
+                    {addingManual ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <FolderPlus className="w-3.5 h-3.5" />
+                    )}
+                    手动添加
+                  </Button>
+                </div>
               </div>
             </SettingCard>
 
