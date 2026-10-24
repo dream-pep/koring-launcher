@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@heroui/react";
-import { Plus, Copy, FolderOpen, Play, RefreshCw, Search, Star, Trash2, X } from "lucide-react";
+import { CheckCircle2, FolderOpen, Copy, Plus, RefreshCw, Search, Star, Trash2, X } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "@/lib/toast";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useConfigStore } from "@/stores/configStore";
-import { useAuthStore } from "@/stores/authStore";
-import { useLaunchStore } from "@/stores/launchStore";
 import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
 import { onInstallComplete, onInstallError, onInstallProgress, openPath, repairInstance, updateInstance } from "@/api/instance";
 import { InstanceIcon } from "./InstanceIcon";
@@ -49,13 +47,12 @@ export function InstancePage() {
   const error = useInstanceStore((state) => state.error);
   const fetchInstances = useInstanceStore((state) => state.fetchInstances);
   const remove = useInstanceStore((state) => state.remove);
+  const select = useInstanceStore((state) => state.select);
   const icons = useInstanceStore((state) => state.icons);
   const loadIcon = useInstanceStore((state) => state.loadIcon);
   const gameConfig = useConfigStore((state) => state.config.game);
-  const user = useAuthStore((state) => state.user);
+  const setGame = useConfigStore((state) => state.setGame);
   const openConfirm = useConfirmDialogStore((state) => state.openDialog);
-  const launch = useLaunchStore((state) => state.launch);
-  const launching = useLaunchStore((state) => state.launching);
 
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -113,7 +110,9 @@ export function InstancePage() {
       return;
     }
     if (!selectedName || !instances.some((item) => item.name === selectedName)) {
-      setSelectedName(instances[0].name);
+      const preferredName = useConfigStore.getState().config.game.selectedInstance;
+      const preferred = instances.find((item) => item.name === preferredName);
+      setSelectedName(preferred?.name ?? instances[0].name);
     }
   }, [instances, selectedName]);
 
@@ -183,22 +182,18 @@ export function InstancePage() {
     [gamePath, refresh]
   );
 
-  const play = useCallback(
+  const selectVersion = useCallback(
     async (instance: InstanceInfo) => {
-      if (!user?.username || !user?.uuid) {
-        toast.warning("请先在设置中登录账号");
-        return;
-      }
       try {
-        await launch(instance.name, gamePath);
-        const launchError = useLaunchStore.getState().error;
-        if (launchError) toast.error(`启动失败：${launchError}`);
-        else toast.success("游戏已启动");
+        await select(instance.name, gamePath);
+        setGame({ selectedInstance: instance.name });
+        const label = instance.config.description || instance.name;
+        toast.success(`已选择「${label}」，回到首页即可启动`);
       } catch (e) {
-        toast.error(`启动失败：${e instanceof Error ? e.message : String(e)}`);
+        toast.error(`选择失败：${e instanceof Error ? e.message : String(e)}`);
       }
     },
-    [gamePath, launch, user]
+    [gamePath, select, setGame]
   );
 
   const handleRepair = useCallback(
@@ -224,6 +219,9 @@ export function InstancePage() {
         onConfirm: async () => {
           try {
             await remove(instance.name, gamePath);
+            if (gameConfig.selectedInstance === instance.name) {
+              setGame({ selectedInstance: "" });
+            }
             toast.success("实例已删除");
           } catch (e) {
             toast.error(`删除失败：${e instanceof Error ? e.message : String(e)}`);
@@ -231,7 +229,7 @@ export function InstancePage() {
         },
       });
     },
-    [gamePath, openConfirm, remove]
+    [gameConfig.selectedInstance, gamePath, openConfirm, remove, setGame]
   );
 
   return (
@@ -391,6 +389,9 @@ export function InstancePage() {
                       {instance.config.description || instance.name}
                     </span>
                     {instance.config.favorite && <Star className="h-3 w-3 shrink-0 fill-current text-amber-500" />}
+                    {instance.name === gameConfig.selectedInstance && (
+                      <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" aria-label="当前选中的版本" />
+                    )}
                     {!instance.healthy && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="文件不完整" />}
                   </div>
                   <div className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
@@ -418,9 +419,9 @@ export function InstancePage() {
             instance={selected}
             icon={icons[selected.name]}
             gamePath={gamePath}
-            launching={launching}
+            selected={selected.name === gameConfig.selectedInstance}
             repairing={repairing}
-            onPlay={() => void play(selected)}
+            onSelect={() => void selectVersion(selected)}
             onRepair={() => void handleRepair(selected)}
             onDelete={() => handleDelete(selected)}
             onChanged={() => void refresh()}
@@ -449,8 +450,8 @@ export function InstancePage() {
           if (!target) return null;
           const left = Math.min(menu.x, (window.innerWidth || 1200) - 200);
           const top = Math.min(menu.y, (window.innerHeight || 800) - 220);
-          const items: { label: string; icon: typeof Play; danger?: boolean; action: () => void }[] = [
-            { label: "启动游戏", icon: Play, action: () => void play(target) },
+          const items: { label: string; icon: typeof CheckCircle2; danger?: boolean; action: () => void }[] = [
+            { label: "选择该版本", icon: CheckCircle2, action: () => void selectVersion(target) },
             { label: "打开目录", icon: FolderOpen, action: () => void openPath(target.path) },
             {
               label: "复制实例 ID",

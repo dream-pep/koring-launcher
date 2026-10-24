@@ -8,6 +8,25 @@ interface TitleBarProps {
   showClose?: boolean;
 }
 
+/** 胶囊指示条拖出两端时的最大橡皮筋位移（px）；越拉阻力越大，最多到这里 */
+const RUBBER_BAND_LIMIT = 75;
+
+/**
+ * 橡皮筋映射：在 [min, max] 内线性跟随，越界后位移按 1/(1+x) 衰减，
+ * 无限拖动也只会无限逼近 limit，不会真的拉走。
+ */
+function rubberBand(value: number, min: number, max: number, limit: number): number {
+  if (value < min) {
+    const overshoot = min - value;
+    return min - limit * (1 - 1 / (overshoot / limit + 1));
+  }
+  if (value > max) {
+    const overshoot = value - max;
+    return max + limit * (1 - 1 / (overshoot / limit + 1));
+  }
+  return value;
+}
+
 export function TitleBar({
   showMinimize = true,
   showMaximize = true,
@@ -52,9 +71,11 @@ export function TitleBar({
   }, []);
 
   useEffect(() => {
-    if (isDefault) {
-      requestAnimationFrame(() => updateIndicator(currentIdx));
-    }
+    if (!isDefault) return;
+    // 拖拽过程中位置完全由 pointermove（含橡皮筋）接管；
+    // 否则跨过条目时 currentIdx 变化会把指示条瞬移回按钮，破坏拖拽手感
+    if (isDragging.current) return;
+    requestAnimationFrame(() => updateIndicator(currentIdx));
   }, [currentIdx, updateIndicator, isDefault]);
 
   useEffect(() => {
@@ -75,19 +96,29 @@ export function TitleBar({
 
       const nav = navRef.current;
       if (!nav) return;
-      const maxLeft = nav.scrollWidth - dragWidth.current;
-      const clampedLeft = Math.max(0, Math.min(maxLeft, dragStartLeft.current + dx));
+      const navRect = nav.getBoundingClientRect();
+      // 右边界取最后一个条目的左边缘：不能用 scrollWidth —— 指示条自身的 translate
+      // 会撑大 nav 的可滚动区域，正是它让右侧能“无限拉”、左侧却被 0 卡死。
+      const lastBtn = btnRefs.current[routes.length - 1];
+      const maxLeft = Math.max(
+        0,
+        lastBtn ? lastBtn.getBoundingClientRect().left - navRect.left : nav.clientWidth - dragWidth.current,
+      );
+      const rawLeft = dragStartLeft.current + dx;
+      // 两端对称的橡皮筋：越界后阻力递增，最多超出 RUBBER_BAND_LIMIT，松手回弹
+      const draggedLeft = rubberBand(rawLeft, 0, maxLeft, RUBBER_BAND_LIMIT);
 
-      setIndicator((prev) => ({ ...prev, left: clampedLeft }));
+      setIndicator((prev) => ({ ...prev, left: draggedLeft }));
 
+      // 吸附/导航判断仍按真实区间内位置算，越界时固定落到首/尾条目
+      const navLeft = Math.max(0, Math.min(maxLeft, draggedLeft));
       let nearestIdx = 0;
       let minDist = Infinity;
       btnRefs.current.forEach((btn, i) => {
         if (!btn) return;
         const rect = btn.getBoundingClientRect();
-        const navRect = nav.getBoundingClientRect();
         const btnCenter = rect.left - navRect.left + rect.width / 2;
-        const dist = Math.abs(clampedLeft + dragWidth.current / 2 - btnCenter);
+        const dist = Math.abs(navLeft + dragWidth.current / 2 - btnCenter);
         if (dist < minDist) { minDist = dist; nearestIdx = i; }
       });
 
@@ -101,7 +132,8 @@ export function TitleBar({
       if (!isDragging.current) return;
       isDragging.current = false;
       const idx = routes.findIndex((r) => r.key === useRouteStore.getState().current);
-      updateIndicator(idx);
+      // 松手回弹：把越界位移弹回当前条目的真实位置（CSS transform 过渡是 spring）
+      updateIndicator(idx < 0 ? 0 : idx);
     };
 
     document.addEventListener("pointermove", onMove);

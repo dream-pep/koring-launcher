@@ -21,7 +21,9 @@ export function InstanceTitle() {
         "select-none",
       )}
     >
-      {currentInstance?.name ?? "选择一个实例"}
+      {currentInstance
+        ? currentInstance.config.description || currentInstance.name
+        : "选择实例"}
     </div>
   );
 }

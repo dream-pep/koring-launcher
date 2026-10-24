@@ -194,9 +194,11 @@ export function Setting() {
     window.addEventListener("resize", updateIndicator);
     // 字体加载（Alimama/Inter）或侧栏内容变化会改变条目高度，需要重新测量指示条位置
     const nav = navRef.current;
-    const observer =
-      nav && typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateIndicator) : null;
-    observer?.observe(nav);
+    let observer: ResizeObserver | null = null;
+    if (nav && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(updateIndicator);
+      observer.observe(nav);
+    }
     document.fonts?.ready.then(() => updateIndicator()).catch(() => {});
     return () => {
       window.removeEventListener("resize", updateIndicator);
@@ -215,7 +217,8 @@ export function Setting() {
     setTransition({ from: selected, dir });
     setSelected(key);
     window.clearTimeout(transitionTimer.current);
-    transitionTimer.current = window.setTimeout(() => setTransition(null), 320);
+    // 旧页 220ms 渐出 + 新页 60ms 延迟后 360ms 渐入，留一点余量再清理过渡状态
+    transitionTimer.current = window.setTimeout(() => setTransition(null), 460);
   };
 
   const handleItemClick = useCallback(

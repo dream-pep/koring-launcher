@@ -58,7 +58,7 @@ const DEFAULT_CONFIG: AppConfig = {
   theme: { darkMode: "auto", parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: "image", image: DEFAULT_BG, blur: 0, opacity: 100 },
-  game: { gameDir: ".minecraft", resourceDir: "", gameDirs: [], dirAliases: {} },
+  game: { gameDir: ".minecraft", resourceDir: "", gameDirs: [], selectedInstance: "", dirAliases: {} },
   java: {
     javaPath: "",
     autoJavaPath: true,

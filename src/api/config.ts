@@ -25,6 +25,8 @@ export interface GameConfig {
   resourceDir: string;
   /** 已添加的游戏目录列表 */
   gameDirs: string[];
+  /** 当前选中的实例 ID（空 = 未选择）；首页启动与实例页「选择该版本」共用同一个值 */
+  selectedInstance: string;
   /** 目录显示名（重命名）：key = 规范化路径，value = 自定义名称；只影响展示 */
   dirAliases: Record<string, string>;
 }

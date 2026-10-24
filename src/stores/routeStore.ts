@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import { useA11yStore } from "./a11yStore";
+import { runViewTransition, type TransitionDirection } from "@/lib/view-transition";
+
+export type { TransitionDirection };
 
 export type RouteKey =
   | "home"
@@ -47,13 +49,12 @@ export type RouteKey =
 export type TitleBarMode = "default" | "sub" | "window" | "oobe" | "blocked";
 
 /**
- * 转场方向语义（与页面层级绑定）：
- * - forward  ：进入更深层级（顶部页 → 二级页），新页从右侧进入，旧页向左退出；
- * - backward ：返回更浅层级（二级页 → 顶部页 / 返回），新页从左侧进入，旧页向右退出；
- * - sibling  ：同层级切换（顶部导航页之间、同一父页的子页之间），不做左右位移，改用交叉淡化/轻微缩放。
+ * 转场方向语义（由“用户从哪来、往哪去”决定）：
+ * - forward  ：进入更深层级 / 往空间顺序的后方切换（新页从右侧渐入，旧页向左渐出）；
+ * - backward ：返回更浅层级 / 往空间顺序的前方切换（镜像）；
+ * - sibling  ：没有明确空间关系的同层级切换，只做纯渐隐渐现。
  * OOBE / UPVP 向导属于同一流程，按步骤先后使用 forward / backward。
  */
-export type TransitionDirection = "forward" | "backward" | "sibling";
 
 interface RouteItem {
   key: RouteKey;
@@ -207,43 +208,6 @@ function reverseDirection(dir: TransitionDirection): TransitionDirection {
   return "sibling";
 }
 
-/** 在途 View Transition：同一时刻只允许一次，避免浏览器跳过/中止导致页面闪现 */
-let activeTransition: ViewTransition | null = null;
-
-function clearTransitionMarkers() {
-  delete document.documentElement.dataset.transitionDir;
-  delete document.documentElement.dataset.transitioning;
-}
-
-function startTransition(dir: TransitionDirection, callback: () => void) {
-  const root = document.documentElement;
-  root.dataset.transitionDir = dir;
-
-  // 减少动画 / 不支持 View Transitions / 已有在途转场：直接切页
-  if (useA11yStore.getState().reduceMotion || !document.startViewTransition || activeTransition) {
-    callback();
-    clearTransitionMarkers();
-    return;
-  }
-
-  // 转场期间给 CSS 用：隐藏 WebGL 画面、抑制 hover 位移被快照
-  root.dataset.transitioning = "";
-  try {
-    const transition = document.startViewTransition(callback);
-    activeTransition = transition;
-    transition.ready.catch(() => {});
-    transition.finished
-      .catch(() => {})
-      .finally(() => {
-        if (activeTransition === transition) activeTransition = null;
-        clearTransitionMarkers();
-      });
-  } catch {
-    callback();
-    clearTransitionMarkers();
-  }
-}
-
 interface RouteState {
   current: RouteKey;
   titleBarMode: TitleBarMode;
@@ -268,7 +232,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     if (prev === key) return;
     // 方向由页面层级决定：进入二级页 → forward；回到顶部页 → backward；同级 → sibling
     const direction = getTransitionDirection(prev, key);
-    startTransition(direction, () => {
+    runViewTransition(direction, () => {
       set({
         current: key,
         titleBarMode: getRouteTitleBarMode(key),
@@ -285,7 +249,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     const prev = history[history.length - 1];
     // 返回 = 反向重放来时的转场（深层→浅层 exact backwards，同级仍是交叉淡化）
     const direction = reverseDirection(getTransitionDirection(prev, current));
-    startTransition(direction, () => {
+    runViewTransition(direction, () => {
       set({
         current: prev,
         titleBarMode: getRouteTitleBarMode(prev),

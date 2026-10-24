@@ -52,6 +52,8 @@ interface InstanceState {
   ) => Promise<void>;
   remove: (name: string, gamePath: string) => Promise<void>;
   select: (name: string, gamePath: string) => Promise<void>;
+  /** 直接把某个实例设为当前选中（不请求主进程，用于首页恢复选择） */
+  setCurrent: (instance: InstanceInfo | null) => void;
   install: (name: string, gamePath: string) => Promise<string>;
   /** 读取实例图标；force = true 时忽略缓存重新读（刷新 / 换图标后用） */
   loadIcon: (name: string, gamePath: string, force?: boolean) => Promise<void>;
@@ -77,7 +79,17 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const instances = await listInstances(gamePath);
-      set({ instances, loading: false });
+      set((state) => {
+        // 列表刷新时同步当前选中实例的引用：改名 / 内存 / 收藏等改动后，
+        // 首页标题等订阅 currentInstance 的地方也要立即看到新值
+        const currentName = state.currentInstance?.name;
+        const fresh = currentName ? instances.find((item) => item.name === currentName) : undefined;
+        return {
+          instances,
+          loading: false,
+          currentInstance: fresh ?? state.currentInstance,
+        };
+      });
     } catch (e: any) {
       set({ error: e.message, loading: false });
     }
@@ -121,6 +133,8 @@ export const useInstanceStore = create<InstanceState>((set, get) => ({
       set({ error: e.message, loading: false });
     }
   },
+
+  setCurrent: (instance) => set({ currentInstance: instance }),
 
   install: async (name, gamePath) => {
     set({ loading: true, error: null });

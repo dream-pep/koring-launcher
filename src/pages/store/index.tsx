@@ -9,11 +9,16 @@
 // 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { ArrowUp } from "lucide-react";
 import { useRouteStore } from "@/stores/routeStore";
-import { Sidebar } from "./Sidebar";
+import { directionFromIndex, runViewTransition } from "@/lib/view-transition";
+import { Sidebar, type StoreSection } from "./Sidebar";
 import { GameVersionView } from "./GameVersionView";
 import { ResourceBrowseView } from "./ResourceBrowseView";
+
+/** 侧栏分类顺序：切换方向按上下顺序决定（与侧边栏一一对应） */
+const SECTION_ORDER: StoreSection[] = ["game", "mod", "modpack"];
 
 export function Store() {
   const section = useRouteStore((s) => s.storeSection);
@@ -21,6 +26,7 @@ export function Store() {
 
   // 内容区滚动容器
   const mainRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const [showTop, setShowTop] = useState(false);
 
   // 监听内容区滚动，非顶部时显示"返回顶部"按钮
@@ -36,14 +42,28 @@ export function Store() {
     mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // 分类切换：方向跟随侧栏上下顺序，旧内容先渐出、新内容再渐入
+  const switchSection = (next: StoreSection) => {
+    if (next === section) return;
+    const direction = directionFromIndex(SECTION_ORDER.indexOf(section), SECTION_ORDER.indexOf(next));
+    runViewTransition(
+      direction,
+      () => {
+        flushSync(() => setStoreSection(next));
+        mainRef.current?.scrollTo({ top: 0 });
+      },
+      { element: contentRef.current, name: "store-content" },
+    );
+  };
+
   return (
     <div className="flex h-full">
       {/* 左侧边栏（与设置页同款样式） */}
-      <Sidebar section={section} onSelect={setStoreSection} />
+      <Sidebar section={section} onSelect={switchSection} />
 
       {/* 右侧内容区（唯一滚动容器，支持无限滚动与返回顶部） */}
       <main ref={mainRef} className="scroll-area flex-1 h-full min-w-0 overflow-y-auto p-6">
-        <div key={section} className="setting-page-enter h-full">
+        <div ref={contentRef} className="h-full">
           {section === "game" ? (
             <GameVersionView />
           ) : (

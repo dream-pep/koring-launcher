@@ -19,7 +19,7 @@ export function StartCard() {
   const handleLaunch = async () => {
     clearError();
     if (!currentInstance) {
-      toast.warning("请先选择一个游戏实例");
+      toast.warning("请先在实例管理中「选择该版本」");
       navigate("gallery");
       return;
     }

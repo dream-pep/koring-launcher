@@ -222,55 +222,106 @@
   animation: none;
 }
 
-/* 内容区转场：前进方向 */
-::view-transition-old(content) {
-  animation: 260ms var(--ease-ios) both page-out-forward;
-  pointer-events: none;
-}
+/* 内容区默认不参与动画：只有整页路由转场（data-vt-scope="route"）才播放 */
+::view-transition-old(content),
 ::view-transition-new(content) {
-  animation: 320ms var(--ease-ios) 30ms both page-in-forward;
-  pointer-events: auto;
+  animation: none;
 }
 
-/* 内容区转场：后退方向（镜像） */
-:root[data-transition-dir="backward"] ::view-transition-old(content) {
+/* 整页路由：旧页先缩小淡出（220ms），新页延迟 60ms 再放大淡入（360ms）。
+   注意：View Transition 伪元素必须用复合写法 `:root[...]::view-transition-*`，
+   写成后代选择器 `:root[...] ::view-transition-*` 不会命中 → 表现为“没有动画 + 新旧页面叠着”。 */
+:root[data-vt-scope="route"]::view-transition-old(content) {
+  animation: 220ms ease-in both page-out-forward;
+  pointer-events: none;
+}
+:root[data-vt-scope="route"]::view-transition-new(content) {
+  animation: 360ms var(--ease-spring-soft) 60ms both page-in-forward;
+  pointer-events: auto;
+}
+:root[data-vt-scope="route"][data-transition-dir="backward"]::view-transition-old(content) {
   animation-name: page-out-backward;
 }
-:root[data-transition-dir="backward"] ::view-transition-new(content) {
+:root[data-vt-scope="route"][data-transition-dir="backward"]::view-transition-new(content) {
+  animation-name: page-in-backward;
+}
+:root[data-vt-scope="route"][data-transition-dir="sibling"]::view-transition-old(content) {
+  animation: 220ms ease-in both page-out-sibling;
+}
+:root[data-vt-scope="route"][data-transition-dir="sibling"]::view-transition-new(content) {
+  animation: 360ms var(--ease-spring-soft) 60ms both page-in-sibling;
+}
+
+/* 资源中心分类切换（侧栏上下顺序）：纵向渐出渐入 + 缩放 */
+::view-transition-old(store-content) {
+  animation: 220ms ease-in both page-out-down;
+}
+::view-transition-new(store-content) {
+  animation: 360ms var(--ease-spring-soft) 60ms both page-in-down;
+}
+:root[data-transition-dir="backward"]::view-transition-old(store-content) {
+  animation-name: page-out-up;
+}
+:root[data-transition-dir="backward"]::view-transition-new(store-content) {
+  animation-name: page-in-up;
+}
+
+/* 实例页签切换（顶部页签左右顺序）：横向渐出渐入 + 缩放 */
+::view-transition-old(instance-tab-content) {
+  animation: 220ms ease-in both page-out-forward;
+}
+::view-transition-new(instance-tab-content) {
+  animation: 360ms var(--ease-spring-soft) 60ms both page-in-forward;
+}
+:root[data-transition-dir="backward"]::view-transition-old(instance-tab-content) {
+  animation-name: page-out-backward;
+}
+:root[data-transition-dir="backward"]::view-transition-new(instance-tab-content) {
   animation-name: page-in-backward;
 }
 
-/* 同层级切换（顶部导航之间 / 同一父页的子页之间）：不做左右位移，交叉淡化 + 极轻微缩放 */
-:root[data-transition-dir="sibling"] ::view-transition-old(content) {
-  animation: 200ms var(--ease-ios) both page-out-sibling;
-}
-:root[data-transition-dir="sibling"] ::view-transition-new(content) {
-  animation: 280ms var(--ease-ios) both page-in-sibling;
-}
-
+/* 渐出：淡出 + 缩小；渐入：从更小尺寸放大归位 */
 @keyframes page-out-forward {
   from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to   { opacity: 0; transform: translate3d(-12px, -4px, 0) scale(0.985); }
+  to   { opacity: 0; transform: translate3d(-14px, 0, 0) scale(0.96); }
 }
 @keyframes page-in-forward {
-  from { opacity: 0; transform: translate3d(24px, 6px, 0) scale(0.985); }
+  from { opacity: 0; transform: translate3d(20px, 0, 0) scale(0.95); }
   to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 @keyframes page-out-backward {
   from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  to   { opacity: 0; transform: translate3d(12px, -4px, 0) scale(0.985); }
+  to   { opacity: 0; transform: translate3d(14px, 0, 0) scale(0.96); }
 }
 @keyframes page-in-backward {
-  from { opacity: 0; transform: translate3d(-24px, 6px, 0) scale(0.985); }
+  from { opacity: 0; transform: translate3d(-20px, 0, 0) scale(0.95); }
   to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
+/* 无空间关系的同层级：淡出缩小 / 淡入放大，不做位移 */
 @keyframes page-out-sibling {
   from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.992); }
+  to   { opacity: 0; transform: scale(0.97); }
 }
 @keyframes page-in-sibling {
-  from { opacity: 0; transform: scale(1.004); }
+  from { opacity: 0; transform: scale(0.975); }
   to   { opacity: 1; transform: scale(1); }
+}
+/* 纵向（侧栏驱动的逻辑切换） */
+@keyframes page-out-down {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to   { opacity: 0; transform: translate3d(0, -12px, 0) scale(0.965); }
+}
+@keyframes page-in-down {
+  from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.965); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes page-out-up {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to   { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.965); }
+}
+@keyframes page-in-up {
+  from { opacity: 0; transform: translate3d(0, -16px, 0) scale(0.965); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 /* ============================================
@@ -322,19 +373,20 @@
   animation: setting-page-in 280ms var(--ease-spring-soft) both;
 }
 @keyframes setting-page-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.996); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* 进入：延迟 60ms，让旧页先渐出；退出：220ms 先走；两边都带缩放 */
 .setting-page-enter-down {
-  animation: setting-page-in-down 300ms var(--ease-spring-soft) both;
+  animation: setting-page-in-down 360ms var(--ease-spring-soft) 60ms both;
 }
 .setting-page-exit-down {
   animation: setting-page-out-down 220ms ease-in both;
   pointer-events: none;
 }
 .setting-page-enter-up {
-  animation: setting-page-in-up 300ms var(--ease-spring-soft) both;
+  animation: setting-page-in-up 360ms var(--ease-spring-soft) 60ms both;
 }
 .setting-page-exit-up {
   animation: setting-page-out-up 220ms ease-in both;
@@ -342,20 +394,20 @@
 }
 
 @keyframes setting-page-in-down {
-  from { opacity: 0; transform: translateY(16px) scale(0.996); }
+  from { opacity: 0; transform: translateY(18px) scale(0.965); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes setting-page-out-down {
   from { opacity: 1; transform: translateY(0) scale(1); }
-  to   { opacity: 0; transform: translateY(-12px) scale(0.998); }
+  to   { opacity: 0; transform: translateY(-12px) scale(0.965); }
 }
 @keyframes setting-page-in-up {
-  from { opacity: 0; transform: translateY(-16px) scale(0.996); }
+  from { opacity: 0; transform: translateY(-18px) scale(0.965); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes setting-page-out-up {
   from { opacity: 1; transform: translateY(0) scale(1); }
-  to   { opacity: 0; transform: translateY(12px) scale(0.998); }
+  to   { opacity: 0; transform: translateY(12px) scale(0.965); }
 }
 
 /* 指针来源（弹层从触发位置“长出来”） */
@@ -411,6 +463,7 @@ html[data-transitioning] .transition-flat:hover {
 .reduce-motion *::before,
 .reduce-motion *::after {
   animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
 }
@@ -427,6 +480,7 @@ html[data-transitioning] .transition-flat:hover {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

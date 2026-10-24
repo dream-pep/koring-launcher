@@ -1,18 +1,14 @@
 appVersion: 1.2.7
 oobe: false
-background:
-  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-mvmnamzbwx0mcu.png
 game:
-  gameDir: C:\Users\ab090\AppData\Roaming\.minecraft
   gameDirs:
-    - .minecraft
+    - C:\Users\ab090\AppData\Roaming\.minecraft
+  selectedInstance: 1.21.9
 java:
   javaPath: C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot\bin\java.exe
-advanced:
-  preLaunchCmd: '123'
-  debugMode: true
+  autoJavaPath: false
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1792862804477
+  checkedAt: 1792864563006
   version: 1.2.7

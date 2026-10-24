@@ -704,3 +704,40 @@ instance:crash-analysis { instancePath, fileName? }
 - `npx tsc -p tsconfig.json --noEmit`：21 条历史报错（比之前少 2 条），新文件零报错
 - `npx vite build`：✓ built in 17.19s
 - Electron 运行时自测（launch-options）：初始内存 2G / 最大 8G、锁定内存 `-Xms=-Xmx=8G`、`-Xms` 回退 `min(2,memGB)`、IPv4/IPv6 参数注入、default 不注入 —— 6 项断言全过
+
+---
+
+## 15. 版本选择模型：实例页只「选择」，首页负责启动（2026-10-25）
+
+标题：实例页选择版本 + 首页启动
+内容：把「选中哪个版本」从实例页的局部状态提升为全局唯一状态，实例页不再启动游戏；首页标题与启动按钮都跟随选中版本；显示名改动即时同步到首页。
+进度：100%。
+
+### 行为
+
+- **全局只能有一个选中版本**：配置 `game.selectedInstance: string`（实例 ID，空 = 未选择）作为唯一来源，主进程稀疏保存，重启后由首页恢复。
+- **实例页**：详情头部「启动游戏」按钮改为「选择该版本」（已选中时显示「当前选中版本」并禁用）；右键菜单「启动游戏」同步改为「选择该版本」；列表项对选中版本显示绿色对勾。实例页不再发起启动。
+- **首页**：`InstanceTitle` 显示选中版本的显示名（`config.description || name`，未选择时显示「选择实例」）；`StartCard` 只启动选中的版本，未选择时提示并跳转实例管理。首页挂载时按 `game.selectedInstance` 恢复选择（`src/stores/instanceStore.ts` 新增 `setCurrent`）。
+- **名称编辑**：实例详情头部显示名旁新增铅笔按钮，内联输入框 + 「保存」按钮（Enter 保存 / Esc 取消），调用 `instance:update` 持久化到 `instance.json`；设置页签仍保留带「保存设置」的完整表单。
+- **同步**：`fetchInstances` 刷新列表时同步 `currentInstance` 的引用（`src/stores/instanceStore.ts`），保存显示名后首页标题立即更新；删除实例时若删的是选中版本则清空 `game.selectedInstance`。
+
+### 涉及文件
+
+- `electron/config.ts`：`GameConfig.selectedInstance` + 默认值（mergeDeep 保证旧配置文件兼容）
+- `src/api/config.ts`、`src/stores/configStore.ts`：同步类型与默认值
+- `src/stores/instanceStore.ts`：新增 `setCurrent`；`fetchInstances` 同步 `currentInstance`
+- `src/pages/instance/index.tsx`：`selectVersion` 替换 `play`；列表对勾、右键菜单、删除时清理选择
+- `src/pages/instance/InstanceDetail.tsx`：`selected` / `onSelect` 替换 `launching` / `onPlay`；头部内联改名 + 保存
+- `src/pages/home/index.tsx`：挂载时恢复选中版本
+- `src/pages/home/InstanceTitle.tsx`：显示显示名而非实例 ID
+- `src/pages/home/StartCard.tsx`：未选择时的提示文案
+
+### 验证
+
+- `npx tsc -p tsconfig.electron.json --noEmit`：通过
+- `npx tsc -p tsconfig.json --noEmit`：仅剩历史报错，改动文件零报错
+- `npx vite build`：✓ built in 19.68s
+
+### 未做
+
+- 未实机点击验证（需 `pnpm dev` 人工过一遍：实例页选择 → 返回首页看标题 → 启动；改名后回首页看标题是否同步）。

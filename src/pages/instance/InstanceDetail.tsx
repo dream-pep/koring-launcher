@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Button } from "@heroui/react";
 import {
   AlertTriangle,
+  Check,
   CheckCircle2,
   Code2,
   FolderOpen,
@@ -9,7 +11,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Package,
-  Play,
+  Pencil,
   RefreshCw,
   Save,
   ScrollText,
@@ -17,9 +19,11 @@ import {
   Star,
   Trash2,
   Wrench,
+  X,
 } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "@/lib/toast";
+import { directionFromIndex, runViewTransition } from "@/lib/view-transition";
 import {
   diagnoseInstance,
   openPath,
@@ -48,13 +52,18 @@ const TABS: { key: TabKey; label: string; icon: typeof HardDrive }[] = [
   { key: "logs", label: "日志", icon: ScrollText },
 ];
 
+/** 页签空间顺序：切换方向跟随页签在顶部的左右排列 */
+const TAB_ORDER = TABS.map((item) => item.key);
+
 interface InstanceDetailProps {
   instance: InstanceInfo;
   icon?: InstanceIconInfo;
   gamePath: string;
-  launching: boolean;
+  /** 是否为全局选中的版本（首页启动的那个） */
+  selected: boolean;
   repairing: boolean;
-  onPlay: () => void;
+  /** 选择该版本（不启动游戏） */
+  onSelect: () => void;
   onRepair: () => void;
   onDelete: () => void;
   onChanged: () => void;
@@ -339,19 +348,37 @@ export function InstanceDetail({
   instance,
   icon,
   gamePath,
-  launching,
+  selected,
   repairing,
-  onPlay,
+  onSelect,
   onRepair,
   onDelete,
   onChanged,
 }: InstanceDetailProps) {
   const [tab, setTab] = useState<TabKey>("overview");
+  const tabContentRef = useRef<HTMLDivElement | null>(null);
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnosis, setDiagnosis] = useState<{ healthy: boolean; issues: string[] } | null>(null);
+  /** 头部显示名内联编辑（本地草稿 + 保存按钮，避免每敲一个字都落盘） */
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   const config = instance.config;
   const displayName = config.description || instance.name;
+
+  // 页签切换：方向跟随页签左右顺序，旧内容先渐出、新内容再渐入（View Transition）
+  const switchTab = (next: TabKey) => {
+    if (next === tab) return;
+    const direction = directionFromIndex(TAB_ORDER.indexOf(tab), TAB_ORDER.indexOf(next));
+    runViewTransition(
+      direction,
+      () => {
+        flushSync(() => setTab(next));
+      },
+      { element: tabContentRef.current, name: "instance-tab-content" },
+    );
+  };
 
   const issues = useMemo(() => {
     const list = [...(diagnosis?.issues ?? instance.issues)];
@@ -387,6 +414,26 @@ export function InstanceDetail({
     }
   };
 
+  const startRename = () => {
+    setNameDraft(config.description ?? "");
+    setRenaming(true);
+  };
+
+  const saveName = async () => {
+    if (savingName) return;
+    setSavingName(true);
+    try {
+      await updateInstance(instance.name, gamePath, { description: nameDraft.trim() || undefined });
+      toast.success("名称已保存");
+      setRenaming(false);
+      onChanged();
+    } catch (e) {
+      toast.error(`保存名称失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <div className="scroll-area flex h-full flex-col overflow-y-auto">
       {/* 头部 */}
@@ -396,7 +443,54 @@ export function InstanceDetail({
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-lg font-bold text-foreground">{displayName}</h2>
+              {renaming ? (
+                <>
+                  <input
+                    autoFocus
+                    value={nameDraft}
+                    placeholder="显示名称（留空则显示实例 ID）"
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void saveName();
+                      if (event.key === "Escape") setRenaming(false);
+                    }}
+                    className={clsx(fieldCls, "h-8 w-64 px-2 text-[14px] font-semibold")}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 min-w-0 px-2"
+                    onPress={() => void saveName()}
+                    isDisabled={savingName}
+                    aria-label="保存名称"
+                  >
+                    {savingName ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    保存
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 min-w-0 px-2"
+                    onPress={() => setRenaming(false)}
+                    isDisabled={savingName}
+                    aria-label="取消重命名"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h2 className="truncate text-lg font-bold text-foreground">{displayName}</h2>
+                  <button
+                    type="button"
+                    onClick={startRename}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-foreground/[0.06] hover:text-foreground dark:hover:bg-white/[0.08]"
+                    aria-label="重命名"
+                    title="重命名（保存后生效）"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
               {config.favorite && <Star className="h-4 w-4 shrink-0 fill-current text-amber-500" />}
               {config.category && (
                 <span className="shrink-0 rounded-md bg-foreground/[0.06] px-1.5 py-0.5 text-[11px] text-muted-foreground dark:bg-white/[0.08]">
@@ -412,10 +506,17 @@ export function InstanceDetail({
               <span className="truncate font-mono text-[11px]">{instance.path}</span>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Button size="sm" onPress={onPlay} isDisabled={launching}>
-                {launching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-                {launching ? "启动中…" : "启动游戏"}
-              </Button>
+              {selected ? (
+                <Button size="sm" variant="ghost" isDisabled className="text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  当前选中版本
+                </Button>
+              ) : (
+                <Button size="sm" onPress={onSelect}>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  选择该版本
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onPress={onRepair} isDisabled={repairing}>
                 {repairing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
                 修复
@@ -463,7 +564,7 @@ export function InstanceDetail({
             <button
               key={item.key}
               type="button"
-              onClick={() => setTab(item.key)}
+              onClick={() => switchTab(item.key)}
               className={clsx(
                 "flex items-center gap-1.5 border-b-2 px-3 py-2 text-[12px] transition-colors",
                 tab === item.key
@@ -478,8 +579,9 @@ export function InstanceDetail({
         })}
       </div>
 
-      {/* 内容：key 随页签变化 → 重放 tab-in 进入动效 */}
-      <div key={tab} className="flex-1 px-6 py-5 animate-tab-in">
+      {/* 内容：页签切换走方向性渐出渐入（View Transition，见 switchTab） */}
+      <div ref={tabContentRef} className="flex-1 px-6 py-5">
+        <div key={tab}>
         {tab === "overview" && (
           <div className="space-y-4">
             <section className="rounded-xl border border-border/40 p-4 dark:border-white/[0.08]">
@@ -545,7 +647,7 @@ export function InstanceDetail({
                 <button
                   key={item.label}
                   type="button"
-                  onClick={() => setTab(item.tab)}
+                  onClick={() => switchTab(item.tab)}
                   className="rounded-xl border border-border/40 px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.04] dark:border-white/[0.08]"
                 >
                   <p className="text-xl font-bold text-foreground">{item.value}</p>
@@ -562,6 +664,7 @@ export function InstanceDetail({
         {tab === "screenshots" && <ScreenshotsTab instancePath={instance.path} onChanged={onChanged} />}
         {tab === "resourcepacks" && <ResourcePacksTab instancePath={instance.path} />}
         {tab === "logs" && <LogsTab instancePath={instance.path} />}
+        </div>
       </div>
     </div>
   );

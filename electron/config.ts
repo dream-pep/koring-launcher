@@ -54,6 +54,11 @@ export interface GameConfig {
   /** 已添加的游戏目录列表 */
   gameDirs: string[];
   /**
+   * 当前选中的实例（实例 ID，非显示名）。空字符串 = 未选择。
+   * 首页启动 / 实例页「选择该版本」都以它为唯一依据，全局同一时刻只有一个。
+   */
+  selectedInstance: string;
+  /**
    * 目录显示名（重命名）：key = 规范化后的绝对路径，value = 用户自定义名称。
    * 仅影响设置页/启动器展示，不改变磁盘路径。
    */
@@ -213,10 +218,10 @@ const DEFAULTS: AppConfig = {
   appVersion: '',
   oobe: true,
   app: { language: 'zh-CN' },
-  theme: { darkMode: 'auto', parallax: true },
+  theme: { darkMode: 'dark', parallax: true },/** 这里默认是auto,现在为了显示效果则选择dark */
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 },
-  game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [], dirAliases: {} },
+  game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [], selectedInstance: '', dirAliases: {} },
   java: {
     javaPath: '',
     autoJavaPath: true,
