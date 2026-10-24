@@ -11,6 +11,7 @@ import {
   deviceNotifications,
   deviceReport,
   deviceStatus,
+  heartbeatInfo,
   startupCheck,
   versionPolicy,
 } from '../core/launcher-api';
@@ -102,6 +103,15 @@ export function registerLauncherApiHandlers() {
     try {
       const { uuid } = getSmbiosUuid();
       return { success: true, data: await deviceNotifications(uuid), error: null };
+    } catch (e: unknown) {
+      return fail(e);
+    }
+  });
+
+  /** 设备心跳运行信息（每 2 分钟一次 POST /device/report） */
+  ipcMain.handle('launcher-api:heartbeat-info', () => {
+    try {
+      return { success: true, data: heartbeatInfo(), error: null };
     } catch (e: unknown) {
       return fail(e);
     }

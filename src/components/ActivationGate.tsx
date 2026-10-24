@@ -5,6 +5,7 @@ import { useConfigStore } from "@/stores/configStore";
 import { useDeveloperModeStore, refreshDeveloperMode } from "@/stores/developerModeStore";
 import {
   launcherStartupCheck,
+  onLauncherDeviceHeartbeat,
   type LauncherNotification,
   type StartupCheckResult,
 } from "@/api/launcher-api";
@@ -208,6 +209,26 @@ export function ActivationGate() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
+
+  /**
+   * 设备心跳（主进程每 2 分钟 POST /device/report 一次，成功即广播）：
+   * - 用最新设备状态同步「开发者模式」开关（服务端改开关后最多 2 分钟生效）；
+   * - 心跳期间发现设备被拉黑 → 立即跳到设备异常页（服务端下发的事实，不设豁免）。
+   */
+  useEffect(() => {
+    return onLauncherDeviceHeartbeat(({ status }) => {
+      useDeveloperModeStore.getState().apply(status.developer_mode === true);
+      if (status.blacklisted) {
+        setActivation({
+          deviceOk: false,
+          checkedAt: Date.now(),
+          reason: status.blacklist?.reason ?? "设备已被拉黑",
+        });
+        setPhase("ok");
+        navigate("device-blocked");
+      }
+    });
+  }, [navigate, setActivation]);
 
   // 强制升级：升级完成前不允许离开版本更新页
   useEffect(() => {

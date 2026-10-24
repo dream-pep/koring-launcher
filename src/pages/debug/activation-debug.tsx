@@ -12,9 +12,12 @@ import {
   launcherDeviceStatus,
   launcherDeviceUuid,
   launcherEnvInfo,
+  launcherHeartbeatInfo,
   launcherStartupCheck,
   launcherVersionPolicy,
+  onLauncherDeviceHeartbeat,
   type LauncherEnvInfo,
+  type LauncherHeartbeatInfo,
   type SmbiosUuidResult,
 } from "@/api/launcher-api";
 import { Loader2 } from "lucide-react";
@@ -36,6 +39,7 @@ export function ActivationDebug() {
   const [uuid, setUuid] = useState<SmbiosUuidResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<CallLog[]>([]);
+  const [heartbeat, setHeartbeat] = useState<LauncherHeartbeatInfo | null>(null);
   const developerMode = useDeveloperModeStore((s) => s.enabled);
 
   const refreshEnv = async () => {
@@ -55,6 +59,17 @@ export function ActivationDebug() {
     void refreshEnv();
     // 仅挂载时读取一次；env/api_base 变更需重启进程
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 设备心跳：挂载时读一次运行信息，之后每次心跳成功上报（主进程广播）都刷新
+  useEffect(() => {
+    const refresh = () => {
+      launcherHeartbeatInfo()
+        .then(setHeartbeat)
+        .catch(() => setHeartbeat(null));
+    };
+    refresh();
+    return onLauncherDeviceHeartbeat(refresh);
   }, []);
 
   /** 统一执行 + 记录（结果以 JSON 折叠文本展示，便于对照接口契约） */
@@ -215,6 +230,28 @@ export function ActivationDebug() {
             需要验证黑名单/禁激活的阻断 UI 时用 <span className="font-mono">KORING_ENFORCE=1</span> 启动；
             联调本地桩用 <span className="font-mono">KORING_API_BASE</span> 覆盖（两者都在 .env / 环境变量里）。
           </p>
+          {/* 设备心跳（主进程每 2 分钟 POST /device/report；成功一次就广播一次） */}
+          <div className="mt-3 pt-3 border-t border-foreground/[0.06] text-[13px] font-mono space-y-1">
+            <p className="flex justify-between gap-4">
+              <span className="text-muted-foreground shrink-0">设备心跳</span>
+              <span>
+                {heartbeat?.running ? "运行中" : "未启动"} · 每{" "}
+                {heartbeat ? Math.round(heartbeat.interval_ms / 1000) : 120} 秒
+              </span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span className="text-muted-foreground shrink-0">成功上报次数</span>
+              <span>{heartbeat?.count ?? 0}</span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span className="text-muted-foreground shrink-0">最近上报</span>
+              <span>{heartbeat?.last ? new Date(heartbeat.last.at).toLocaleTimeString() : "—"}</span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span className="text-muted-foreground shrink-0">服务端 report_count</span>
+              <span>{heartbeat?.last?.status.report_count ?? "—"}</span>
+            </p>
+          </div>
         </GlassCard>
       </div>
 

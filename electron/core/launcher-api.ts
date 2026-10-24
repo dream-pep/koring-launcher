@@ -275,7 +275,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 /** 查询设备状态（未登记返回 recorded:false，仍是 200） */
 export async function deviceStatus(uuid: string): Promise<DeviceStatusData> {
-  return request<DeviceStatusData>('/api/v1/device/status', { query: { uuid } });
+  const status = await request<DeviceStatusData>('/api/v1/device/status', { query: { uuid } });
+  rememberDeviceStatus(status);
+  return status;
 }
 
 /** 采集上报字段（os / 时区 / 语言 / 国家 / 版本） */
@@ -312,7 +314,9 @@ export function collectDeviceReportPayload(uuid: string): DeviceReportPayload {
 export async function deviceReport(uuid: string): Promise<DeviceStatusData> {
   const payload = collectDeviceReportPayload(uuid);
   log.info(`[launcher-api] 上报设备 uuid=${uuid} source=${getSmbiosUuid().source} os=${payload.os ?? '-'}`);
-  return request<DeviceStatusData>('/api/v1/device/report', { method: 'POST', body: payload });
+  const status = await request<DeviceStatusData>('/api/v1/device/report', { method: 'POST', body: payload });
+  rememberDeviceStatus(status);
+  return status;
 }
 
 /** 设备维度通知（轮询用；启动器仅在启动时查一次） */
@@ -366,6 +370,115 @@ export async function deviceCheck(): Promise<DeviceCheckResult> {
     reported = true;
   }
   return normalizeDevice(status, uuid, source, reported);
+}
+
+// ==================== 设备心跳（周期上报） ====================
+
+/**
+ * 设备心跳间隔：进程存活期间每 2 分钟 POST /device/report 一次。
+ *
+ * 目的：保持 last_seen_at / report_count 新鲜，让服务端能知道这台机器「活着」，
+ * 并可在设备侧下发黑名单、开发者模式等变更（心跳响应就是最新设备状态）。
+ * 限流桶（设备四接口 + 版本两接口共用 120/分/IP）下 0.5 次/分钟，完全安全。
+ *
+ * 失败策略：只记日志（同一错误只记一次，避免断网时刷屏），不弹窗、不影响任何功能。
+ */
+export const DEVICE_HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
+
+/** 最近一次拿到的设备状态（启动检查 / OOBE 校验 / 心跳都会刷新，供调试页展示） */
+let latestDeviceStatus: { at: number; status: DeviceStatusData } | null = null;
+
+function rememberDeviceStatus(status: DeviceStatusData): void {
+  latestDeviceStatus = { at: Date.now(), status };
+}
+
+/** 调试用：最近一次设备状态（心跳或校验） */
+export function getLatestDeviceStatus(): { at: number; status: DeviceStatusData } | null {
+  return latestDeviceStatus;
+}
+
+/** 心跳事件载荷（主进程 → 渲染端，通道 launcher-api:device-updated） */
+export interface DeviceHeartbeatEvent {
+  /** 本次上报完成的时间戳（ms） */
+  at: number;
+  /** 服务端返回的最新设备状态 */
+  status: DeviceStatusData;
+}
+
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let heartbeatCount = 0;
+let lastHeartbeatError = '';
+
+/** 把心跳结果广播给所有渲染窗口（窗口销毁瞬间发送失败直接忽略） */
+function broadcastHeartbeat(status: DeviceStatusData): void {
+  const payload: DeviceHeartbeatEvent = { at: Date.now(), status };
+  for (const w of electron.BrowserWindow.getAllWindows()) {
+    if (w.isDestroyed()) continue;
+    try {
+      w.webContents.send('launcher-api:device-updated', payload);
+    } catch {
+      // 窗口正在销毁，忽略
+    }
+  }
+}
+
+async function heartbeatOnce(): Promise<void> {
+  const { uuid } = getSmbiosUuid();
+  if (!uuid) return;
+  try {
+    const status = await deviceReport(uuid);
+    heartbeatCount += 1;
+    lastHeartbeatError = '';
+    broadcastHeartbeat(status);
+  } catch (e) {
+    const text = toErrorText(e);
+    if (text !== lastHeartbeatError) {
+      lastHeartbeatError = text;
+      log.warn(
+        `[launcher-api] 心跳上报失败（每 ${DEVICE_HEARTBEAT_INTERVAL_MS / 60000} 分钟重试）：${text}`,
+      );
+    }
+  }
+}
+
+/**
+ * 启动设备心跳（进程级单例）。定时器 unref，不阻止进程退出；
+ * 由 main.ts 在 app ready 后调用，退出时 stopDeviceHeartbeat()。
+ */
+export function startDeviceHeartbeat(): void {
+  if (heartbeatTimer) return;
+  heartbeatTimer = setInterval(() => {
+    void heartbeatOnce();
+  }, DEVICE_HEARTBEAT_INTERVAL_MS);
+  heartbeatTimer.unref?.();
+  log.info(
+    `[launcher-api] 设备心跳已启动（每 ${DEVICE_HEARTBEAT_INTERVAL_MS / 60000} 分钟 POST /device/report）`,
+  );
+}
+
+export function stopDeviceHeartbeat(): void {
+  if (!heartbeatTimer) return;
+  clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
+}
+
+/** 心跳运行信息（调试页展示） */
+export interface HeartbeatInfo {
+  interval_ms: number;
+  /** 心跳成功上报累计次数 */
+  count: number;
+  /** 最近一次成功上报的时间与设备状态 */
+  last: DeviceHeartbeatEvent | null;
+  running: boolean;
+}
+
+export function heartbeatInfo(): HeartbeatInfo {
+  return {
+    interval_ms: DEVICE_HEARTBEAT_INTERVAL_MS,
+    count: heartbeatCount,
+    last: latestDeviceStatus ? { at: latestDeviceStatus.at, status: latestDeviceStatus.status } : null,
+    running: heartbeatTimer !== null,
+  };
 }
 
 // ==================== 版本策略 ====================

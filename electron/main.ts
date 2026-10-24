@@ -17,7 +17,7 @@ import { registerWindowHandlers } from './handlers/window';
 import { registerCrashHandlers, setupCrashListeners, testCrashDialog } from './handlers/crash-monitor';
 import { registerKoringAuthHandlers } from './handlers/koring-auth';
 import { registerLauncherApiHandlers } from './handlers/launcher-api';
-import { startupCheck } from './core/launcher-api';
+import { startupCheck, startDeviceHeartbeat, stopDeviceHeartbeat } from './core/launcher-api';
 import { registerJavaHandlers } from './handlers/java';
 import { registerNewsHandlers } from './handlers/news';
 import { registerUpdateHandlers } from './handlers/update';
@@ -274,6 +274,10 @@ app.whenReady().then(() => {
     )
     .catch((e) => log.warn(`[launcher-api] 启动校验异常：${String(e)}`));
 
+  // 设备心跳：进程存活期间每 2 分钟 POST /device/report 上报一次本机信息
+  // （保持 last_seen_at/report_count 新鲜；结果会广播给渲染端同步设备状态）
+  startDeviceHeartbeat();
+
   // 1. Show splash immediately
   win.splashWindow = createSplashWindow();
   log.info('Splash 窗口已创建');
@@ -324,6 +328,10 @@ app.whenReady().then(() => {
       log.error('[updater] 启动静默检查失败:', e);
     });
   }, 12000);
+});
+
+app.on('before-quit', () => {
+  stopDeviceHeartbeat();
 });
 
 app.on('window-all-closed', () => {

@@ -1,4 +1,4 @@
-import { ipcInvoke } from './ipc';
+import { ipcInvoke, onIpcEvent } from './ipc';
 
 /**
  * Koring Account 启动器 API（渲染端封装）。
@@ -153,4 +153,34 @@ export function launcherDeviceReport(): Promise<DeviceStatusData> {
 /** 设备维度通知 */
 export function launcherDeviceNotifications(): Promise<LauncherNotification[]> {
   return ipcInvoke<LauncherNotification[]>('launcher-api:device-notifications');
+}
+
+// ==================== 设备心跳（每 2 分钟一次 POST /device/report） ====================
+
+/** 心跳事件载荷（主进程在每次成功上报后广播） */
+export interface DeviceHeartbeatEvent {
+  /** 本次上报完成的时间戳（ms） */
+  at: number;
+  /** 服务端返回的最新设备状态 */
+  status: DeviceStatusData;
+}
+
+/** 订阅设备心跳（每次心跳成功上报一次就回调一次；返回取消订阅函数） */
+export function onLauncherDeviceHeartbeat(
+  callback: (event: DeviceHeartbeatEvent) => void,
+): () => void {
+  return onIpcEvent<DeviceHeartbeatEvent>('launcher-api:device-updated', callback);
+}
+
+/** 设备心跳运行信息（调试页展示） */
+export interface LauncherHeartbeatInfo {
+  interval_ms: number;
+  count: number;
+  last: DeviceHeartbeatEvent | null;
+  running: boolean;
+}
+
+/** 读取设备心跳运行信息 */
+export function launcherHeartbeatInfo(): Promise<LauncherHeartbeatInfo> {
+  return ipcInvoke<LauncherHeartbeatInfo>('launcher-api:heartbeat-info');
 }
