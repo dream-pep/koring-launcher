@@ -141,6 +141,6 @@ console.log(
   `[switch-icon] Mode: ${mode} → build/icon.png` +
     (isWin
       ? ' + build/icon.ico + build/installer-header.bmp (sidebar 164x314) + build/installer-custom.nsh + build/license.txt'
-      : '（Linux：仅 icon.png）') +
+      : '（非 Windows：仅 icon.png）') +
     ' updated'
 );
