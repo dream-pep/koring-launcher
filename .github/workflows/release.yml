@@ -15,6 +15,7 @@
 #   - Release 正文为中文：版本信息（当前版本 / 编译状态 / 构建来源 commit）+ 提交记录（默认折叠）
 #   - 上传产物（Windows job）：koring-launcher-{full}-setup.exe + latest.yml
 #   - Linux（AppImage）由 build-linux job 追加：*.AppImage + latest-linux.yml（beta 另加 beta-linux.yml）
+#   - macOS（dmg / zip，arm64 + x64）由 build-mac job 追加：*.dmg + *.zip + latest-mac.yml
 #   - 构建元数据（commit / buildId）写入 src/lib/buildInfo.ts，打包进渲染层供 UI 显示
 #
 # Secrets：
@@ -307,3 +308,86 @@ jobs:
           }
           gh release upload $tag @assets --clobber
           Write-Host "已上传到 $tag : $($assets -join ', ')"
+
+  # ==================== macOS（dmg + zip）====================
+  # 未签名构建：产物可直接安装，但用户首次打开需右键 → 打开（或 xattr -cr）。
+  # ⚠️ 未签名包无法自动更新（Squirrel.Mac 要求 Developer ID 签名），Mac 端暂时只能手动下 dmg。
+  # 启用签名 / 公证：在 Environment "BUILDER" 配置 MAC_CSC_LINK（p12 的 base64）/
+  # MAC_CSC_KEY_PASSWORD / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID，
+  # 取消 electron-builder.yml 中 mac 段注释的 hardenedRuntime / entitlements / notarize，
+  # 并在下方 job 的 env 注入对应变量。
+  build-mac:
+    needs: build-sign-publish
+    runs-on: macos-latest
+    environment: BUILDER
+    env:
+      ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || '' }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 与 Windows / Linux job 用同一条 RUN_NUMBER，三平台产物版本一致
+      - name: Set version (same RUN_NUMBER)
+        id: macver
+        shell: bash
+        run: |
+          if [ "${{ inputs.mode }}" = "beta" ]; then
+            full=$(node scripts/version.js build ci "${{ github.run_number }}.beta")
+          else
+            full=$(node scripts/version.js build ci "${{ github.run_number }}")
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "macOS version: $full"
+
+      - name: Generate build info
+        shell: bash
+        run: node scripts/gen-build-info.js ${{ inputs.mode }}
+        env:
+          BUILD_ID: ${{ github.run_number }}
+
+      - name: Build renderer + main (${{ inputs.mode }})
+        shell: bash
+        run: |
+          if [ "${{ inputs.mode }}" = "beta" ]; then
+            pnpm build:beta && pnpm icon:beta && pnpm env:beta
+          else
+            pnpm build:run && pnpm icon:run && pnpm env:run
+          fi
+
+      # arm64 + x64 一次产出（无原生模块，交叉构建安全）；
+      # 两个架构的 dmg/zip 汇总进同一份 latest-mac.yml，MacUpdater 按本机架构挑 zip
+      - name: Package (arm64 + x64)
+        shell: bash
+        run: pnpm exec electron-builder --mac --arm64 --x64 --publish never
+
+      - name: Upload mac assets to Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ steps.macver.outputs.full }}"
+          shopt -s nullglob
+          assets=(dist-electron/*.dmg dist-electron/*.zip dist-electron/latest-mac.yml)
+          for a in "${assets[@]}"; do
+            if [ ! -f "$a" ]; then
+              echo "资产不存在: $a"
+              exit 1
+            fi
+          done
+          gh release upload "$tag" "${assets[@]}" --clobber
+          echo "已上传到 $tag : ${assets[*]}"
