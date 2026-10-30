@@ -37,7 +37,7 @@ export function OobeAboutInfo() {
   const items: InfoItem[] = systemInfo && localeInfo
     ? [
         { icon: Package, label: "App Version", value: `v${VERSION}`, color: "text-primary", bg: "bg-primary/10" },
-        { icon: Cpu, label: "BIOS ID", value: systemInfo.bios_id, color: "text-blue-500", bg: "bg-blue-500/10" },
+        { icon: Cpu, label: "Device ID", value: systemInfo.bios_id, color: "text-blue-500", bg: "bg-blue-500/10" },
         { icon: Monitor, label: "OS Name", value: `${systemInfo.os_name} (${systemInfo.os_version})`, color: "text-purple-500", bg: "bg-purple-500/10" },
         { icon: Globe, label: "Region", value: localeInfo.region, color: "text-green-500", bg: "bg-green-500/10" },
         { icon: Languages, label: "Language", value: localeInfo.language, color: "text-amber-500", bg: "bg-amber-500/10" },

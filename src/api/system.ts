@@ -18,10 +18,10 @@ export async function getSystemInfo(): Promise<SystemInfo> {
  */
 export interface DeviceIdentity {
   deviceId: string | null;
-  source: 'board' | 'disk' | 'bios' | 'machine' | 'none';
+  source: 'board' | 'disk' | 'bios' | 'machine' | 'openudid' | 'none';
   /** 原始 SMBIOS UUID；取不到时为 null */
   smbiosUuid: string | null;
-  smbiosSource: 'smbios' | 'fingerprint' | 'none';
+  smbiosSource: 'smbios' | 'fingerprint' | 'openudid' | 'none';
 }
 
 export async function getDeviceId(): Promise<DeviceIdentity> {
