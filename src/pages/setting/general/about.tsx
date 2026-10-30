@@ -75,11 +75,13 @@ export function AboutSetting({ sharedTransition = true }: AboutSettingProps) {
 
   const deviceIdValue = device?.smbiosUuid || device?.deviceId || "—";
   const deviceIdDesc =
-    device?.smbiosUuid
-      ? "设备追踪ID · SMBIOS UUID"
-      : device?.deviceId
-        ? "设备追踪ID · 设备指纹（未取到 SMBIOS UUID）"
-        : "设备追踪ID · SMBIOS UUID";
+    device?.smbiosSource === 'openudid'
+      ? "设备追踪ID · OpenUDID（macOS 隐私限制下由应用生成并持久化）"
+      : device?.smbiosUuid
+        ? "设备追踪ID · SMBIOS UUID"
+        : device?.deviceId
+          ? "设备追踪ID · 设备指纹（未取到 SMBIOS UUID）"
+          : "设备追踪ID · SMBIOS UUID";
 
   // 更新通道（下拉框，选项来自主进程通道注册表）
   const [channels, setChannels] = useState<UpdateChannelDef[]>([]);

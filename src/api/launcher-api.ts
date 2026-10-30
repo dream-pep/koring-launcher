@@ -57,7 +57,7 @@ export interface DeviceStatusData {
 /** 设备校验结果（未登记时主进程会自动上报一次） */
 export interface DeviceCheckResult {
   uuid: string;
-  uuid_source: 'smbios' | 'fingerprint' | 'none';
+  uuid_source: 'smbios' | 'fingerprint' | 'openudid' | 'none';
   reported: boolean;
   recorded: boolean;
   blacklisted: boolean;
@@ -104,7 +104,7 @@ export interface StartupCheckResult {
 
 export interface SmbiosUuidResult {
   uuid: string;
-  source: 'smbios' | 'fingerprint' | 'none';
+  source: 'smbios' | 'fingerprint' | 'openudid' | 'none';
 }
 
 /** 主进程环境信息（不发起网络请求） */

@@ -1,7 +1,7 @@
 import electron from 'electron';
 import { execSync } from 'child_process';
 import * as os from 'os';
-import { getDeviceId, getSmbiosUuid } from '../core/device-id';
+import { getDeviceId, getOsInfo, getSmbiosUuid } from '../core/device-id';
 
 const { ipcMain, app, shell } = electron;
 
@@ -12,7 +12,15 @@ interface ProcessMemorySample {
   peakWorkingSetSize: number; // KB
 }
 
+/**
+ * 设备序列号（system:info 的 bios_id 字段，用于「关于」页展示）。
+ * - Windows：BIOS 序列号（Win32_BIOS.SerialNumber）
+ * - macOS：因隐私限制禁止读取硬件标识，返回 OpenUDID（应用自生成并持久化的 UUID）
+ */
 function getBiosId(): string {
+  if (process.platform === 'darwin') {
+    return getSmbiosUuid().uuid || 'Unknown';
+  }
   if (process.platform !== 'win32') return 'N/A (non-Windows)';
   try {
     const output = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_BIOS).SerialNumber"', {
@@ -25,8 +33,16 @@ function getBiosId(): string {
   }
 }
 
+/**
+ * 操作系统版本。
+ * - Windows：PowerShell 读取
+ * - macOS：sw_vers（复用 device-id 的探测缓存）
+ */
 function getOsVersion(): string {
-  if (process.platform !== 'win32') return 'N/A (non-Windows)';
+  if (process.platform === 'darwin') {
+    return getOsInfo().version || os.release();
+  }
+  if (process.platform !== 'win32') return os.release();
   try {
     const output = execSync('powershell -NoProfile -Command "[System.Environment]::OSVersion.VersionString"', {
       encoding: 'utf-8',
@@ -38,8 +54,16 @@ function getOsVersion(): string {
   }
 }
 
+/**
+ * 操作系统名称。
+ * - Windows：PowerShell 读取
+ * - macOS：macOS（复用 device-id 的探测缓存，返回 sw_vers 的 productName）
+ */
 function getOsName(): string {
-  if (process.platform !== 'win32') return 'N/A (non-Windows)';
+  if (process.platform === 'darwin') {
+    return getOsInfo().name || 'macOS';
+  }
+  if (process.platform !== 'win32') return os.type();
   try {
     const output = execSync('powershell -NoProfile -Command "(Get-CimInstance Win32_OperatingSystem).Caption"', {
       encoding: 'utf-8',
