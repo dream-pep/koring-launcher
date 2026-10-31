@@ -32,8 +32,23 @@ win:
       - sha256
     sign: scripts/signpath-sign.js
 mac:
-  target: dmg
+  # dmg 供手动安装；zip 供 electron-updater（Squirrel.Mac 只接受 zip，清单为 latest-mac.yml）
+  target:
+    - dmg
+    - zip
   icon: build/icon.png
+  category: public.app-category.games
+  # 显式带 arch：latest-mac.yml 中 arm64 / x64 两个 zip 靠文件名区分，MacUpdater 按本机架构挑包
+  artifactName: "koring-launcher-${version}-mac-${arch}.${ext}"
+  # ⚠️ 当前未签名：用户首次打开需右键 → 打开（或 xattr -cr）。
+  # 启用签名 / 公证时取消下面注释，并配置 MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD /
+  # APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID（Secrets），
+  # 同时新增 mac/entitlements.mac.plist（allow-jit / allow-unsigned-executable-memory）。
+  # hardenedRuntime: true
+  # gatekeeperAssess: false
+  # entitlements: mac/entitlements.mac.plist
+  # entitlementsInherit: mac/entitlements.mac.plist
+  # notarize: true
 linux:
   target: AppImage
   icon: build/icon.png

@@ -8,13 +8,15 @@ const { app } = electron;
  * 数据基准目录（游戏数据 `.minecraft` 等相对路径的解析根）：
  * - 开发模式 → 项目根
  * - Linux / AppImage → userData：exe 目录是只读挂载（/tmp/.mount_*），无法写入
+ * - macOS → userData：exe 位于 .app/Contents/MacOS，写入会破坏代码签名，
+ *   且更新时 .app 被整体替换 → 数据丢失
  * - Windows 打包 → exe 目录（沿用历史行为）
  */
 export function dataBasePath(): string {
   if (!app.isPackaged) {
     return path.join(__dirname, '..', '..');
   }
-  if (process.platform === 'linux') {
+  if (process.platform === 'linux' || process.platform === 'darwin') {
     return app.getPath('userData');
   }
   return path.dirname(app.getPath('exe'));
