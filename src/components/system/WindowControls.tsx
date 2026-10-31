@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { BUILD_MODE } from "@/lib/mode";
 import { TaskButton } from "@/components/task/TaskButton";
+import { Badge } from "@/components/ui/badge";
 import { useRouteStore } from "@/stores/routeStore";
 import { useConfigStore } from "@/stores/configStore";
 import { Info } from "lucide-react";
@@ -53,16 +54,17 @@ export function WindowControls({
   return (
     <div className="flex items-center gap-0.5 pr-2" style={noDrag}>
       {showBadge && (
-        <span
+        <Badge
+          variant="outline"
           className={clsx(
-            "inline-flex items-center justify-center h-[18px] rounded text-[10px] font-bold tracking-wider mr-1",
+            "mr-1 font-semibold tracking-wider",
             BUILD_MODE === "dev"
-              ? "w-[30px] bg-amber-500/65 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-              : "w-[38px] bg-emerald-500/65 text-emerald-800 dark:text-emerald-400 border border-emerald-500/20",
+              ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/25"
+              : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/25",
           )}
         >
           {badgeLabel}
-        </span>
+        </Badge>
       )}
 
       <div

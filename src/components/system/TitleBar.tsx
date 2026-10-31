@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GlassContent, GlassScene, GlassSurface } from "@glass-sdk/liquid-glass";
 import { useRouteStore, routes, allRoutes } from "@/stores/routeStore";
 import { useIsDark } from "@/hooks/useIsDark";
+import { Badge } from "@/components/ui/badge";
 import { WindowControls } from "./WindowControls";
 
 interface TitleBarProps {
@@ -58,6 +59,19 @@ export function TitleBar({
 
   // 跟随应用主题，让顶部选择器的玻璃 appearance 与背景一致
   const isDark = useIsDark();
+
+  // 网络在线状态：监听浏览器 online / offline 事件
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
   // 按压/拖拽时的液态形变（按钮盖在玻璃上，SDK 的 interactive 收不到指针，这里自己驱动）
   const [dragging, setDragging] = useState(false);
 
@@ -238,6 +252,13 @@ export function TitleBar({
         >
           Koring Launcher
         </span>
+
+        {/* 网络状态徽章：仅断网时显示红色 Offline，在线时不显示 */}
+        {!online && (
+          <Badge variant="destructive" className="ml-2 font-semibold">
+            Offline
+          </Badge>
+        )}
       </div>
 
       {/* 中间区域：胶囊菜单 */}

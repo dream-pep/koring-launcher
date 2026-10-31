@@ -43,3 +43,4 @@ dsh-usage/usage-records.json
 
 # 账号令牌（dev 下写在项目根，含 accessToken / refreshToken，禁止入库）
 koring-auth.json
+Koring.yml
