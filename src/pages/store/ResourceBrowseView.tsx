@@ -175,7 +175,6 @@ export function ResourceBrowseView({ projectType, canInstall, scrollRef }: Resou
         <Select.Root
           selectedKey={gameVersion ?? "all"}
           onSelectionChange={handleSelectChange(setGameVersion)}
-          size="sm"
           className="w-40"
         >
           <Select.Trigger className="h-8 rounded-lg border border-border/40 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 hover:border-primary/30 transition-colors">
@@ -203,7 +202,6 @@ export function ResourceBrowseView({ projectType, canInstall, scrollRef }: Resou
         <Select.Root
           selectedKey={loader ?? "all"}
           onSelectionChange={handleSelectChange(setLoader)}
-          size="sm"
           className="w-36"
         >
           <Select.Trigger className="h-8 rounded-lg border border-border/40 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 hover:border-primary/30 transition-colors">
@@ -231,7 +229,6 @@ export function ResourceBrowseView({ projectType, canInstall, scrollRef }: Resou
         <Select.Root
           selectedKey={category ?? "all"}
           onSelectionChange={handleSelectChange(setCategory)}
-          size="sm"
           className="w-40"
         >
           <Select.Trigger className="h-8 rounded-lg border border-border/40 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 hover:border-primary/30 transition-colors">

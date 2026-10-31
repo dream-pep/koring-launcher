@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { VERSION } from "@/lib/version";
 
 type CrashInfo = {
   type: string;
@@ -8,7 +7,7 @@ type CrashInfo = {
 };
 
 export function CrashPage() {
-  const [crashInfo, setCrashInfo] = useState<CrashInfo | null>(null);
+  const [, setCrashInfo] = useState<CrashInfo | null>(null);
   const [copying, setCopying] = useState(false);
   const [copyDone, setCopyDone] = useState(false);
 

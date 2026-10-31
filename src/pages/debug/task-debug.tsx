@@ -56,8 +56,8 @@ function simulateSidecarTask(
   title: string,
   executorName: string,
   params: Record<string, unknown>,
-) {
-  useTaskStore.getState().addSidecarTask({
+): string {
+  return useTaskStore.getState().addSidecarTask({
     type,
     title,
     description: `IPC @xmcl/task: ${executorName}`,

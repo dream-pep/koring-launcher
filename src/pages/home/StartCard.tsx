@@ -1,4 +1,4 @@
-import { Play, Settings, Package, Loader2 } from "lucide-react";
+import { Play, Loader2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { useRouteStore } from "@/stores/routeStore";
 import { useInstanceStore } from "@/stores/instanceStore";
@@ -30,48 +30,30 @@ export function StartCard() {
     }
   };
 
+  // 单按钮胶囊：保留原玻璃拟态外观
   return (
-    <div
+    <button
+      onClick={handleLaunch}
+      disabled={launching}
       className={clsx(
-        "inline-flex items-center gap-1",
-        "rounded-full",
-        "bg-background/60 backdrop-blur-xl border border-border/40",
+        "inline-flex items-center gap-1.5 px-4 h-9 rounded-full",
+        // 与顶部标题栏一致的模糊磨砂背景（--titlebar-bg + blur(3px) + --titlebar-border）
+        "bg-background/60 backdrop-blur-[5px]",
+        "border border-[color:var(--titlebar-border)]",
         "shadow-lg shadow-black/5 dark:shadow-black/20",
+        "font-medium text-sm text-primary",
+        "cursor-pointer shrink-0 hover:bg-background/40",
+        "active:scale-[0.97] hover:scale-[1.02]",
+        "transition-[transform,background-color] duration-150 ease-spring",
+        "disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100",
       )}
     >
-      {/* Settings button */}
-      <button
-        onClick={() => navigate("setting")}
-        className="flex items-center justify-center w-9 h-9 ml-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 active:scale-95 transition-[transform,background-color,color] duration-150 ease-spring-soft cursor-pointer shrink-0 rounded-full"
-        aria-label="设置"
-      >
-        <Settings className="w-4 h-4" />
-      </button>
-
-      {/* Launch button */}
-      <button
-        onClick={handleLaunch}
-        disabled={launching}
-        className="flex items-center justify-center h-9 rounded-full cursor-pointer shrink-0 hover:scale-[1.02] active:scale-[0.97] transition-[transform,background-color,color] duration-150 ease-spring disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
-      >
-        <span className="flex items-center gap-1.5 px-4 h-7 rounded-full font-medium text-sm text-primary bg-primary/10 hover:bg-primary/20 transition-colors">
-          {launching ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Play className="w-3.5 h-3.5 fill-current" />
-          )}
-          {launching ? "正在启动..." : running ? "游戏中" : "启动游戏"}
-        </span>
-      </button>
-
-      {/* Instance button */}
-      <button
-        onClick={() => navigate("gallery")}
-        className="flex items-center justify-center w-9 h-9 mr-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 active:scale-95 transition-[transform,background-color,color] duration-150 ease-spring-soft cursor-pointer shrink-0 rounded-full"
-        aria-label="选择实例"
-      >
-        <Package className="w-4 h-4" />
-      </button>
-    </div>
+      {launching ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      ) : (
+        <Play className="w-3.5 h-3.5 fill-current" />
+      )}
+      {launching ? "正在启动..." : running ? "游戏中" : "启动游戏"}
+    </button>
   );
 }

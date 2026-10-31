@@ -139,8 +139,8 @@ export function AboutSetting({ sharedTransition = true }: AboutSettingProps) {
 
       <div className="space-y-6">
         {/* 设置页：整卡可点击跳转更新页，显示「查看更新」。
-            keep-alive 下只有活动子页的卡带 view-transition-name（见 home.tsx 同款处理）。 */}
-        <VersionCard isSettingPage noViewTransition={!sharedTransition} />
+            keep-alive 下只有活动子页的卡带 view-transition-name（见 home.tsx 同款处理）。
+        <VersionCard isSettingPage noViewTransition={!sharedTransition} /> */}
 
         <div>
           <SectionTitle>项目信息</SectionTitle>

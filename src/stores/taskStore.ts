@@ -9,7 +9,6 @@ import type {
   TaskContext,
   TaskExecutor,
   XmclTaskDef,
-  XmclTaskEvent,
 } from "@/types/task";
 
 const STORAGE_KEY = "koring-task-history";

@@ -34,9 +34,21 @@ export function Home() {
   }, [gamePath, setCurrent]);
 
   return (
-    <div className="relative h-full flex flex-col justify-end items-start p-6 gap-3">
-      <InstanceTitle />
-      <StartCard />
+    <div className="relative h-full overflow-hidden">
+      {/*
+        底部感应区：
+        - 默认：文字下移 gap+按钮占位高度（48px），底边恰好贴住底部内边距（自适应文字行数，单行/多行都贴底不裁切）
+        - 按钮下移 64px 完全移出视口隐藏
+        - 鼠标靠近：两者滑回原位，露出按钮
+      */}
+      <div className="group absolute inset-x-0 bottom-0 h-40 flex flex-col items-start justify-end gap-3 px-6 pb-6">
+        <div className="translate-y-12 transition-transform duration-300 ease-spring-soft group-hover:translate-y-0">
+          <InstanceTitle />
+        </div>
+        <div className="translate-y-16 transition-transform duration-300 ease-spring-soft group-hover:translate-y-0">
+          <StartCard />
+        </div>
+      </div>
     </div>
   );
 }

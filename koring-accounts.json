@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "activeAccountId": "3e22cc12-5260-476c-8f50-5c459480bfc2",
+  "accounts": [
+    {
+      "id": "3e22cc12-5260-476c-8f50-5c459480bfc2",
+      "type": "offline",
+      "username": "dream_pep",
+      "uuid": "cb8357c5-2e4a-246c-306b-bbdda63ad46f",
+      "addedAt": 1793441863184,
+      "lastLoginAt": 1793441863184
+    }
+  ]
+}

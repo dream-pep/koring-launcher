@@ -173,3 +173,70 @@ export async function validateMinecraftToken(accessToken: string): Promise<boole
     return false;
   }
 }
+
+// ==================== LittleSkin（Yggdrasil 协议）====================
+
+// LittleSkin Yggdrasil 认证端点
+const LITTLESKIN_AUTH_URL = 'https://littleskin.cn/api/yggdrasil/authserver/authenticate';
+
+// 将 32 位无横线 UUID 格式化为 36 位带横线形式（已是带横线则原样返回）
+function formatUuid(id: string): string {
+  const hex = id.replace(/-/g, '');
+  if (hex.length !== 32) return id;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export interface LittleskinProfile {
+  username: string;
+  uuid: string;
+  accessToken: string;
+  clientToken: string;
+}
+
+/**
+ * LittleSkin 登录（Yggdrasil authenticate）。
+ * 多个角色时优先 selectedProfile，否则取第一个可用角色。
+ */
+export async function littleskinLogin(username: string, password: string): Promise<LittleskinProfile> {
+  const clientToken = crypto.randomUUID();
+
+  const response = await net.fetch(LITTLESKIN_AUTH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username,
+      password,
+      clientToken,
+      agent: { name: 'Minecraft', version: 1 },
+      requestUser: false,
+    }),
+  });
+
+  // 403/401 通常为账号或密码错误
+  if (response.status === 403 || response.status === 401) {
+    throw new Error('用户名或密码错误');
+  }
+  if (!response.ok) {
+    throw new Error(`LittleSkin 登录失败: ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    accessToken: string;
+    clientToken: string;
+    availableProfiles?: { id: string; name: string }[];
+    selectedProfile?: { id: string; name: string };
+  };
+
+  const profiles = data.availableProfiles ?? [];
+  const profile = data.selectedProfile ?? profiles[0];
+  if (!profile) {
+    throw new Error('该账号没有可用的 Minecraft 角色');
+  }
+
+  return {
+    username: profile.name,
+    uuid: formatUuid(profile.id),
+    accessToken: data.accessToken,
+    clientToken: data.clientToken ?? clientToken,
+  };
+}
