@@ -8,6 +8,7 @@ import {
   installInstanceGame,
   repairInstance,
   diagnoseInstance,
+  verifyInstance,
   getMinecraftVersionList,
   getForgeVersionList,
   getFabricVersionList,
@@ -208,9 +209,61 @@ export function registerInstanceHandlers(win: WinRef) {
     }
   });
 
+  /**
+   * 修复（同步等待版）：进度事件与 instance:repair 完全一致，但 IPC 会等到修复结束，
+   * 直接把实例信息返回给调用方。供启动流水线「核验 → 补全 → 启动」串行执行。
+   */
+  ipcMain.handle('instance:repair-wait', async (_event, payload: {
+    name: string;
+    gamePath: string;
+    download?: DownloadSettings;
+  }) => {
+    const requestId = `repair-${Date.now()}`;
+    try {
+      const gamePath = resolveGamePath(payload.gamePath);
+      win.mainWindow?.webContents.send('instance:repair-start', { requestId, channel: 'repair' });
+      const data = await repairInstance(
+        payload.name,
+        gamePath,
+        {
+          onProgress: (progress) => {
+            win.mainWindow?.webContents.send('instance:progress', {
+              requestId,
+              channel: 'repair',
+              ...(progress as object),
+            });
+          },
+        },
+        payload.download
+      );
+      win.mainWindow?.webContents.send('instance:install-complete', { requestId, channel: 'repair', data });
+      return ok(data);
+    } catch (e: unknown) {
+      win.mainWindow?.webContents.send('instance:install-error', {
+        requestId,
+        channel: 'repair',
+        error: e instanceof Error ? e.message : String(e),
+      });
+      return fail(e);
+    }
+  });
+
   ipcMain.handle('instance:diagnose', async (_event, payload: { name: string; gamePath: string }) => {
     try {
       return ok(await diagnoseInstance(payload.name, resolveGamePath(payload.gamePath)));
+    } catch (e: unknown) {
+      return fail(e);
+    }
+  });
+
+  /**
+   * 深度校验实例文件（大小 / SHA1，只读）。
+   * 启动流水线的「核验」阶段用它发现「文件存在但已损坏」的情况，
+   * 再交给 repairInstance 重新下载。
+   */
+  ipcMain.handle('instance:verify', async (_event, payload: { name: string; gamePath: string }) => {
+    try {
+      return ok(verifyInstance(payload.name, resolveGamePath(payload.gamePath)));
     } catch (e: unknown) {
       return fail(e);
     }

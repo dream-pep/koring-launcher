@@ -14,7 +14,7 @@ import {
 
 /** 高级设置的默认值（「重置本页」用） */
 const ADVANCED_DEFAULTS = {
-  afterLaunch: "close",
+  afterLaunch: "minimize",
   winMode: "default",
   customWidth: 854,
   customHeight: 480,

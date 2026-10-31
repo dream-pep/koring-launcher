@@ -176,6 +176,26 @@ export async function repairInstance(
   return ipcInvoke<{ requestId: string }>('instance:repair', { name, gamePath });
 }
 
+/**
+ * 修复（同步等待版）：进度事件与 repairInstance 相同，但会等到修复结束并返回实例信息。
+ * 供启动流水线「核验 → 补全 → 启动」串行使用（同一时刻只允许一个修复任务）。
+ */
+export async function repairInstanceAndWait(
+  name: string,
+  gamePath: string,
+  onProgress?: (progress: InstallProgress) => void
+): Promise<InstanceInfo> {
+  const unlisten = onInstallProgress((data) => {
+    if (data.channel !== 'repair') return;
+    onProgress?.(data);
+  });
+  try {
+    return await ipcInvoke<InstanceInfo>('instance:repair-wait', { name, gamePath });
+  } finally {
+    unlisten();
+  }
+}
+
 export async function diagnoseInstance(
   name: string,
   gamePath: string
@@ -186,6 +206,28 @@ export async function diagnoseInstance(
   dependency: InstanceDependencyInfo;
 }> {
   return ipcInvoke('instance:diagnose', { name, gamePath });
+}
+
+/** 实例文件深度校验结果（大小 / SHA1） */
+export interface InstanceIntegrityInfo {
+  versionId: string;
+  /** 所有已存在的文件都与版本清单一致 */
+  ready: boolean;
+  /** 可读问题清单，空数组 = 完好 */
+  problems: string[];
+  /** 客户端 JAR 校验失败时的绝对路径 */
+  corruptedJar?: string;
+  /** 校验失败的依赖库（相对 libraries 的路径） */
+  corruptedLibraries: string[];
+  checkedLibraries: number;
+}
+
+/**
+ * 深度校验实例文件（只读）：发现「文件存在但已损坏」的客户端 JAR / 依赖库。
+ * 供启动流水线在「补全」前判断是否真的需要重新下载。
+ */
+export async function verifyInstance(name: string, gamePath: string): Promise<InstanceIntegrityInfo> {
+  return ipcInvoke<InstanceIntegrityInfo>('instance:verify', { name, gamePath });
 }
 
 /** 启动环境体检：不抛错，缺版本时返回 problem 供 UI 展示并引导修复 */

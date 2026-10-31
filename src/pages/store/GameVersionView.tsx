@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Accordion, Button, Card, Input, Skeleton } from "@heroui/react";
 import { Box, Search, ChevronDown, Plus, Sparkles, Beaker, RotateCcw } from "lucide-react";
 import { getMinecraftVersionList, type VersionEntry, type VersionListResult } from "@/api/instance";
+import { isAprilFoolId } from "@/lib/version-type";
 import { InstallDialog } from "./InstallDialog";
 import clsx from "clsx";
 
@@ -31,13 +32,9 @@ function compareVersions(a: string, b: string): number {
 }
 
 // 判断是否为愚人节版（如 3D Shareware v1.34、Love and Hugs、One Block、20w14∞ 等）
+// 判定规则统一在 @/lib/version-type，实例页的版本类型标签复用同一套逻辑
 function isAprilFool(v: VersionEntry): boolean {
-  const known = ["3D Shareware v1.34", "Love and Hugs Update", "One Block at a Time Update",
-    "1.RV-Pre1", "15w14a", "2.0", "Java Edition 2.0", "20w14∞", "20w14infinite", "23w13a_or_b"];
-  if (known.some((k) => v.id === k || v.id.toLowerCase().includes(k.toLowerCase()))) return true;
-  // 负更新三叉戟版
-  if (v.id.match(/^(?:1\.RV|2\.0|20w14|23w13a)/)) return true;
-  return false;
+  return isAprilFoolId(v.id);
 }
 
 // 格式化发布时间

@@ -8,8 +8,10 @@
 // 未经允许的情况下删除此版权头可能会受到民事指控
 // 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
 
+import * as fs from 'fs';
 import * as path from 'path';
 import { Version, launch, createMinecraftProcessWatcher } from '@xmcl/core';
+import type { ResolvedVersion } from '@xmcl/core';
 import type { AppConfig } from '../config';
 import { getInstanceInfo, planInstanceLaunch, updateInstance } from './instance';
 import { checkDependencies, describeDependencyReport } from './launch-target';
@@ -47,6 +49,40 @@ export interface LaunchGameOptions {
 }
 
 /**
+ * 「独立整合包版本」兼容（PCL / HMCL 的 clientVersion 写法）。
+ *
+ * 这类版本 JSON 用 `clientVersion` 声明原版版本号，但 jar 以自身 id 命名、且没有 inheritsFrom：
+ * 例如 `versions/Create-Delight-Remake/{Create-Delight-Remake.json,Create-Delight-Remake.jar}`，
+ * json 里 `clientVersion: "1.20.1"`，而 `versions/1.20.1/` 根本不存在。
+ *
+ * @xmcl/core 会把 `minecraftVersion` 解析成 clientVersion，并用它做三件事：
+ *   1. 找客户端 jar（`versions/1.20.1/1.20.1.jar`）→ 报 `Corrupted Version jar`
+ *   2. 拼 classpath → 真正的 jar 不在里面
+ *   3. 填充 `${version_name}`（Forge 的 `-DignoreList=...,${version_name}.jar` 靠它忽略自身 jar）
+ *
+ * 处理：把 `minecraftVersion` 归一为版本自身 id（等价于 PCL 的 version_name=版本 id），
+ * 上述三处就都指向真实 jar，且不产生重复模块。
+ */
+function normalizeStandaloneVersion(
+  resourceRoot: string,
+  resolved: ResolvedVersion
+): { originalMinecraftVersion: string } | null {
+  const minecraftVersion = resolved.minecraftVersion;
+  if (!minecraftVersion || minecraftVersion === resolved.id) return null;
+  // 只有「没有继承链」的独立版本才需要兼容（正常加载器版本走父版本的 jar）
+  if (resolved.inheritances.length !== 1) return null;
+
+  const ownJar = path.join(resourceRoot, 'versions', resolved.id, `${resolved.id}.jar`);
+  const expectedJar = path.join(resourceRoot, 'versions', minecraftVersion, `${minecraftVersion}.jar`);
+  if (!fs.existsSync(ownJar)) return null;
+  // 真正的原版版本目录里已有 jar 时，说明这是正常的继承版本，无需兼容
+  if (fs.existsSync(expectedJar)) return null;
+
+  resolved.minecraftVersion = resolved.id;
+  return { originalMinecraftVersion: minecraftVersion };
+}
+
+/**
  * 统一游戏启动入口：
  * 实例信息 → 版本解析 → Java 解析 → 配置映射（buildLaunchOptions）→ @xmcl/core launch
  * 启动后监听 window-ready / exit，并在退出时累计实例 playtime。
@@ -73,6 +109,16 @@ export async function launchGame(options: LaunchGameOptions): Promise<GameLaunch
   // 4. 配置 → LaunchOption（version 覆盖为已解析版本）
   const launchOption = buildLaunchOptions(config, instance, profile, javaPath, server, plan);
   launchOption.version = resolved;
+
+  // 4.1 独立整合包版本兼容：把 minecraftVersion 归一为版本自身 id，
+  //     否则 classpath / jar 校验 / ${version_name} 都会指向不存在的原版目录
+  const standalone = normalizeStandaloneVersion(plan.roots.resourceRoot, resolved);
+  if (standalone) {
+    onEvent?.({
+      event: 'warning',
+      message: `检测到整合包独立版本（clientVersion=${standalone.originalMinecraftVersion}），已按版本自身的 jar 启动。`,
+    });
+  }
 
   onEvent?.({
     event: 'plan',

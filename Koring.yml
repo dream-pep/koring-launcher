@@ -4,16 +4,17 @@ theme:
   darkMode: auto
 a11y:
   contentBlurOpacity: 44
+background:
+  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-mvwqj7612tcxl1.png
 game:
-  gameDirs:
+  gameDir: C:\Users\ab090\AppData\Roaming\.minecraft
+  gameDirOrder:
     - C:\Users\ab090\AppData\Roaming\.minecraft
-    - C:\Users\ab090\Desktop\VRCub1.1.1\.minecraft
-  selectedInstance: 1.21.9
+  selectedInstance: VRCub Fabric
 java:
   javaPath: C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot\bin\java.exe
-  autoJavaPath: false
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1793446550077
+  checkedAt: 1793473557991
   version: 1.2.7

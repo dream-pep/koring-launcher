@@ -22,7 +22,7 @@ export function InstanceTitle() {
       )}
     >
       {currentInstance
-        ? currentInstance.config.description || currentInstance.name
+        ? currentInstance.config.name || currentInstance.config.description || currentInstance.name
         : "选择实例"}
     </div>
   );

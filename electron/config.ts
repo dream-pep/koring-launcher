@@ -53,6 +53,8 @@ export interface GameConfig {
   resourceDir: string;
   /** 已添加的游戏目录列表 */
   gameDirs: string[];
+  /** 目录显示顺序：切换当前目录时不重排，列表选项保持原位 */
+  gameDirOrder: string[];
   /**
    * 当前选中的实例（实例 ID，非显示名）。空字符串 = 未选择。
    * 首页启动 / 实例页「选择该版本」都以它为唯一依据，全局同一时刻只有一个。
@@ -221,7 +223,7 @@ const DEFAULTS: AppConfig = {
   theme: { darkMode: 'dark', parallax: true },/** 这里默认是auto,现在为了显示效果则选择dark */
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 },
-  game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [], selectedInstance: '', dirAliases: {} },
+  game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [], gameDirOrder: [], selectedInstance: '', dirAliases: {} },
   java: {
     javaPath: '',
     autoJavaPath: true,
@@ -234,7 +236,7 @@ const DEFAULTS: AppConfig = {
     gc: 'auto',
     jvmArgs: '',
   },
-  advanced: { afterLaunch: 'close', winMode: 'default', customWidth: 854, customHeight: 480, gameArgs: '', preLaunchCmd: '', debugMode: false, server: { ip: '', port: 25565 } },
+  advanced: { afterLaunch: 'minimize', winMode: 'default', customWidth: 854, customHeight: 480, gameArgs: '', preLaunchCmd: '', debugMode: false, server: { ip: '', port: 25565 } },
   download: { source: 'bmclapi', threads: 16, customVersionManifest: '', customMavenHost: '', customAssetsHost: '' },
   network: { securityId: { enabled: false, authUrl: '' } },
   ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: 'version', showQuickActions: true },

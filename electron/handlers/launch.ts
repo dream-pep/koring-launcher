@@ -19,7 +19,7 @@ interface WinRef {
  * - hide-reopen 隐藏，游戏退出后重新显示启动器
  */
 function applyAfterLaunch(config: AppConfig, win: WinRef): void {
-  const mode = config.advanced?.afterLaunch ?? 'close';
+  const mode = config.advanced?.afterLaunch ?? 'minimize';
   const main = win.mainWindow;
   if (!main) return;
   if (mode === 'close') {
@@ -34,7 +34,7 @@ function applyAfterLaunch(config: AppConfig, win: WinRef): void {
 
 /** 游戏进程退出后的启动器处理（仅 hide-exit / hide-reopen 有额外行为） */
 function applyGameExit(config: AppConfig, win: WinRef): void {
-  const mode = config.advanced?.afterLaunch ?? 'close';
+  const mode = config.advanced?.afterLaunch ?? 'minimize';
   if (mode === 'hide-exit') {
     app.quit();
   } else if (mode === 'hide-reopen') {

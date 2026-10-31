@@ -362,6 +362,16 @@
   from { opacity: 0; transform: translateY(8px) scale(0.995); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
+/* 顶栏任务按钮：新通知到达时的提示性弹跳 */
+@keyframes task-button-pop {
+  0%   { transform: scale(1) rotate(0deg); }
+  30%  { transform: scale(1.28) rotate(-8deg); }
+  60%  { transform: scale(0.94) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.animate-task-button-pop {
+  animation: task-button-pop 520ms var(--ease-spring) both;
+}
 @keyframes sheet-in {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -371,10 +381,7 @@
   to   { opacity: 0; }
 }
 
-/* ============================================
-   设置子页面切换 — 方向由侧边栏条目顺序决定
-   选择更靠下的条目：新页从下方进入、旧页向上退出；更靠上则镜像。
-   ============================================ */
+/* 通用子页淡入（下载页/版本列表等单页内容使用） */
 .setting-page-enter {
   animation: setting-page-in 280ms var(--ease-spring-soft) both;
 }
@@ -383,35 +390,39 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* ============================================
+   PageShell 子页切换 — 方向由侧边栏条目顺序决定
+   选择更靠下的条目：新页从下方进入、旧页向上退出；更靠上则镜像。
+   ============================================ */
 /* 进入：延迟 60ms，让旧页先渐出；退出：220ms 先走；两边都带缩放 */
-.setting-page-enter-down {
-  animation: setting-page-in-down 360ms var(--ease-spring-soft) 60ms both;
+.page-shell-enter-down {
+  animation: page-shell-in-down 360ms var(--ease-spring-soft) 60ms both;
 }
-.setting-page-exit-down {
-  animation: setting-page-out-down 220ms ease-in both;
+.page-shell-exit-down {
+  animation: page-shell-out-down 220ms ease-in both;
   pointer-events: none;
 }
-.setting-page-enter-up {
-  animation: setting-page-in-up 360ms var(--ease-spring-soft) 60ms both;
+.page-shell-enter-up {
+  animation: page-shell-in-up 360ms var(--ease-spring-soft) 60ms both;
 }
-.setting-page-exit-up {
-  animation: setting-page-out-up 220ms ease-in both;
+.page-shell-exit-up {
+  animation: page-shell-out-up 220ms ease-in both;
   pointer-events: none;
 }
 
-@keyframes setting-page-in-down {
+@keyframes page-shell-in-down {
   from { opacity: 0; transform: translateY(18px) scale(0.965); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes setting-page-out-down {
+@keyframes page-shell-out-down {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to   { opacity: 0; transform: translateY(-12px) scale(0.965); }
 }
-@keyframes setting-page-in-up {
+@keyframes page-shell-in-up {
   from { opacity: 0; transform: translateY(-18px) scale(0.965); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes setting-page-out-up {
+@keyframes page-shell-out-up {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to   { opacity: 0; transform: translateY(12px) scale(0.965); }
 }

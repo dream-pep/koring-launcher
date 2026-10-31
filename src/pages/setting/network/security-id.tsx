@@ -20,7 +20,7 @@ export function SecurityIdSetting() {
 
   return (
     <div>
-      <PageHeader title="安全识别服务" desc="管理账户安全验证、设备识别与登录保护" />
+      <PageHeader title="KoringDevice 服务" desc="基于 KoringDevice 服务的认证与设备识别" />
 
       <div className="space-y-6">
         <div>

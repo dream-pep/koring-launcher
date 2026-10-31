@@ -12,10 +12,10 @@ export function StartCard() {
   const gameDir = useConfigStore((s) => s.config.game.gameDir);
   const launching = useLaunchStore((s) => s.launching);
   const running = useLaunchStore((s) => s.running);
-  const launch = useLaunchStore((s) => s.launch);
+  const launchPrepared = useLaunchStore((s) => s.launchPrepared);
   const clearError = useLaunchStore((s) => s.clearError);
 
-  // 启动游戏：自动携带实例 + 主进程权威配置（Java/内存/GC/窗口等）
+  // 启动游戏：核验 → 补全 → 启动（任务列表可见），窗口就绪后最小化启动器
   const handleLaunch = async () => {
     clearError();
     if (!currentInstance) {
@@ -23,7 +23,10 @@ export function StartCard() {
       navigate("gallery");
       return;
     }
-    await launch(currentInstance.name, gameDir);
+    await launchPrepared(currentInstance.name, gameDir, {
+      displayName: currentInstance.config.name || currentInstance.name,
+      minecraftVersion: currentInstance.config.runtime.minecraft,
+    });
     const error = useLaunchStore.getState().error;
     if (error) {
       toast.error(error);
@@ -34,7 +37,7 @@ export function StartCard() {
   return (
     <button
       onClick={handleLaunch}
-      disabled={launching}
+      disabled={launching || running}
       className={clsx(
         "inline-flex items-center gap-1.5 px-4 h-9 rounded-full",
         // 与顶部标题栏一致的模糊磨砂背景（--titlebar-bg + blur(3px) + --titlebar-border）

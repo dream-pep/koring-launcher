@@ -346,9 +346,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     });
   },
 
+  // 清空历史：只移除已完成 / 失败 / 取消的任务，保留进行中与已暂停的任务
   clearHistory: () => {
     set((state) => {
-      const tasks = state.tasks.filter((t) => t.status === "running" || t.status === "pending");
+      const tasks = state.tasks.filter(
+        (t) => t.status === "running" || t.status === "pending" || t.status === "paused",
+      );
       saveHistory(tasks);
       return { tasks };
     });

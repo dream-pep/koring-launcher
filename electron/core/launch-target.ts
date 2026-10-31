@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import {
   LOADER_LABELS,
   type LoaderKey,
@@ -391,6 +392,104 @@ export function checkDependencies(resourceRoot: string, versionId: string, sampl
     checkedAssets,
     warnings,
   };
+}
+
+// ==================== 文件完整性校验（大小 / SHA1） ====================
+
+export interface IntegrityReport {
+  /** 没有发现损坏文件 */
+  ready: boolean;
+  /** 客户端 JAR 校验失败时的绝对路径 */
+  corruptedJar?: string;
+  /** 校验失败的依赖库（相对 libraries 的路径） */
+  corruptedLibraries: string[];
+  checkedLibraries: number;
+  warnings: string[];
+}
+
+function fileSizeOf(target: string): number | null {
+  try {
+    return fs.statSync(target).size;
+  } catch {
+    return null;
+  }
+}
+
+function sha1Of(target: string): string | null {
+  try {
+    return createHash('sha1').update(fs.readFileSync(target)).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 启动前的深度校验：按版本 JSON 里的 size / sha1 校验客户端 JAR 与依赖库。
+ * 只校验已存在的文件（缺失项由 checkDependencies 负责），只读不修改磁盘。
+ *
+ * 存在的意义：文件"在"不代表文件"对"。从别的启动器导入 / 下载中断时，
+ * xmcl 的启动前置检查会报 `Corrupted Version jar` / `Missing N libraries`，
+ * 提前校验出来就能交给修复流程重新下载。
+ */
+export function verifyDependencies(resourceRoot: string, versionId: string): IntegrityReport {
+  const versionsDir = path.join(resourceRoot, 'versions');
+  const chain = readVersionChain(versionsDir, versionId);
+  const warnings = [...chain.warnings];
+  const corruptedLibraries: string[] = [];
+  let checkedLibraries = 0;
+  let expectedJar: { id: string; sha1?: string; size?: number } | null = null;
+
+  for (const id of chain.chain) {
+    const json = readVersionJson(path.join(versionsDir, id, `${id}.json`));
+    if (!json) continue;
+    if (!expectedJar && json.downloads?.client) {
+      expectedJar = { id: json.jar || id, sha1: json.downloads.client.sha1, size: json.downloads.client.size };
+    }
+
+    for (const lib of json.libraries || []) {
+      if (!libraryApplies(lib)) continue;
+      const artifact = lib.downloads?.artifact;
+      const relative = artifact?.path || mavenRelativePath(lib.name || '');
+      if (!relative || relative.includes('${')) continue;
+      const target = path.join(resourceRoot, 'libraries', relative);
+      if (!exists(target)) continue;
+      checkedLibraries += 1;
+
+      if (artifact?.sha1) {
+        if (sha1Of(target) !== artifact.sha1) corruptedLibraries.push(relative);
+        continue;
+      }
+      const size = artifact?.size;
+      if (typeof size === 'number' && size > 0 && fileSizeOf(target) !== size) corruptedLibraries.push(relative);
+    }
+  }
+
+  let corruptedJar: string | undefined;
+  if (expectedJar && chain.chain.includes(expectedJar.id)) {
+    const jarPath = path.join(versionsDir, expectedJar.id, `${expectedJar.id}.jar`);
+    if (exists(jarPath)) {
+      const sizeBad =
+        typeof expectedJar.size === 'number' && expectedJar.size > 0 && fileSizeOf(jarPath) !== expectedJar.size;
+      const sha1Bad = expectedJar.sha1 ? sha1Of(jarPath) !== expectedJar.sha1 : false;
+      if (sizeBad || sha1Bad) corruptedJar = jarPath;
+    }
+  }
+
+  return {
+    ready: !corruptedJar && corruptedLibraries.length === 0,
+    corruptedJar,
+    corruptedLibraries,
+    checkedLibraries,
+    warnings,
+  };
+}
+
+/** 完整性问题 → 可读中文 */
+export function describeIntegrityReport(report: IntegrityReport): string {
+  const parts: string[] = [];
+  if (report.corruptedJar) parts.push(`客户端 JAR 校验失败（${path.basename(report.corruptedJar)}）`);
+  if (report.corruptedLibraries.length) parts.push(`${report.corruptedLibraries.length} 个依赖库校验失败`);
+  return parts.join('；');
 }
 
 /** 依赖缺失时生成可读的中文错误 */

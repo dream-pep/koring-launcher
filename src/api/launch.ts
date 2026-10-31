@@ -58,3 +58,65 @@ export function onGameEvent(
     }
   );
 }
+
+export interface WaitForGameReadyOptions {
+  /** 超时时间（毫秒），默认 120 秒 */
+  timeoutMs?: number;
+  /** 主进程启动阶段的告警（缺文件 / 加载器回退等） */
+  onWarning?: (message: string) => void;
+  /** 其他事件（stdout / stderr / plan 等），供日志使用 */
+  onEvent?: (event: { event: string; [key: string]: unknown }) => void;
+}
+
+/**
+ * 等待游戏窗口就绪（window-ready）——「启动完成」的判定点。
+ * 若游戏进程在窗口就绪前退出，或超过超时时间，则 reject。
+ */
+export function waitForGameReady(
+  requestId: string,
+  options: WaitForGameReadyOptions = {}
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let unlisten: (() => void) | null = null;
+
+    const finish = (done: () => void) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      unlisten?.();
+      done();
+    };
+
+    timer = setTimeout(() => {
+      finish(() => reject(new Error(`等待游戏窗口就绪超时（${Math.round(timeoutMs / 1000)} 秒）`)));
+    }, timeoutMs);
+
+    unlisten = onGameEvent(requestId, (event) => {
+      options.onEvent?.(event);
+      if (event.event === 'warning') {
+        const message = typeof event.message === 'string' ? event.message : '启动阶段出现告警';
+        options.onWarning?.(message);
+        return;
+      }
+      if (event.event === 'window-ready') {
+        finish(resolve);
+        return;
+      }
+      if (event.event === 'exit') {
+        const code = typeof event.code === 'number' ? event.code : undefined;
+        finish(() =>
+          reject(
+            new Error(
+              code === undefined
+                ? '游戏在窗口就绪前退出'
+                : `游戏在窗口就绪前退出（退出码 ${code}）`
+            )
+          )
+        );
+      }
+    });
+  });
+}

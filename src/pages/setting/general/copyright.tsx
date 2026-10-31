@@ -70,14 +70,24 @@ export function CopyrightSetting() {
 
         <div>
           <SectionTitle>项目代码开源协议</SectionTitle>
-          <SettingCard>
-            <SettingRow label="开源协议 LL-1.0 (LingkeLice 1.0)" desc="开源协议使用 Shenzhen Lingke Network Technology Co., Ltd. 发布的LL-1.0协议">
-              <Link onPress={() => openLink("https://support.lingke.ink/LL-1.0")}>
-                查看
-                <ExternalLink className="w-3 h-3" />
-              </Link>
-            </SettingRow>
-          </SettingCard>
+          <div className="space-y-2">
+            <SettingCard>
+              <SettingRow label="顶层协议 LL-1.0 (LingkeLice 1.0)" desc="顶层协议使用 Shenzhen Lingke Network Technology Co., Ltd. 发布的LL-1.0协议">
+                <Link onPress={() => openLink("https://support.lingke.ink/LL-1.0")}>
+                  查看
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              </SettingRow>
+            </SettingCard>
+            <SettingCard>
+              <SettingRow label="补充协议 MIT" desc="顶层协议在部分场景下未指定其他协议时，默认使用 MIT 协议">
+                <Link onPress={() => openLink("https://mit-license.org")}>
+                  查看
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              </SettingRow>
+            </SettingCard>
+          </div>
         </div>
 
         <div>

@@ -33,10 +33,12 @@ import {
   LaunchError,
   checkDependencies,
   describeDependencyReport,
+  describeIntegrityReport,
   loaderRequests,
   resolveLaunchPlan,
   resolveLaunchRoots,
   resolveLaunchVersionId,
+  verifyDependencies,
   type LaunchPlan,
   type ResolvedLaunch,
 } from './launch-target';
@@ -721,6 +723,59 @@ export function planInstanceLaunch(
   return { instance, plan };
 }
 
+/** 实例文件完整性信息（大小 / SHA1 深度校验） */
+export interface InstanceIntegrityInfo {
+  versionId: string;
+  /** 所有已存在的文件都与版本清单一致 */
+  ready: boolean;
+  /** 可读问题清单，空数组 = 完好 */
+  problems: string[];
+  /** 客户端 JAR 校验失败时的绝对路径 */
+  corruptedJar?: string;
+  /** 校验失败的依赖库（相对 libraries 的路径） */
+  corruptedLibraries: string[];
+  checkedLibraries: number;
+}
+
+/**
+ * 深度校验实例文件（大小 / SHA1）。
+ *
+ * 与 `diagnoseInstance` 的存在性体检互补：文件"在"不代表文件"对"，
+ * 从别的启动器导入或下载中断的实例常见「能通过存在性检查，启动时才报
+ * Corrupted Version jar / Missing N libraries」。启动流水线的「核验」阶段调用它。
+ */
+export function verifyInstance(name: string, gamePath: string): InstanceIntegrityInfo {
+  const instance = getInstanceInfo(name, gamePath);
+  try {
+    const roots = resolveLaunchRoots({
+      instancePath: instance.path,
+      runtime: instance.config.runtime,
+      resourcePath: instance.config.resourcePath,
+      sharedResourceDir: getConfig().game.resourceDir || undefined,
+    });
+    const versionsDir = path.join(roots.resourceRoot, 'versions');
+    const resolved = resolveLaunchVersionId(versionsDir, instance.config.runtime, instance.config.launchVersion);
+    const report = verifyDependencies(roots.resourceRoot, resolved.id);
+    return {
+      versionId: resolved.id,
+      ready: report.ready,
+      problems: report.ready ? [] : [describeIntegrityReport(report)],
+      corruptedJar: report.corruptedJar,
+      corruptedLibraries: report.corruptedLibraries,
+      checkedLibraries: report.checkedLibraries,
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      versionId: instance.config.launchVersion || instance.config.runtime.minecraft,
+      ready: false,
+      problems: [message],
+      corruptedLibraries: [],
+      checkedLibraries: 0,
+    };
+  }
+}
+
 export function updateInstance(
   name: string,
   gamePath: string,
@@ -957,9 +1012,30 @@ export async function repairInstance(
   const baseJson = path.join(versionsDir, runtime.minecraft, `${runtime.minecraft}.json`);
   const baseJar = path.join(versionsDir, runtime.minecraft, `${runtime.minecraft}.jar`);
 
+  // 0) 深度校验：文件存在但内容损坏（sha1 / size 与版本清单不符）时，强制重新下载
+  //    典型场景：从别的启动器导入/下载中断，导致 xmcl 启动前置检查报 Corrupted Version jar。
+  let integrity: ReturnType<typeof verifyDependencies> | null = null;
+  try {
+    const resolved = resolveLaunchVersionId(versionsDir, runtime, instance.config.launchVersion);
+    integrity = verifyDependencies(target, resolved.id);
+    if (integrity.corruptedLibraries.length) {
+      report(
+        'installing-dependencies',
+        `检测到 ${integrity.corruptedLibraries.length} 个依赖库校验失败，正在重新下载…`
+      );
+    }
+  } catch {
+    integrity = null;
+  }
+
   // 1) 补齐原版本体（版本 JSON / JAR / assets / libraries）
-  if (!exists(baseJson) || !exists(baseJar) || plan?.dependencies.missingJar) {
-    report('installing-minecraft', `正在补齐 Minecraft ${runtime.minecraft} 的版本文件…`);
+  if (!exists(baseJson) || !exists(baseJar) || plan?.dependencies.missingJar || integrity?.corruptedJar) {
+    report(
+      'installing-minecraft',
+      integrity?.corruptedJar
+        ? `检测到客户端 JAR 校验失败，正在重新下载 Minecraft ${runtime.minecraft}…`
+        : `正在补齐 Minecraft ${runtime.minecraft} 的版本文件…`
+    );
     await installMinecraftVersion(runtime.minecraft, target, options, source, settings, report);
   }
 

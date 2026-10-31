@@ -13,8 +13,8 @@ export interface VersionLibrary {
   name?: string;
   rules?: { action?: string; os?: { name?: string; arch?: string } }[];
   downloads?: {
-    artifact?: { path?: string; url?: string };
-    classifiers?: Record<string, { path?: string; url?: string }>;
+    artifact?: { path?: string; url?: string; sha1?: string; size?: number };
+    classifiers?: Record<string, { path?: string; url?: string; sha1?: string; size?: number }>;
   };
 }
 

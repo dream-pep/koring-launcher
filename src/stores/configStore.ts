@@ -58,7 +58,7 @@ const DEFAULT_CONFIG: AppConfig = {
   theme: { darkMode: "auto", parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
   background: { bgType: "image", image: DEFAULT_BG, blur: 0, opacity: 100 },
-  game: { gameDir: ".minecraft", resourceDir: "", gameDirs: [], selectedInstance: "", dirAliases: {} },
+  game: { gameDir: ".minecraft", resourceDir: "", gameDirs: [], gameDirOrder: [], selectedInstance: "", dirAliases: {} },
   java: {
     javaPath: "",
     autoJavaPath: true,
@@ -71,7 +71,7 @@ const DEFAULT_CONFIG: AppConfig = {
     gc: "auto",
     jvmArgs: "",
   },
-  advanced: { afterLaunch: "close", winMode: "default", customWidth: 854, customHeight: 480, gameArgs: "", preLaunchCmd: "", debugMode: false, server: { ip: "", port: 25565 } },
+  advanced: { afterLaunch: "minimize", winMode: "default", customWidth: 854, customHeight: 480, gameArgs: "", preLaunchCmd: "", debugMode: false, server: { ip: "", port: 25565 } },
   download: { source: "bmclapi", threads: 16, customVersionManifest: "", customMavenHost: "", customAssetsHost: "" },
   network: { securityId: { enabled: false, authUrl: "" } },
   ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: "version", showQuickActions: true },
