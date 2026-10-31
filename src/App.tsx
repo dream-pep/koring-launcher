@@ -29,6 +29,9 @@ import { ActivationDebug } from "./pages/debug/activation-debug";
 import { CrashDebug } from "./pages/debug/crash-debug";
 import { ResourceDebug } from "./pages/debug/resource-debug";
 import { RoutesDebug } from "./pages/debug/routes-debug";
+import { AuthDebug } from "./pages/debug/auth-debug";
+import { InstanceDebug } from "./pages/debug/instance-debug";
+import { ModsDebug } from "./pages/debug/mods-debug";
 import { Oobe } from "./pages/oobe";
 import { OobeLanguage } from "./pages/oobe/step-language";
 import { OobeDevice } from "./pages/oobe/step-device";
@@ -95,6 +98,9 @@ const pageMap = {
   "debug-crash": CrashDebug,
   "debug-resource": ResourceDebug,
   "debug-routes": RoutesDebug,
+  "debug-auth": AuthDebug,
+  "debug-instance": InstanceDebug,
+  "debug-mods": ModsDebug,
 } as const;
 
 function App() {

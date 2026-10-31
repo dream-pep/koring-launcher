@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { VersionCard } from "@/components/VersionCard";
 import { BUILD_MODE } from "@/lib/mode";
 import { BUILD_COMMIT, BUILD_ID } from "@/lib/buildInfo";
 import { ExternalLink, GitFork, RotateCcw, ChevronDown } from "lucide-react";
@@ -48,7 +47,7 @@ interface AboutSettingProps {
   sharedTransition?: boolean;
 }
 
-export function AboutSetting({ sharedTransition = true }: AboutSettingProps) {
+export function AboutSetting(_props: AboutSettingProps) {
   const [open, setOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const canConfirm = countdown <= 0;

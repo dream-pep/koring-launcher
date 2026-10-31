@@ -45,7 +45,10 @@ export type RouteKey =
   | "debug-activation"
   | "debug-resource"
   | "debug-crash"
-  | "debug-routes";
+  | "debug-routes"
+  | "debug-auth"
+  | "debug-instance"
+  | "debug-mods";
 export type TitleBarMode = "default" | "sub" | "window" | "oobe" | "blocked";
 
 /**
@@ -111,6 +114,9 @@ export const allRoutes: RouteItem[] = [
   { key: "debug-resource", label: "资源与内存", path: "/debug/resource", hidden: true },
   { key: "debug-crash", label: "崩溃测试", path: "/debug/crash", hidden: true },
   { key: "debug-routes", label: "页面跳转", path: "/debug/routes", hidden: true },
+  { key: "debug-auth", label: "账号认证调试", path: "/debug/auth", hidden: true },
+  { key: "debug-instance", label: "实例与启动调试", path: "/debug/instance", hidden: true },
+  { key: "debug-mods", label: "资源搜索调试", path: "/debug/mods", hidden: true },
 ];
 
 const topLevelKeys = new Set(routes.map((r) => r.key));
