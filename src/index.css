@@ -619,6 +619,18 @@ html[data-transitioning] .silk-snapshot {
     height 320ms ease !important;
 }
 
+/* 通知面板卡片：复用 toast 的表面配方（popover 90% + 细边框 + 柔阴影 + 磨砂） */
+.notice-surface {
+  border: 1px solid var(--titlebar-border);
+  background: color-mix(in oklch, var(--popover) 90%, transparent);
+  color: var(--popover-foreground);
+  box-shadow:
+    0 18px 40px -18px rgba(0, 0, 0, 0.35),
+    0 2px 10px -4px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+}
+
 .cn-toast-icon {
   display: flex;
   align-items: center;

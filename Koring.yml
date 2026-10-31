@@ -1,5 +1,9 @@
 appVersion: 1.2.7
 oobe: false
+theme:
+  darkMode: auto
+a11y:
+  contentBlurOpacity: 44
 game:
   gameDirs:
     - C:\Users\ab090\AppData\Roaming\.minecraft
@@ -11,5 +15,5 @@ java:
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1793445026238
+  checkedAt: 1793446550077
   version: 1.2.7

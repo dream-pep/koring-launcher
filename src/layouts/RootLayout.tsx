@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { BackgroundLayer } from "@/components/background/BackgroundLayer";
 import { SystemLayer } from "@/components/system/SystemLayer";
+import { TaskPanel } from "@/components/task/TaskPanel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 import { RuntimeNotices } from "@/components/RuntimeNotices";
@@ -60,6 +61,9 @@ export function RootLayout({
         showMaximize={showMaximize}
         showClose={showClose}
       />
+
+      {/* Layer 90: 任务面板（Windows 通知中心式右侧浮层） */}
+      <TaskPanel />
 
       {/* Global confirm dialog */}
       <ConfirmDialog />

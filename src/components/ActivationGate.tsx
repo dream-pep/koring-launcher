@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "@/lib/toast";
 import { useRouteStore } from "@/stores/routeStore";
 import { useConfigStore } from "@/stores/configStore";
+import { useNoticeStore } from "@/stores/noticeStore";
 import { useDeveloperModeStore, refreshDeveloperMode } from "@/stores/developerModeStore";
 import {
   launcherStartupCheck,
@@ -97,11 +98,15 @@ export function ActivationGate() {
         ...(data.device.data?.notifications ?? []),
         ...(data.policy.data?.notifications ?? []),
       ];
+      const unique: LauncherNotification[] = [];
       for (const n of all) {
         if (!n?.id || seen.has(n.id)) continue;
         seen.add(n.id);
+        unique.push(n);
         showNotification(n);
       }
+      // 同步到全局通知 store，供右侧任务/通知面板展示（系统通知）
+      useNoticeStore.getState().setSystemNotices(unique);
       if (!data.device.ok && data.device.error) {
         toast.warning("设备校验未完成", { description: data.device.error, duration: 8000, closeButton: true });
       }

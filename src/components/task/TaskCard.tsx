@@ -62,9 +62,11 @@ function logLevelColor(level: Task["logs"][number]["level"]): string {
 
 interface TaskCardProps {
   task: Task;
+  /** 表面样式：default 普通列表 / glass 通知面板（toast 同款背景） */
+  surface?: "default" | "glass";
 }
 
-export function TaskCard({ task }: TaskCardProps) {
+export function TaskCard({ task, surface = "default" }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const cancelTask = useTaskStore((s) => s.cancelTask);
   const pauseTask = useTaskStore((s) => s.pauseTask);
@@ -86,7 +88,13 @@ export function TaskCard({ task }: TaskCardProps) {
       : undefined;
 
   return (
-    <div className="rounded-xl bg-muted/30 overflow-hidden">
+    <div
+      className={
+        surface === "glass"
+          ? "notice-surface rounded-[14px] overflow-hidden"
+          : "rounded-xl bg-muted/30 overflow-hidden"
+      }
+    >
       <div className="px-4 py-3">
         <div className="flex items-start gap-3">
           {/* Content */}
