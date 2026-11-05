@@ -5,13 +5,12 @@
 <h1 align="center">Koring Launcher</h1>
 
 <p align="center">
-  A modern Minecraft launcher for Windows · 基于 Electron + React 的现代化 Minecraft 启动器
+  一款现代化 Minecraft 启动器 · Windows / macOS / Linux
 </p>
 
 <p align="center">
   <a href="https://github.com/dream-pep/koring-launcher/releases"><img src="https://img.shields.io/github/v/release/dream-pep/koring-launcher?display_name=release&label=Release&logo=github&color=4c6ef5" alt="Release"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-8a94a6" alt="Platform">
-  <img src="https://img.shields.io/badge/Electron%2033%20%C2%B7%20React%2019%20%C2%B7%20TypeScript-20242e" alt="Electron · React · TypeScript">
   <img src="https://img.shields.io/badge/license-LL--1.0-7d5fb8" alt="License">
   <a href="https://github.com/dream-pep/koring-launcher/actions/workflows/release.yml"><img src="https://github.com/dream-pep/koring-launcher/actions/workflows/release.yml/badge.svg" alt="Build & Release"></a>
 </p>
@@ -25,84 +24,105 @@
 # 中文文档
 
 - [项目简介](#项目简介)
-- [功能特性](#功能特性)
+- [功能一览](#功能一览)
 - [界面预览](#界面预览)
-- [快速开始](#快速开始)
-- [开发指南](#开发指南)
-- [构建与发布](#构建与发布)
-- [技术架构](#技术架构)
-- [目录结构](#目录结构)
-- [版本与自动更新](#版本与自动更新)
-- [路线图](#路线图)
-- [贡献指南](#贡献指南)
+- [下载与安装](#下载与安装)
+- [快速上手](#快速上手)
+- [版本通道与自动更新](#版本通道与自动更新)
+- [项目状态与路线图](#项目状态与路线图)
+- [反馈与贡献](#反馈与贡献)
 - [许可证](#许可证)
 
 ---
 
 ## 项目简介
 
-**Koring Launcher** 是一款面向现代 Windows 桌面的 Minecraft 启动器，采用
-**Electron + React 19 + TypeScript** 构建，游戏侧核心能力基于成熟的
-[@xmcl](https://github.com/Voxelum/xmcl) 开源生态（安装、启动、任务）。
+**Koring Launcher** 是一款面向 Minecraft 玩家的现代化桌面启动器，目标是把「装得上、启动得起来、出了问题看得懂」做成默认体验。
 
-项目强调**流畅的桌面体验**与**工程化的进程架构**：自定义无边框窗口与启动画面、
-三层层级 UI、主进程权威的配置体系、内置资源注册表与内存管理，以及 beta/run 双通道
-自动更新。代码库以「渲染进程薄、主进程权威」为原则，所有游戏相关能力
-（@xmcl、文件系统、进程管理）均运行于 Electron 主进程，渲染进程只通过类型安全的
-IPC 与主进程通信。
+它围绕**实例**组织游戏：你可以把不同版本、不同模组加载器与不同模组组合拆成彼此独立的实例，自由切换、分别配置；启动器会在启动前核验版本与依赖是否完整，缺什么就补什么，而不是把一个「半成品」送进游戏。界面采用无边框窗口与玻璃质感设计，配合启动动画、页面转场与深浅色主题，尽量让日常操作保持轻快。
 
-> **状态**：项目处于积极开发与内测阶段（`beta` / `run` 双通道发布）。主框架与核心
-> 流程稳定可用，部分 UI 模块（见 [路线图](#路线图)）仍在打磨。
+同时，启动器提供了一套面向发布与安全的配套能力：双通道自动更新、设备校验与版本激活、运行公告、崩溃分析、任务队列与反馈入口，让「使用」和「维护」都有明确路径。
 
-## 功能特性
+> **当前状态**：主线版本 **1.2.7**，Windows / macOS / Linux 安装包由 GitHub Actions 统一构建发布。启动、实例管理、崩溃分析、资讯、设置与自动更新等核心能力已可用；资源中心、联机与部分账号入口仍在完善中，详见 [项目状态与路线图](#项目状态与路线图)。
 
-**桌面体验**
+## 功能一览
 
-- 自定义**无边框窗口**：自绘标题栏（毛玻璃）与窗口控制，深浅色模式自动适配
-- 独立的 **Splash 启动画面**（480×320 透明窗，无框架依赖，`ready-to-show` + 最短停留时间过渡）
-- **三层层级 UI**：背景层 / 内容层 / 系统层，页面间使用 View Transitions 过渡
-- 内置**隐藏调试页**（`debug-*` 路由）：显示、更新、任务、资源与内存等专项调试
+### 启动与运行
 
-**游戏能力（基于 @xmcl）**
+- **首页一键启动**：在实例页选中一个版本后，首页标题与启动按钮都会跟随该版本；未选择版本时会引导你前往实例管理，避免「点了没反应」。
+- **可启动性优先**：启动前会解析启动方案并检查版本文件、客户端 JAR 与依赖库；缺失时明确提示原因，并提供一键补全，而不是带着残缺依赖启动。
+- **Java 自动匹配**：按 Minecraft 版本推算所需 Java 大版本并匹配本机环境，也可手动指定路径、扫描本机 Java，或调整初始内存、最大内存、GC 与额外 JVM 参数。
+- **启动参数集中管理**：游戏窗口大小、快速进服地址、IP 协议偏好、游戏参数、启动前命令与「启动后启动器如何处理」都可以在设置里统一配置，并在实例级覆盖。
+- **运行任务可见**：安装、补全与下载统一进入任务队列，支持进度、阶段计数、日志查看、暂停、继续、取消、重试与移除。
 
-- **可启动性优先的启动链路**：启动前解析「启动方案」——资源根（实例自定义 / 实例目录 / 共享资源目录）
-  与可启动版本（指定版本 → 加载器版本 → 原版 → 回退匹配），并做依赖体检
-  （版本 JSON / 客户端 JAR / `rules` 过滤后的依赖库），**依赖缺失时明确报错而不是启动半成品**
-- **统一配置驱动启动**：主进程读取权威配置，自动映射为 `LaunchOption`
-  （Java 路径 / 内存 / GC / JVM 参数 / 游戏参数 / 窗口 / 启动前命令），
-  支持 `plan` / `warning` / `stdout` / `stderr` / `window-ready` / `exit` 事件推送与 `afterLaunch` 窗口处理
-- **Java 自动匹配**：按 Minecraft 版本推算所需 Java 主版本（1.20.5+ → 21 / 1.17–1.20.4 → 17 / ≤1.16.5 → 8），
-  在设置页给出预览与候选（`java:plan`），并提供 `java:scan` / `java:resolve` 手动校验
-- **实例依赖修复**：一键补全缺失的原版、加载器与依赖库并回写实例（`instance:repair`，带进度）
-- **PCL2 式目录识别与管理**：选中 `versions/`、单个版本目录或实例目录都会自动上溯为游戏根，
-  识别启动器类型（Koring / 官方 / PCL2 / HMCL / Prism / MultiMC）与版本健康度，
-  支持本机常见位置**自动查找**；导入支持**引用**（省空间）与**复制**（含共享 libraries/assets）两种模式
-- **实例卡片画廊**：每个实例一张卡片，实例目录里放 `logo.png`（或 `icon.png` / `logo.jpg` 等）即自动作为图标，
-  缺失时用按名称取色的默认图标；支持**搜索**（名称 / 分类 / 版本）、**分类筛选**与**收藏**，
-  卡片上可直接启动或打开目录，详情页展示启动方案与依赖体检并提供一键修复
-- **Mod 生态**：Modrinth / CurseForge 检索与安装模块
-- **账号体系**：Koring 账号、离线账号（规范离线 UUID），微软 OAuth 核心已接入；
-  账户页展示真实启动档案（`--username` / `--uuid` / 认证方式）
-- 任务系统：安装 / 下载进度统一通过主进程任务队列（`task:*`）推进，UI 可查看队列
+### 实例管理
 
-> 启动链路、目录识别、下载源与 IPC 契约的实现细节见 **[`docs/launch-pipeline.md`](docs/launch-pipeline.md)**；
-> 纯逻辑可用 `pnpm build:main && node scripts/verify-launch-core.mjs` 校验（90 项断言）。
+- **多游戏目录**：可添加多个 `.minecraft` 目录，为目录设置显示名、调整顺序，并在目录之间快速切换。
+- **新建实例向导**：选择 Minecraft 版本与加载器（Forge / NeoForge / Fabric / Quilt / OptiFine）、安装位置与内存，支持创建后立即下载游戏文件。
+- **导入已有版本**：选择已有游戏目录即可自动识别游戏根目录，并批量导入其中可用的版本，已导入的版本会自动跳过。
+- **实例详情**：概览、设置、模组、存档、截图、资源包与日志七个页签，集中展示启动版本、加载器、资源根、游玩时长与最近游玩时间等信息。
+- **本地内容管理**：
+  - 模组：搜索、按启用状态筛选、单个或批量启用 / 禁用 / 删除，读取模组名与版本；
+  - 存档：查看图标、世界名称、大小与时间，支持备份、删除与打开目录；
+  - 截图：缩略图网格预览，可打开或删除；
+  - 资源包 / 光影包：识别启用状态，快速查看与打开目录。
+- **体检与修复**：随时检查实例完整性，一键补全缺失的原版文件、加载器与依赖库。
+- **收藏与选中**：标记常用实例，选择后由首页负责启动，实例页只负责管理，职责清晰。
 
-**配置与个性化**
+### 崩溃分析与日志
 
-- **主进程权威配置**：YAML（`Koring.yml`），深度合并 + 稀疏写盘 + 变更广播
-- **设置中心**（参考 PCL2 的分组结构）：游戏（账号 / Java / 目录 / 高级）、
-  个性化（主题背景 / 主界面 / 语言 / 无障碍）、网络（下载 / 安全识别）等均已接入；
-  目录、Java 与下载页已按新的能力重做（识别结果、自动匹配预览、下载源预览）
-- **背景系统**：颜色 / 渐变 / 模糊 / 自选壁纸；自选壁纸由主进程按屏幕尺寸降采样并
-  落盘存储，经 `koring-res://` 特权协议流式读取（**全程无 base64**），并纳入
-  **资源注册表**统一管理（引用计数、预算 + LRU 逐出）
-- **引导流程**：首次启动 OOBE 向导（语言 / 协议 / 登录 / 版本）与更新后引导（UPvP），
-  「关于此版本」将 GitHub Release Notes 按新增 / 修复 / 优化等**分类卡片化**展示
-- **意见反馈**：设置 → 服务与反馈内置 HeroUI 反馈按钮，点击在系统浏览器打开 YouTrack 反馈表单
-  （`components/feedback/FeedbackButton`，直链 `lingke.youtrack.cloud/form/<uuid>`）
-- **设备识别码**：关于页展示设备唯一标识 —— 由硬件指纹（主板 UUID / 硬盘序列号 / BIOS 序列号，过滤 OEM 占位值）
-  优先取源，缺失时回退注册表 `MachineGuid`，经 SHA-256 生成 UUID 样式标识（`electron/core/device-id.ts`，进程内缓存）
+- 日志页签会自动分析实例的崩溃报告与最新日志，给出 **一句结论 + 证据 + 建议 + 环境信息 + 日志尾部**。
+- 内置二十余条常见原因规则，覆盖内存不足、Java 版本不匹配、模组冲突、缺少前置、Mixin 注入失败、加载器错误、OpenGL / 显卡驱动问题、文件校验失败与权限问题等。
+- 没有命中规则时也会给出兜底排查建议，避免只看到一堆原始日志。
+
+### 安装与下载
+
+- 支持原版、Forge、NeoForge、Fabric、Quilt 与 OptiFine 的组合安装与补全。
+- 内置 **BMCLAPI 镜像、Mojang 官方源与自定义镜像**三种下载源，可调整并发线程数，并在设置页预览实际生效的资源地址。
+- 下载源切换即时生效，无需重启启动器。
+
+### 账号与安全服务
+
+- **Koring 账户**：扫码登录能力已接入，用于同步个人资料与账户信息（设置入口暂时隐藏）。
+- **离线账户**：按规范离线 UUID 生成身份，适合离线或局域网游戏。
+- **LittleSkin**：使用皮肤站用户名与密码登录。
+- **微软正版账户**：登录核心已接入，界面入口仍在完善中。
+- **设备校验**：首次启动与版本更新后会进行设备登记与状态校验；设备异常时进入独立的阻断页，并提供重试与状态说明。
+- **版本激活**：启动前校验当前版本是否允许使用；服务端可下发禁激活、强制升级与运行公告。
+- **KoringDevice 服务**：可启用第三方认证服务地址，用于离线服务器等场景。
+- **设备识别码**：关于页展示基于硬件指纹生成的设备标识，便于问题排查与设备管理。
+
+### 资讯
+
+- 内置 Minecraft 官方资讯流，按 Java 版、基岩版、地下城、传奇等平台筛选。
+- 自动加载下一页、滚动到底继续加载，并支持手动刷新；点击卡片可在系统浏览器中打开官方原文。
+
+### 桌面体验与个性化
+
+- 无边框窗口、自绘毛玻璃标题栏与窗口控制，深浅色主题自动适配。
+- 独立启动画面与启动过渡，页面之间使用带方向的转场动画；版本卡片带有动态丝绸质感。
+- 背景支持颜色、渐变、图片、模糊、不透明度与视差效果；自选壁纸会按屏幕尺寸优化后本地保存，并以资源引用方式读取，避免大图长期占用内存。
+- 辅助功能提供减少动画、减少透明度与高对比度选项；界面语言可选简体中文 / English（文案本地化仍在推进）。
+
+### 设置中心
+
+设置按用途分组，常用项包括：
+
+- **主页**：版本卡片、更新入口与常用设置快捷入口；
+- **游戏**：启动器行为、窗口大小、快速进服、IP 协议偏好；
+- **游戏账户与档案**：账号管理与游戏档案；
+- **Java 虚拟机与内存**：自动 / 手动 Java、扫描、内存分配、锁定内存、GC 与 JVM 参数；
+- **游戏目录**：自动查找、目录显示名、排序与共享资源目录；
+- **高级设置**：游戏参数尾部、启动前命令、调试模式与危险区重置；
+- **主题与背景**、**主界面**、**语言**、**辅助功能**；
+- **下载**、**以太联机**、**陶瓦联机**、**KoringDevice 服务**；
+- **关于**、**版权**、**服务与反馈**、**赞助我们**，以及由服务端控制的开发者选项。
+
+### 首次启动与更新引导
+
+- 首次启动进入 OOBE：语言 → 设备校验 → 产品协议 → 法律信息 → 欢迎 → 当前版本 → 关于此版本 →（测试版需签署 Beta 协议）→ 版本激活 → 完成。
+- 版本更新后进入 UPVP 引导，重新完成设备校验、查看更新内容与版本激活，再回到游戏。
+- 「关于此版本」会把发布说明按新增 / 修复 / 优化等类别做成卡片，便于快速了解改动。
 
 ## 界面预览
 
@@ -113,209 +133,87 @@ IPC 与主进程通信。
   <img src="docs/screenshots/home.png" width="720" alt="主界面" />
 -->
 
-## 快速开始
+## 下载与安装
 
-**面向用户**：从 [GitHub Releases](https://github.com/dream-pep/koring-launcher/releases)
-下载最新安装包（NSIS 安装器，可自选安装目录）。目前发布管线产出 Windows 安装程序，
-macOS（DMG）与 Linux（AppImage）构建目标已配置，将在 CI 中逐步开放。
+从 [GitHub Releases](https://github.com/dream-pep/koring-launcher/releases) 下载最新安装包：
 
-**开发环境要求**
-
-| 依赖 | 版本 | 说明 |
+| 平台 | 安装包 | 说明 |
 | --- | --- | --- |
-| OS | Windows 10/11（x64） | 主要开发与目标平台 |
-| Node.js | ≥ 20.19（CI 使用 22） | Vite 7 要求 |
-| pnpm | ≥ 9（CI 使用 11.7） | 包管理器，仓库基于 pnpm workspace |
+| Windows | NSIS 安装程序 | 可自选安装目录，创建桌面与开始菜单快捷方式 |
+| macOS | DMG / ZIP | 同时提供 Apple Silicon 与 Intel 构建 |
+| Linux | AppImage | 下载后赋予可执行权限即可运行 |
 
-> 国内网络环境：仓库 `.npmrc` 已配置 Electron 二进制走 npmmirror 镜像，
-> 可避免 Electron 下载超时。
+**系统要求**
 
-```bash
-# 安装依赖
-pnpm install
+- Windows 10 / 11（x64）
+- macOS（Apple Silicon 与 Intel）
+- 主流 x64 Linux 桌面发行版
 
-# 开发（完整应用：Vite dev server :1420 + Electron）
-pnpm dev
+运行游戏需要本机已安装可用的 Java。启动器会自动匹配并校验，也可以在设置中手动指定。
 
-# 仅渲染进程（HMR，端口 1420）/ 仅主进程
-pnpm dev:renderer
-pnpm dev:main
-```
+> 说明：Windows 安装包已接入远程签名（当前处于测试证书阶段），部分系统可能仍提示「未知发布者」；macOS 构建暂未签名，首次打开如被拦截，可在「系统设置 → 隐私与安全」中允许，或右键选择「打开」。
 
-## 开发指南
+**数据存放**
 
-常用脚本一览（完整说明见 `DEV.md` 与 `AGENTS.md`）：
+配置、账号与崩溃日志保存在用户数据目录（Windows 为 `%APPDATA%\Koring Launcher`），不写入安装目录，因此升级或重装启动器不会丢失配置。
 
-| 命令 | 说明 |
+## 快速上手
+
+1. **安装并启动**：完成 OOBE 引导，选择语言、阅读协议并完成设备与版本校验。
+2. **确认游戏目录**：在「设置 → 游戏目录」中使用默认目录、自动查找，或添加自己的 `.minecraft` 目录。
+3. **建立实例**：在「实例」页新建实例，或直接导入已有游戏目录中的版本。
+4. **选择版本**：在实例页点击目标实例，将其设为启动版本；也可以在详情页做体检与补全。
+5. **开始游戏**：回到首页点击「启动游戏」。安装与下载进度可在任务队列中查看。
+6. **按需调整**：在设置中调整 Java、内存、下载源、启动后行为、主题与辅助功能。
+
+## 版本通道与自动更新
+
+启动器内置两个更新通道，可在「设置 → 关于」中切换：
+
+| 通道 | 说明 |
 | --- | --- |
-| `pnpm dev` | 完整开发环境（先编译主进程，再并行启动 Vite + Electron） |
-| `pnpm dev:renderer` | 仅渲染进程（Vite HMR，端口 1420） |
-| `pnpm dev:main` | 仅主进程（`tsc` 编译后启动 Electron） |
-| `pnpm build:renderer:{dev,beta,run}` | 按模式构建渲染进程 |
-| `pnpm build:main` | 编译主进程 TypeScript |
-| `pnpm build:{dev,beta,run}` | 对应模式的完整构建（渲染进程 + 主进程） |
-| `pnpm preview` | 预览 Vite 产物 |
-| `pnpm version:set` | 设置版本号（单一事实源为 `package.json`） |
-| `pnpm pack` | `electron-builder --dir`（未打包目录产物） |
-| `pnpm dist` / `dist:win` / `dist:mac` / `dist:linux` | electron-builder 按目标平台打包 |
+| **慢走模式** | 仅接收正式版更新，适合日常稳定使用 |
+| **跑步模式** | 可接收测试版更新，适合愿意尝鲜与反馈问题的玩家 |
 
-**开发要点速览**
+- 更新页会展示当前版本与可用版本的发布说明，并支持检查更新、下载（含进度、暂停 / 继续 / 取消）与安装重启。
+- 安装包在下载后会做完整性与校验值检查，再进入安装流程。
+- 当服务端要求强制升级或当前版本被禁止激活时，启动器会给出明确提示并引导到更新页。
 
-- `@/` 路径别名映射到 `src/`（同时配置于 `vite.config.ts` 与 `tsconfig.json`）
-- 渲染进程公共资源路径须使用 `import.meta.env.BASE_URL` 前缀（打包后绝对路径失效）
-- 所有 `@xmcl/*`、文件系统与子进程能力运行于主进程；渲染进程经
-  `ipcRenderer.invoke()` → `ipcMain.handle()` 调用，方向性事件经 `webContents.send()` 推送
-- 主进程配置为唯一权威：渲染端只提交补丁，不直接写盘（详见「配置存储」）
-- HeroUI 3（基于 react-aria）控件使用 `onChange`，`onValueChange` 已移除
-- 窗口拖拽需使用内联样式 `WebkitAppRegion: "drag"`（Electron 仅识别 CSS 属性）
+## 项目状态与路线图
 
-## 构建与发布
+**已经可用**
 
-### 构建模式
+- 首页启动、启动前核验与一键补全；
+- 多目录实例管理与新建 / 导入 / 体检 / 修复；
+- 实例内模组、存档、截图、资源包与日志管理；
+- 崩溃分析、Minecraft 官方资讯、任务队列；
+- 离线 / LittleSkin 账户，设备校验与版本激活；
+- 设置中心、个性化与辅助功能；
+- OOBE / UPVP 引导、双通道自动更新、运行公告；
+- Windows、macOS、Linux 构建与发布流水线。
 
-项目支持三种构建模式，通过环境文件（`.env.development` / `.env.beta` /
-`.env.production`）注入，并配套**切换图标**（exe / 安装器图标随模式不同）：
+**正在完善**
 
-| 模式 | Vite mode | 图标目录 | 用途 |
-| --- | --- | --- | --- |
-| `dev` | `development` | `public/icons/dev/` | 日常开发 |
-| `beta` | `beta` | `public/icons/beta/` | 内测发布 |
-| `run` | `production` | `public/icons/run/` | 正式发布 |
+- [ ] **资源中心入口**：Minecraft 版本、Mod 与整合包的浏览 / 安装界面已具备主体实现，入口尚未在正式版本中开放（整合包安装仍在完善）；
+- [ ] **联机页**：以太联机与陶瓦联机仍为占位；
+- [ ] **账号入口**：微软正版登录与 Koring 账户的界面入口待开放；
+- [ ] **多语言**：语言偏好已支持简体中文 / English，界面文案正在逐步外置；
+- [ ] **整合包**：整合包安装与导出、模组依赖检查与更新检测；
+- [ ] **实例增强**：存档导入导出、版本复制、创建快捷方式；
+- [ ] **发布完善**：macOS 签名与公证、Windows 生产证书；
+- [ ] **崩溃分析**：云端原因库与多日志级联分析。
 
-```bash
-pnpm dist:dev    # build:dev  →  icon:dev  →  electron-builder --win
-pnpm dist:beta   # build:beta →  icon:beta →  electron-builder --win
-pnpm dist:run    # build:run  →  icon:run  →  electron-builder --win
-```
+## 反馈与贡献
 
-打包流程：模式构建 → `scripts/switch-icon.js` 将对应图标复制到 `build/`
-（electron-builder 的 `buildResources`）→ electron-builder 产出 NSIS 安装程序，
-产物位于 `dist-electron/koring-launcher-{version}-setup.exe`。
-
-### 发布流水线（GitHub Actions）
-
-`.github/workflows/release.yml` 手动触发（选择 `beta` / `run` 模式）：
-
-1. 从 `package.json` 读取基础版本号，附加 **BUILD ID**（GitHub Run Number，
-   严格递增）生成最终版本：`{base}-beta.{buildId}`（beta）或 `{base}-{buildId}`（run）
-2. `pnpm build:{mode}` + `pnpm icon:{mode}`（renderer + main + 图标）
-3. `electron-builder --win`，经 **SignPath 远程签名**（无 `SIGNPATH_API_TOKEN`
-   时自动跳过，本地构建不受影响；仅对 sha256 签名以节省配额）
-4. 生成中文发布说明并发布 GitHub Release：beta 为 prerelease 并额外上传
-   `latest-beta.yml`，run 为正式版并上传 `latest.yml`（electron-updater 更新清单）
-
-### 配置存储（主进程权威）
-
-- **`Koring.yml`**：打包后存 `app.getPath('userData')`（`%APPDATA%/Koring Launcher/`），
-  开发模式存项目根目录；旧版 exe 旁文件首次启动自动迁移
-- 主进程内存缓存为唯一权威：渲染端经 `config:update` 提交补丁 → 主进程深度合并 →
-  300ms debounce **稀疏写盘**（仅写非默认值）→ 广播 `config:changed` 同步渲染端镜像
-- **`koring-auth.json`**（账号数据）与崩溃日志采用相同存储策略
-- ⚠️ 数据文件不可放入安装目录：NSIS 重装 / 升级会经旧卸载器删除整个安装目录
-
-## 技术架构
-
-```
-┌────────────────────────── Renderer (React 19) ─────────────────────────┐
-│  pages / components / stores (Zustand)        resources (注册表+LRU)   │
-│        │ ipcRenderer.invoke()  ▲ ipcMain.handle()                      │
-│        ▼                      │ webContents.send() (方向性事件)         │
-├────────────────────────── Main Process (Electron / Node) ──────────────┤
-│  handlers/*  ──  config.ts (YAML 权威) · auth.ts · updater.ts           │
-│  core/*      ──  @xmcl/core · @xmcl/installer · @xmcl/task             │
-│                  launch-options (配置→LaunchOption)                    │
-│  resource-protocol.ts  koring-res://（白名单流式读取，realpath 校验）    │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-- **IPC 流**：渲染进程 `invoke` → 主进程 `handle` → 处理完成返回；主进程主动事件
-  经 `webContents.send` 推送给渲染端（如 `config:changed`、`launch:event`）
-- **可变的 `win` 引用**：`main.ts` 使用可变 `win` 对象，各 handler 在运行时读取
-  `win.mainWindow`，而非注册时捕获
-- **`koring-res://`**：特权自定义协议，仅服务 userData 内
-  `background-custom*` 白名单文件（realpath 二次校验，防目录穿越），
-  用于渲染进程「按引用」流式读取本地壁纸，避免 base64 膨胀内存
-- **背景图处理**：自选壁纸由主进程复制到 userData，并按屏幕尺寸降采样 / 重编码
-  **落盘**；配置文件只存文件路径
-- **资源注册表**（`src/resources/`）：acquire / release 引用计数、预算 + LRU 逐出、
-  onRelease 释放回调；图片按显示尺寸降采样，供列表缩略图复用
-
-## 目录结构
-
-```
-koring-launcher/
-├─ electron/                  # 主进程（Electron，@xmcl 全部运行于此）
-│  ├─ main.ts                 # 入口：窗口管理、splash→主界面过渡
-│  ├─ preload.ts              # contextBridge 暴露 window.electronAPI
-│  ├─ config.ts               # YAML 配置（权威、稀疏写盘、迁移）
-│  ├─ auth.ts · updater.ts · resource-protocol.ts
-│  ├─ core/                   # @xmcl 集成与业务核心
-│  │  ├─ auth.ts · koring-auth.ts · installer.ts · launcher.ts
-│  │  ├─ launch-options.ts · launch-target.ts · version-scan.ts
-│  │  ├─ game-folder.ts · download-options.ts · modrinth.ts · instance.ts
-│  │  ├─ task.ts · paths.ts · background-image.ts · crash-logger.ts
-│  └─ handlers/               # IPC 处理器（config/auth/install/launch/java/
-│                             #   mods/instance/background/task/system/update/
-│                             #   koring-auth/crash-monitor/window）
-├─ src/                       # 渲染进程（React 19）
-│  ├─ api/                    # IPC 类型封装
-│  ├─ components/             # background/ system/ setting/ task/
-│  │                          #   about-version/ ui/ (shadcn) …
-│  ├─ pages/                  # home · gallery · store · today · play-link ·
-│  │                          #   setting(分组子页) · oobe · upvp · update ·
-│  │                          #   task-queue · crash · debug
-│  ├─ resources/              # 资源注册表（引用计数/预算/LRU）与图片解码管线
-│  ├─ stores/                 # Zustand 状态（config/auth/theme/route/launch…）
-│  ├─ layouts/ · hooks/ · lib/ (mode/buildInfo/version) · assets/ · types/
-│  ├─ App.tsx · main.tsx · index.css
-├─ public/                    # 静态资源：icons/{dev,beta,run}/、背景、字体
-├─ scripts/                   # switch-icon · version · gen-build-info ·
-│                             #   signpath-sign · release-notes …
-├─ docs/ · DEV.md · AGENTS.md # 开发文档与仓库约定
-├─ electron-builder.yml       # appId / 打包目标 / NSIS / 签名配置
-├─ vite.config.ts · tsconfig*.json · .env.{development,beta,production}
-└─ package.json               # 版本单一事实源
-```
-
-## 版本与自动更新
-
-- **版本单一事实源**：`package.json` 的 `version` 字段（`scripts/version.js`
-  `get` / `set`），本地与 CI 共用，消除双轨
-- **版本号格式**：`{base}`（package.json）→ 发布时追加构建号
-  `{base}-beta.{buildId}`（beta 通道）/ `{base}-{buildId}`（run 通道）
-- **自动更新**：`electron-updater` + GitHub provider；run 通道读 `latest.yml`，
-  beta 通道读 `latest-beta.yml`；客户端开启 `allowPrerelease` 以接收带构建号的
-  beta 更新
-- ⚠️ 若切换构建号方案（时间戳 → Run Number），旧版数值更大，老用户不会自动
-  升级，需同步提升 base 版本（详见 `docs/auto-update-plan.md`）
-
-## 路线图
-
-- [ ] **实例中心 / 资源中心 UI**：完整实现已就绪，暂以占位页收尾打磨后放开
-      （Minecraft 版本 / Mod / 整合包浏览与安装）
-- [ ] **微软账号登录 UI**：OAuth / Xbox / Minecraft 认证核心已接入，入口 UI 完善中
-- [ ] **以太 / 陶瓦联机页**：目前为占位
-- [ ] macOS（DMG）与 Linux（AppImage）CI 发布产物
-- [ ] 多语言（`app.language` 偏好已定义，UI 文案逐步外置）
-
-## 贡献指南
-
-欢迎提交 Issue 与 Pull Request：
-
-1. Fork 本仓库并以 `master` 为基线创建功能分支
-2. 遵循仓库现有风格（TypeScript 严格模式、组件/处理器分层），
-   提交信息建议使用约定式（`feat:` / `fix:` / `docs:` / `refactor:` …）
-3. 修改渲染进程前先阅读 [AGENTS.md](AGENTS.md)（架构约束与注意点）
-   与 [DEV.md](DEV.md)（开发说明）
-4. 涉及图标 / 安装器的改动请分别验证三种构建模式（`dist:dev/beta/run`）
+- **问题反馈**：可在启动器「设置 → 服务与反馈」中打开在线反馈表单（[YouTrack 表单](https://lingke.youtrack.cloud/form/aa6a005d-2559-4e92-a0f5-d3898f377ef8)），或在仓库提交 [Issue](https://github.com/dream-pep/koring-launcher/issues)。
+- **参与开发**：欢迎 Fork 仓库并基于 `master` 提交 Pull Request。开发环境、构建方式与仓库约定请阅读 [DEV.md](DEV.md) 与 [AGENTS.md](AGENTS.md)。
+- 提交信息建议使用约定式（`feat:` / `fix:` / `docs:` / `refactor:` …）。
 
 ## 许可证
 
-本项目使用自定义 **LingkeLice 1.0（LL-1.0）** 许可证，版权归
-**Shenzhen Lingke Network Technology Co., Ltd.（深圳灵科网络科技有限公司）** 所有。
-要点：**非商业用途**可自由使用、复制、修改与分发（含并入其他项目）；任何
-**商业用途**（含集成进商业产品、商业化提供服务、直接 / 间接获利）须事先获得
-版权所有者的**书面授权**。详见 [LICENSE](LICENSE)。
+本项目使用自定义 **LingkeLice 1.0（LL-1.0）** 许可证，版权归 **Shenzhen Lingke Network Technology Co., Ltd.（深圳灵科网络科技有限公司）** 所有。
+
+要点：**非商业用途**可自由使用、复制、修改与分发（含并入其他项目）；任何 **商业用途**（含集成进商业产品、商业化提供服务、直接 / 间接获利）须事先获得版权所有者的**书面授权**。详见 [LICENSE](LICENSE)。
 
 商业授权请联系 Shenzhen Lingke Network Technology Co., Ltd.
 
@@ -326,96 +224,108 @@ koring-launcher/
 - [Introduction](#introduction)
 - [Features](#features)
 - [Screenshots](#screenshots)
-- [Quick Start](#quick-start)
-- [Development](#development)
-- [Build & Release](#build--release)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Versioning & Auto-Update](#versioning--auto-update)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
+- [Download & Install](#download--install)
+- [Getting Started](#getting-started)
+- [Update Channels](#update-channels)
+- [Status & Roadmap](#status--roadmap)
+- [Feedback & Contributing](#feedback--contributing)
 - [License](#license)
 
 ## Introduction
 
-**Koring Launcher** is a modern Minecraft launcher for Windows built with
-**Electron + React 19 + TypeScript**, with game-side capabilities powered by the
-mature [@xmcl](https://github.com/Voxelum/xmcl) ecosystem (install, launch, task).
+**Koring Launcher** is a modern Minecraft launcher for Windows, macOS and Linux.
+Its goal is to make the basics effortless: **install it, launch it, and understand
+what went wrong when something breaks**.
 
-The project favors a *thin renderer, authoritative main process* architecture:
-game-related features (@xmcl, filesystem, subprocesses) all run in the Electron
-main process, while the renderer talks to it only through type-safe IPC. Notable
-engineering practices include a custom frameless window and splash screen,
-a three-layer UI model, main-process-authoritative configuration, a built-in
-resource registry with memory management, and dual-channel (beta/run) auto-update.
+Games are organized as **instances**. Each instance can use its own Minecraft version,
+mod loader and mods, so you can switch between setups and configure them independently.
+Before launching, the launcher verifies that the version files and dependencies are
+complete and offers one-click repair — instead of starting a half-installed game.
 
-> **Status**: under active development with public beta/run releases. The core
-> framework and main flows are stable; a few UI modules are being polished
-> (see [Roadmap](#roadmap)).
+The interface uses a frameless window, glass-inspired surfaces, a dedicated splash
+screen, directional page transitions and light/dark themes. The launcher also ships
+with dual-channel auto-update, device verification, version activation, runtime
+notices, crash analysis, a task queue and an in-app feedback entry.
+
+> **Status**: the mainline release is **1.2.7**, with Windows, macOS and Linux
+> packages built and published through GitHub Actions. Launching, instance management,
+> crash analysis, news, settings and auto-update are available. The resource center,
+> online play and some account entries are still in progress — see
+> [Status & Roadmap](#status--roadmap).
 
 ## Features
 
+**Launching**
+
+- One-click launch from the home page; the home title and play button follow the
+  instance selected on the instance page.
+- Launchability check for the version manifest, client JAR and libraries, with
+  clear errors and one-click repair instead of starting an incomplete instance.
+- Automatic Java matching based on the Minecraft version, plus manual Java paths,
+  Java scanning, initial/max memory, GC and extra JVM arguments.
+- Centralized launch options: game window size, quick-connect server, IP stack
+  preference, game arguments, pre-launch commands and post-launch launcher behavior.
+- A visible task queue for installs, repairs and downloads, with progress, phase
+  counters, logs, pause/resume/cancel/retry and removal.
+
+**Instance management**
+
+- Multiple game directories with custom display names and ordering.
+- New-instance wizard: Minecraft version, loader (Forge / NeoForge / Fabric / Quilt /
+  OptiFine), install location and memory, with an option to download immediately.
+- Import an existing game folder; playable versions are discovered and imported in
+  bulk, skipping ones already added.
+- Instance detail with seven tabs: overview, settings, mods, saves, screenshots,
+  resource packs and logs.
+- Local content management: enable/disable/delete mods with search and filters;
+  browse, back up or delete saves; preview and delete screenshots; inspect resource
+  and shader packs.
+- Instance health check and one-click repair of vanilla files, loaders and libraries.
+- Favorites, plus a clear separation: the instance page selects a version, the home
+  page launches it.
+
+**Crash analysis**
+
+- The logs tab analyzes crash reports and the latest log, presenting a conclusion,
+  evidence, suggestions, environment information and the log tail.
+- More than twenty rules cover out-of-memory, wrong Java version, mod conflicts,
+  missing dependencies, Mixin failures, loader errors, OpenGL / GPU driver issues,
+  file verification and permission problems.
+- A fallback recommendation is shown when no rule matches.
+
+**Install & download**
+
+- Vanilla, Forge, NeoForge, Fabric, Quilt and OptiFine installations and repairs.
+- Three download sources: BMCLAPI mirror, Mojang official and custom mirror, with
+  configurable concurrency and a preview of the effective URLs.
+- Download source changes take effect immediately.
+
+**Accounts & safety**
+
+- Offline accounts with spec-compliant UUIDs and LittleSkin accounts. Koring
+  account QR sign-in and Microsoft sign-in are integrated, but their UI entries
+  are currently hidden while being finished.
+- Device registration and verification on first launch and after updates, with a
+  dedicated blocked page for abnormal devices.
+- Version activation, forced upgrades and runtime notices delivered by the service.
+- Optional third-party authentication endpoint, plus a hardware-based device ID
+  shown on the About page.
+
+**News**
+
+- Official Minecraft news feed with platform filters (Java, Bedrock, Dungeons,
+  Legends), infinite scrolling, manual refresh and links to the original articles.
+
 **Desktop experience**
 
-- Custom **frameless window**: glassmorphism title bar and window controls,
-  automatic dark/light mode
-- Standalone **splash screen** (480×320 transparent window, dependency-free,
-  `ready-to-show` + minimum-duration transition)
-- **Three-layer UI** (background / content / system) with View Transitions
-- Hidden **debug pages** (`debug-*` routes) for display, update, task, and
-  resource/memory inspection
-
-**Game capabilities (via @xmcl)**
-
-- **Launchability first**: before launching, the launcher resolves the *launch plan* —
-  resource root (instance override / instance dir / shared resource dir) and the runnable
-  version (configured → loader → base → fallback) — then checks dependencies (version JSON,
-  client JAR, `rules`-filtered libraries). Missing dependencies fail loudly instead of
-  launching a half-installed instance
-- **Config-driven unified launch**: the main process maps authoritative config to
-  `LaunchOption` (Java path, memory, GC, JVM args, window, pre-launch commands), with
-  `plan` / `warning` / `stdout` / `stderr` / `window-ready` / `exit` event streaming and
-  `afterLaunch` window handling
-- **Java auto-matching**: derives the required Java major from the Minecraft version
-  (1.20.5+ → 21, 1.17–1.20.4 → 17, ≤ 1.16.5 → 8), previews the chosen runtime and
-  candidates in Settings (`java:plan`), plus `java:scan` / `java:resolve` validation
-- **One-click instance repair**: fills in missing vanilla, loader and library artifacts and
-  writes back the instance (`instance:repair`, with progress)
-- **PCL2-style directory recognition**: picking `versions/`, a single version folder or an
-  instance folder resolves to the real game root; detects the launcher kind (Koring /
-  official / PCL2 / HMCL / Prism / MultiMC) and version health, and can **auto-discover**
-  common locations; importing supports **reference** (space-saving) and **copy** (with
-  shared `libraries`/`assets`) modes
-- **Instance card gallery**: every instance is a card; drop a `logo.png` (or `logo.jpg` /
-  `icon.png` …) into the instance folder and it becomes the icon, otherwise a default icon
-  tinted from the instance name is used. Supports **search** (name / category / version),
-  **category filters** and **favorites**; cards launch the game or open the folder directly,
-  and the detail view shows the launch plan and dependency report with one-click repair
-- **Mod ecosystem**: Modrinth / CurseForge search & install modules
-- **Accounts**: Koring account, offline login (spec-compliant offline UUID),
-  Microsoft OAuth core integrated; the account page shows the real launch profile
-  (`--username` / `--uuid` / auth mode)
-- **Task system**: install / download progress flows through a main-process
-  task queue (`task:*`) with a visible UI queue
-
-> Implementation details for the launch pipeline, directory recognition, download sources
-> and the IPC contract live in **[`docs/launch-pipeline.md`](docs/launch-pipeline.md)**;
-> the pure logic is verified by `pnpm build:main && node scripts/verify-launch-core.mjs` (90 assertions).
-
-**Configuration & personalization**
-
-- **Main-process-authoritative config**: YAML (`Koring.yml`), deep merge +
-  sparse save + change broadcast
-- **Settings center** (PCL2-inspired groups): game (account / Java / directory /
-  advanced), personalization (theme & background / UI / language / a11y),
-  network (download / security ID), etc.
-- **Background system**: color / gradient / blur / custom wallpaper. Custom
-  wallpapers are downsampled to screen size and stored **on disk** by the main
-  process, streamed via the privileged `koring-res://` protocol (**no base64**),
-  and managed by a **resource registry** (ref-counting, budget + LRU eviction)
-- **Onboarding flows**: first-launch OOBE wizard (language / agreement / login /
-  version) and post-update wizard (UPvP); “About this version” renders GitHub
-  release notes as categorized cards (added / fixed / improved / …)
+- Frameless window, custom glass title bar and window controls, light/dark themes.
+- Dedicated splash screen and directional page transitions; version cards feature
+  an animated silk effect.
+- Backgrounds support colors, gradients, images, blur, opacity and parallax.
+- Accessibility options for reduced motion, reduced transparency and high contrast.
+- Flexible settings center covering game, accounts, Java, directories, advanced
+  options, theme, UI, language, downloads, online play, security, feedback and more.
+- First-run OOBE and post-update UPVP flows, with categorized release notes.
 
 ## Screenshots
 
@@ -426,229 +336,103 @@ resource registry with memory management, and dual-channel (beta/run) auto-updat
   e.g. <img src="docs/screenshots/home.png" width="720" alt="Home" />
 -->
 
-## Quick Start
+## Download & Install
 
-**End users**: download the latest installer from
-[GitHub Releases](https://github.com/dream-pep/koring-launcher/releases) (NSIS,
-custom install directory). The release pipeline currently publishes Windows
-setups; macOS (DMG) and Linux (AppImage) targets are configured and will be
-opened up in CI gradually.
+Get the latest package from
+[GitHub Releases](https://github.com/dream-pep/koring-launcher/releases):
 
-**Development requirements**
-
-| Dependency | Version | Notes |
+| Platform | Package | Notes |
 | --- | --- | --- |
-| OS | Windows 10/11 (x64) | Primary development & target platform |
-| Node.js | ≥ 20.19 (CI uses 22) | Required by Vite 7 |
-| pnpm | ≥ 9 (CI uses 11.7) | Package manager (pnpm workspace) |
+| Windows | NSIS installer | Custom install directory, desktop and Start Menu shortcuts |
+| macOS | DMG / ZIP | Apple Silicon and Intel builds |
+| Linux | AppImage | Make it executable and run |
 
-> In China, `.npmrc` already redirects Electron binaries to the npmmirror
-> mirror to avoid download timeouts.
+**Requirements**
 
-```bash
-pnpm install
+- Windows 10 / 11 (x64)
+- macOS (Apple Silicon and Intel)
+- A mainstream x64 Linux desktop
 
-# Full app dev (Vite :1420 + Electron)
-pnpm dev
-pnpm dev:renderer   # renderer only (HMR, port 1420)
-pnpm dev:main       # main process only
-```
+A working Java runtime is required to play. The launcher matches and validates it
+automatically, and you can also point it at a specific Java manually.
 
-## Development
+> Windows installers use remote signing (currently a test certificate), so some
+> systems may still show an “unknown publisher” warning. macOS builds are not yet
+> signed; if Gatekeeper blocks the first launch, allow it in System Settings →
+> Privacy & Security, or right-click and choose Open.
 
-Common scripts (full details in `DEV.md` and `AGENTS.md`):
+Configuration, account data and crash logs live in the user data directory
+(`%APPDATA%\Koring Launcher` on Windows), not in the install directory, so upgrades
+and reinstalls keep your setup.
 
-| Command | Description |
+## Getting Started
+
+1. Install and complete the OOBE: language, agreements, device and version checks.
+2. Confirm your game directory, or add your own `.minecraft` folder.
+3. Create an instance in the instance page, or import an existing game folder.
+4. Select the instance to play; run a health check and repair if needed.
+5. Return home and press Play. Progress is visible in the task queue.
+6. Adjust Java, memory, download source, post-launch behavior, theme and
+   accessibility as needed.
+
+## Update Channels
+
+Two channels are available under Settings → About:
+
+| Channel | Description |
 | --- | --- |
-| `pnpm dev` | Full dev environment (compile main, then Vite + Electron) |
-| `pnpm dev:renderer` | Renderer only (Vite HMR, port 1420) |
-| `pnpm dev:main` | Main process only (`tsc` then launch Electron) |
-| `pnpm build:renderer:{dev,beta,run}` | Build renderer for a mode |
-| `pnpm build:main` | Compile main-process TypeScript |
-| `pnpm build:{dev,beta,run}` | Full build for a mode (renderer + main) |
-| `pnpm preview` | Preview the Vite build |
-| `pnpm version:set` | Set the version (`package.json` is the single source) |
-| `pnpm pack` | `electron-builder --dir` (unpacked output) |
-| `pnpm dist` / `dist:win` / `dist:mac` / `dist:linux` | Package for a target |
+| **Woker (steady)** | Stable releases only — recommended for daily play |
+| **Runner (preview)** | Also receives beta builds — for users who want early access |
 
-**Quick notes**
+The update page shows release notes, supports checking and downloading updates
+(with progress, pause/resume/cancel) and installing with a restart. Downloaded
+packages are verified before installation. Forced upgrades and blocked versions are
+communicated explicitly and routed to the update page.
 
-- `@/` maps to `src/` (in both `vite.config.ts` and `tsconfig.json`)
-- Public assets in the renderer must use the `import.meta.env.BASE_URL` prefix
-  (absolute paths break when packaged)
-- All `@xmcl/*`, filesystem and subprocess code lives in the main process; the
-  renderer calls via `ipcRenderer.invoke()` → `ipcMain.handle()`, and
-  directional events are pushed with `webContents.send()`
-- Main-process config is authoritative — the renderer submits patches, never
-  writes files directly
-- HeroUI 3 (built on react-aria) controls use `onChange` (`onValueChange`
-  no longer exists)
-- Window dragging requires the inline style `WebkitAppRegion: "drag"`
-  (Electron only honors the CSS property)
+## Status & Roadmap
 
-## Build & Release
+**Available**
 
-### Build modes
+- Home launch, pre-launch verification and one-click repair;
+- Multi-directory instances with create/import/check/repair;
+- Mods, saves, screenshots, resource packs and logs per instance;
+- Crash analysis, official Minecraft news and the task queue;
+- Offline and LittleSkin accounts, device verification and version activation;
+- Settings center, personalization and accessibility;
+- OOBE / UPVP onboarding, dual-channel auto-update and runtime notices;
+- Windows, macOS and Linux build & release pipelines.
 
-Three build modes are driven by env files (`.env.development` / `.env.beta` /
-`.env.production`) and each ships its **own icon set** for the exe and
-installer:
+**In progress**
 
-| Mode | Vite mode | Icon dir | Purpose |
-| --- | --- | --- | --- |
-| `dev` | `development` | `public/icons/dev/` | Daily development |
-| `beta` | `beta` | `public/icons/beta/` | Beta release |
-| `run` | `production` | `public/icons/run/` | Production release |
+- [ ] **Resource center entry**: the browsing and installation UI for Minecraft
+      versions, mods and modpacks is largely implemented but not yet exposed in
+      stable builds (modpack installation is still in progress);
+- [ ] **Online play**: Ether and Tawa online play pages are placeholders;
+- [ ] **Account entries**: Microsoft and Koring account UI entries are pending;
+- [ ] **Localization**: Simplified Chinese / English preference exists; UI strings
+      are being externalized;
+- [ ] **Modpacks**: install/export, mod dependency checks and update detection;
+- [ ] **Instance extras**: save import/export, version copy and shortcuts;
+- [ ] **Release polish**: macOS signing/notarization and a Windows production
+      certificate;
+- [ ] **Crash analysis**: cloud-based cause library and multi-log correlation.
 
-```bash
-pnpm dist:dev    # build:dev  →  icon:dev  →  electron-builder --win
-pnpm dist:beta   # build:beta →  icon:beta →  electron-builder --win
-pnpm dist:run    # build:run  →  icon:run  →  electron-builder --win
-```
+## Feedback & Contributing
 
-Pipeline: mode build → `scripts/switch-icon.js` copies the mode icons into
-`build/` (electron-builder’s `buildResources`) → electron-builder produces an
-NSIS installer at `dist-electron/koring-launcher-{version}-setup.exe`.
-
-### Release pipeline (GitHub Actions)
-
-`.github/workflows/release.yml` is triggered manually with a `beta` / `run` mode:
-
-1. Read the base version from `package.json`, append a **BUILD ID**
-   (GitHub Run Number, strictly increasing): `{base}-beta.{buildId}` (beta) or
-   `{base}-{buildId}` (run)
-2. `pnpm build:{mode}` + `pnpm icon:{mode}`
-3. `electron-builder --win` with **SignPath remote signing** (auto-skipped when
-   `SIGNPATH_API_TOKEN` is absent; sha256-only to save quota)
-4. Generate Chinese release notes and publish a GitHub Release: beta releases
-   are prereleases that also upload `latest-beta.yml`; run releases are stable
-   and upload `latest.yml` (the electron-updater manifest)
-
-### Config storage (main-process authoritative)
-
-- **`Koring.yml`**: stored under `app.getPath('userData')`
-  (`%APPDATA%/Koring Launcher/`) when packaged, or in the project root in dev;
-  legacy files next to the old exe are auto-migrated on first launch
-- The in-memory cache in the main process is the single source of truth:
-  renderer submits a patch via `config:update` → deep merge → 300 ms debounced
-  **sparse write** (non-default values only) → broadcast `config:changed`
-- **`koring-auth.json`** (account data) and crash logs follow the same policy
-- ⚠️ Never store data files inside the install directory: NSIS reinstall /
-  upgrade removes the whole directory via the old uninstaller
-
-## Architecture
-
-```
-┌────────────────────────── Renderer (React 19) ─────────────────────────┐
-│  pages / components / stores (Zustand)        resources (registry+LRU) │
-│        │ ipcRenderer.invoke()  ▲ ipcMain.handle()                      │
-│        ▼                      │ webContents.send() (directional)        │
-├────────────────────────── Main Process (Electron / Node) ──────────────┤
-│  handlers/*  ──  config.ts (YAML authority) · auth.ts · updater.ts      │
-│  core/*      ──  @xmcl/core · @xmcl/installer · @xmcl/task             │
-│                  launch-options (config → LaunchOption)                │
-│  resource-protocol.ts  koring-res:// (whitelist streaming, realpath)    │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-- **IPC flow**: renderer `invoke` → main `handle` → result returns; the main
-  process pushes directional events (e.g. `config:changed`, `launch:event`)
-  via `webContents.send`
-- **Mutable `win` reference**: `main.ts` keeps a mutable `win` object, and
-  handlers read `win.mainWindow` at runtime instead of capture time
-- **`koring-res://`**: privileged custom protocol serving only whitelisted
-  `background-custom*` files inside userData (realpath double-check against
-  path traversal) so the renderer can stream local wallpapers by reference
-- **Wallpaper pipeline**: custom wallpapers are copied into userData,
-  downsampled/re-encoded to screen size and written **to disk**; the config
-  stores only the file path
-- **Resource registry** (`src/resources/`): acquire/release ref-counting,
-  budget + LRU eviction, onRelease callbacks; images are decoded at display
-  size and shared by list thumbnails
-
-## Project Structure
-
-```
-koring-launcher/
-├─ electron/                  # Main process (all @xmcl code runs here)
-│  ├─ main.ts                 # Entry: windows, splash → main transition
-│  ├─ preload.ts              # contextBridge → window.electronAPI
-│  ├─ config.ts               # YAML config (authoritative, sparse save, migrate)
-│  ├─ auth.ts · updater.ts · resource-protocol.ts
-│  ├─ core/                   # @xmcl integrations & business core
-│  │  ├─ auth.ts · koring-auth.ts · installer.ts · launcher.ts
-│  │  ├─ launch-options.ts · launch-target.ts · version-scan.ts
-│  │  ├─ game-folder.ts · download-options.ts · modrinth.ts · instance.ts
-│  │  ├─ task.ts · paths.ts · background-image.ts · crash-logger.ts
-│  └─ handlers/               # IPC handlers (config/auth/install/launch/java/
-│                             #   mods/instance/background/task/system/update/
-│                             #   koring-auth/crash-monitor/window)
-├─ src/                       # Renderer (React 19)
-│  ├─ api/                    # Typed IPC wrappers
-│  ├─ components/             # background/ system/ setting/ task/
-│  │                          #   about-version/ ui/ (shadcn) …
-│  ├─ pages/                  # home · gallery · store · today · play-link ·
-│  │                          #   setting (grouped subpages) · oobe · upvp ·
-│  │                          #   update · task-queue · crash · debug
-│  ├─ resources/              # Resource registry (ref-count/budget/LRU) +
-│  │                          #   image decode pipeline
-│  ├─ stores/                 # Zustand (config/auth/theme/route/launch…)
-│  ├─ layouts/ · hooks/ · lib/ (mode/buildInfo/version) · assets/ · types/
-│  ├─ App.tsx · main.tsx · index.css
-├─ public/                    # Static assets: icons/{dev,beta,run}/, bg, fonts
-├─ scripts/                   # switch-icon · version · gen-build-info ·
-│                             #   signpath-sign · release-notes …
-├─ docs/ · DEV.md · AGENTS.md # Docs & repository conventions
-├─ electron-builder.yml       # appId / targets / NSIS / signing
-├─ vite.config.ts · tsconfig*.json · .env.{development,beta,production}
-└─ package.json               # Single source of truth for the version
-```
-
-## Versioning & Auto-Update
-
-- **Single source of truth**: the `version` field in `package.json`
-  (`scripts/version.js` `get`/`set`) shared by local builds and CI
-- **Version format**: `{base}` (package.json) gains a build suffix at release
-  time: `{base}-beta.{buildId}` (beta) / `{base}-{buildId}` (run)
-- **Auto-update**: `electron-updater` with the GitHub provider; run reads
-  `latest.yml`, beta reads `latest-beta.yml`; the client enables
-  `allowPrerelease` so suffixed beta builds are detected
-- ⚠️ Switching the build-ID scheme (timestamp → Run Number) makes old versions
-  numerically larger; raise the base version at the same time or old clients
-  will not upgrade (details: `docs/auto-update-plan.md`)
-
-## Roadmap
-
-- [ ] **Instance center / Resource center UI**: full implementations are ready
-      but temporarily behind placeholder pages (Minecraft versions / mods /
-      modpacks browse & install)
-- [ ] **Microsoft account login UI**: OAuth / Xbox / Minecraft auth core is
-      integrated; UI entry is being polished
-- [ ] **Ether / Tawa online play pages**: currently placeholders
-- [ ] macOS (DMG) and Linux (AppImage) CI artifacts
-- [ ] i18n rollout (`app.language` preference is defined; UI strings are being
-      externalized)
-
-## Contributing
-
-Issues and pull requests are welcome:
-
-1. Fork the repository and branch from `master`
-2. Follow the existing style (strict TypeScript, layered components/handlers);
-   prefer conventional commits (`feat:` / `fix:` / `docs:` / `refactor:` …)
-3. Before touching the renderer, read [AGENTS.md](AGENTS.md) (architecture
-   constraints) and [DEV.md](DEV.md) (development notes)
-4. Icon / installer changes should be verified across all three build modes
-   (`dist:dev/beta/run`)
+- Use the in-app feedback form under Settings → Service & Feedback
+  ([YouTrack form](https://lingke.youtrack.cloud/form/aa6a005d-2559-4e92-a0f5-d3898f377ef8)),
+  or open an [issue](https://github.com/dream-pep/koring-launcher/issues).
+- Contributions are welcome: fork the repository and branch from `master`.
+  See [DEV.md](DEV.md) and [AGENTS.md](AGENTS.md) for development and repository
+  conventions. Conventional commit messages are preferred.
 
 ## License
 
 This project is licensed under the custom **LingkeLice 1.0 (LL-1.0)**, ©
-**Shenzhen Lingke Network Technology Co., Ltd.** In short: **non-commercial
-use** (use, copy, modify, distribute, including incorporation into other
-projects) is free; any **commercial use** — integrating into commercial
-products, providing paid services, or earning direct/indirect revenue — requires
-**prior written authorization** from the copyright holder. See
-[LICENSE](LICENSE).
+**Shenzhen Lingke Network Technology Co., Ltd.** In short: **non-commercial use**
+(use, copy, modify, distribute, including incorporation into other projects) is
+free; any **commercial use** — integrating into commercial products, providing paid
+services, or earning direct/indirect revenue — requires **prior written
+authorization** from the copyright holder. See [LICENSE](LICENSE).
 
 For commercial licensing, contact Shenzhen Lingke Network Technology Co., Ltd.
