@@ -211,11 +211,11 @@
 
 ## 许可证
 
-本项目使用自定义 **LingkeLice 1.0（LL-1.0）** 许可证，版权归 **Shenzhen Lingke Network Technology Co., Ltd.（深圳灵科网络科技有限公司）** 所有。
+本项目使用自定义 **LingkeLice 1.0（LL-1.0）** 许可证，版权归 **Lingke Network Technology Co., Ltd.（瓴克网络科技有限公司）** 所有。
 
 要点：**非商业用途**可自由使用、复制、修改与分发（含并入其他项目）；任何 **商业用途**（含集成进商业产品、商业化提供服务、直接 / 间接获利）须事先获得版权所有者的**书面授权**。详见 [LICENSE](LICENSE)。
 
-商业授权请联系 Shenzhen Lingke Network Technology Co., Ltd.
+商业授权请联系 Lingke Network Technology Co., Ltd.（瓴克网络科技有限公司）。
 
 ---
 
@@ -429,10 +429,10 @@ communicated explicitly and routed to the update page.
 ## License
 
 This project is licensed under the custom **LingkeLice 1.0 (LL-1.0)**, ©
-**Shenzhen Lingke Network Technology Co., Ltd.** In short: **non-commercial use**
+**Lingke Network Technology Co., Ltd.** In short: **non-commercial use**
 (use, copy, modify, distribute, including incorporation into other projects) is
 free; any **commercial use** — integrating into commercial products, providing paid
 services, or earning direct/indirect revenue — requires **prior written
 authorization** from the copyright holder. See [LICENSE](LICENSE).
 
-For commercial licensing, contact Shenzhen Lingke Network Technology Co., Ltd.
+For commercial licensing, contact Lingke Network Technology Co., Ltd.
