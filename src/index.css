@@ -530,8 +530,8 @@ html[data-transitioning] .silk-snapshot {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  /* 明亮模式：白色遮罩在 contentBlurOpacity 基础上再降 35%（×0.65），避免白纱过重 */
-  background: rgba(255, 255, 255, calc(var(--content-blur-opacity, 0.6) * 0.95));
+  /* 明亮模式：白色遮罩比设置值再强 20%（上限 0.9），避免明亮背景下内容区发灰、文字对比不足 */
+  background: rgba(255, 255, 255, var(--content-blur-opacity, 1));
   transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 :root.dark .content-blur-overlay {

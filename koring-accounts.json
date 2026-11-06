@@ -9,6 +9,14 @@
       "uuid": "cb8357c5-2e4a-246c-306b-bbdda63ad46f",
       "addedAt": 1793441863184,
       "lastLoginAt": 1793441863184
+    },
+    {
+      "id": "7d4c048d-3703-411a-b143-b762ae358281",
+      "type": "offline",
+      "username": "alibaba",
+      "uuid": "9ec2d9f0-7ad5-7ceb-c009-92851eecc436",
+      "addedAt": 1793970148748,
+      "lastLoginAt": 1793970148748
     }
   ]
 }

@@ -41,6 +41,11 @@ pnpm dev
 - 前端热更新（HMR）
 - 主进程修改后需重启 `pnpm dev`
 - 调试工具：`Ctrl+Shift+I` 打开 DevTools
+- ⚠️ **dev 下根目录运行时文件会触发整页重载**：Vite 监听到项目根内任何文件的 `change` 事件都会向页面发
+  `full-reload`。主进程在未打包时把状态写在项目根（`Koring.yml`、`koring-auth.json`、
+  `koring-accounts.json`、`koring-crash.log`、`.minecraft/**`），必须在 `vite.config.ts` 的
+  `server.watch.ignored` 里逐个忽略，否则「切换/添加游戏账户」「启动游戏」等操作会让界面闪回首页
+  （多账号注册表 `koring-accounts.json` 就是漏加导致的典型案例）。新增根目录运行时文件时同步补进去。
 
 ### 生产打包
 

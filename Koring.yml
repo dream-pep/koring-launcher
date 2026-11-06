@@ -1,20 +1,21 @@
 appVersion: 1.2.7
 oobe: false
-theme:
-  darkMode: auto
 a11y:
   contentBlurOpacity: 44
 background:
-  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-mvwqj7612tcxl1.png
+  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-mw4zlwcf7sdofe.png
 game:
   gameDir: C:\Users\ab090\AppData\Roaming\.minecraft
+  gameDirs:
+    - C:\Users\ab090\Desktop\VRCub1.1.1\.minecraft
   gameDirOrder:
     - C:\Users\ab090\AppData\Roaming\.minecraft
-  selectedInstance: VRCub Fabric
+    - C:\Users\ab090\Desktop\VRCub1.1.1\.minecraft
+  selectedInstance: Create-Delight-Remake
 java:
   javaPath: C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot\bin\java.exe
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1793473557991
+  checkedAt: 1793971078579
   version: 1.2.7

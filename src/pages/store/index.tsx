@@ -8,91 +8,49 @@
 // 未经允许的情况下删除此版权头可能会受到民事指控
 // 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
 
-import { useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
-import { ArrowUp } from "lucide-react";
-import { useRouteStore } from "@/stores/routeStore";
-import { directionFromIndex, runViewTransition } from "@/lib/view-transition";
-import { Sidebar, type StoreSection } from "./Sidebar";
-import { GameVersionView } from "./GameVersionView";
-import { ResourceBrowseView } from "./ResourceBrowseView";
+import { useState } from "react";
+import { Box, CalendarHeart, Package, Puzzle } from "lucide-react";
+import { PageShell, type PageShellGroup } from "@/components/page-shell";
+import { TodayView } from "./TodayView";
 
-/** 侧栏分类顺序：切换方向按上下顺序决定（与侧边栏一一对应） */
-const SECTION_ORDER: StoreSection[] = ["game", "mod", "modpack"];
+const iconCls = "w-[18px] h-[18px] shrink-0";
+
+/**
+ * 资源页侧边栏。
+ *
+ * 结构：Today / 原版游戏（无分组）+ 社区资源分组（Mod 模组 / 整合包）。
+ * 内容区暂时留空（PageShellItem 不传 content），后续再逐个接入。
+ */
+const STORE_GROUPS: PageShellGroup[] = [
+  {
+    items: [
+      {
+        key: "today",
+        label: "Today",
+        icon: <CalendarHeart className={iconCls} />,
+        content: <TodayView />,
+      },
+      { key: "vanilla", label: "原版游戏", icon: <Box className={iconCls} /> },
+    ],
+  },
+  {
+    title: "社区资源",
+    items: [
+      { key: "mod", label: "Mod 模组", icon: <Puzzle className={iconCls} /> },
+      { key: "modpack", label: "整合包", icon: <Package className={iconCls} /> },
+    ],
+  },
+];
 
 export function Store() {
-  const section = useRouteStore((s) => s.storeSection);
-  const setStoreSection = useRouteStore((s) => s.setStoreSection);
-
-  // 内容区滚动容器
-  const mainRef = useRef<HTMLElement | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const [showTop, setShowTop] = useState(false);
-
-  // 监听内容区滚动，非顶部时显示"返回顶部"按钮
-  useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-    const onScroll = () => setShowTop(el.scrollTop > 300);
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const scrollToTop = () => {
-    mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // 分类切换：方向跟随侧栏上下顺序，旧内容先渐出、新内容再渐入
-  const switchSection = (next: StoreSection) => {
-    if (next === section) return;
-    const direction = directionFromIndex(SECTION_ORDER.indexOf(section), SECTION_ORDER.indexOf(next));
-    runViewTransition(
-      direction,
-      () => {
-        flushSync(() => setStoreSection(next));
-        mainRef.current?.scrollTo({ top: 0 });
-      },
-      { element: contentRef.current, name: "store-content" },
-    );
-  };
+  const [section, setSection] = useState("today");
 
   return (
-    <div className="flex h-full">
-      {/* 左侧边栏（与设置页同款样式） */}
-      <Sidebar section={section} onSelect={switchSection} />
-
-      {/* 右侧内容区（唯一滚动容器，支持无限滚动与返回顶部） */}
-      <main ref={mainRef} className="scroll-area flex-1 h-full min-w-0 overflow-y-auto p-6">
-        <div ref={contentRef} className="h-full">
-          {section === "game" ? (
-            <GameVersionView />
-          ) : (
-            <ResourceBrowseView
-              projectType={section}
-              canInstall={section === "mod"}
-              scrollRef={mainRef}
-            />
-          )}
-        </div>
-
-        {/* 返回顶部按钮（非顶部时显示） */}
-        {showTop && (
-          <button
-            onClick={scrollToTop}
-            aria-label="返回顶部"
-            className="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full
-              bg-background/85 backdrop-blur-xl border border-border/50
-              shadow-lg shadow-black/10 dark:shadow-black/30
-              flex items-center justify-center text-muted-foreground hover:text-foreground
-              hover:border-primary/40 transition-all duration-200 cursor-pointer"
-          >
-            <ArrowUp className="w-4.5 h-4.5" />
-          </button>
-        )}
-      </main>
-    </div>
+    <PageShell
+      groups={STORE_GROUPS}
+      value={section}
+      onValueChange={setSection}
+      navLabel="资源导航"
+    />
   );
 }
-
-// 供外部（实例管理）跳转资源中心分类使用
-export type { StoreSection } from "./Sidebar";

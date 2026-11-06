@@ -39,7 +39,19 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     watch: {
-      ignored: ["**/Koring.yml", "**/koring-auth.json"],
+      // 主进程在 dev 下把状态文件写在项目根；Vite 监听到根目录内的文件 change 会向页面发
+      // `full-reload`，表现为「切换/添加游戏账户后整个界面闪回首页」。必须显式忽略这些运行时
+      // 写入：Koring.yml（启动器配置）、koring-auth.json（旧版单账号）、koring-accounts.json
+      // （多账号注册表，切换/添加/删除账户都会重写）、koring-crash.log / koring.log（崩溃与调试日志）、
+      // .minecraft（游戏目录，启动后持续写日志）。新增根目录运行时文件时必须同步加到这里。
+      ignored: [
+        "**/Koring.yml",
+        "**/koring-auth.json",
+        "**/koring-accounts.json",
+        "**/koring-crash.log",
+        "**/koring.log",
+        "**/.minecraft/**",
+      ],
     },
   },
 }));

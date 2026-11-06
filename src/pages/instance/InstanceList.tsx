@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, Loader2, RefreshCw } from "lucide-react";
 import {
   getMinecraftVersionList,
   listInstances,
@@ -8,10 +8,15 @@ import {
 } from "@/api/instance";
 import { versionTypeLabel } from "@/lib/version-type";
 import { toast } from "@/lib/toast";
-import { SettingListItem } from "@/components/setting/SettingListItem";
+import { cn } from "@/lib/utils";
+import { SettingRow } from "@/components/setting";
 import { useConfigStore } from "@/stores/configStore";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useRouteStore } from "@/stores/routeStore";
+
+/** 设置页卡片背景（与 SettingCard / SettingRow 一致的磨砂玻璃外观） */
+const cardCls =
+  "rounded-xl border border-black/[0.06] bg-white/85 backdrop-blur-[12px] dark:border-white/[0.07] dark:bg-black/45";
 
 /** 实例行图标（用户指定：草地方块） */
 const GRASS_ICON = `${import.meta.env.BASE_URL}Blocks/Grass.png`;
@@ -132,10 +137,7 @@ export function InstanceList({ gamePath }: InstanceListProps) {
     return (
       <div className="flex flex-col gap-2">
         {[0, 1, 2].map((index) => (
-          <div
-            key={index}
-            className="flex items-center gap-3 rounded-lg border border-border/40 bg-foreground/[0.02] px-3 py-2.5 dark:border-white/[0.06]"
-          >
+          <div key={index} className={cn(cardCls, "flex items-center gap-3 px-4 py-3")}>
             <div className="h-10 w-10 shrink-0 animate-pulse rounded-md bg-foreground/[0.06]" />
             <div className="flex flex-1 flex-col gap-1.5">
               <div className="h-3.5 w-40 animate-pulse rounded bg-foreground/[0.06]" />
@@ -188,31 +190,43 @@ export function InstanceList({ gamePath }: InstanceListProps) {
         const isPending = pendingName === instance.name;
 
         return (
-          <SettingListItem
+          <button
             key={instance.name}
-            selected={isSelected}
+            type="button"
             disabled={isPending}
             onClick={() => void handleSelect(instance)}
-            className="group gap-3 py-2.5"
+            className={cn(
+              cardCls,
+              "group w-full px-4 py-3 text-left transition-colors",
+              "hover:border-black/[0.1] hover:bg-white/95 dark:hover:border-white/[0.12] dark:hover:bg-black/55",
+              "disabled:cursor-default disabled:opacity-60",
+            )}
           >
-            <img
-              src={GRASS_ICON}
-              alt=""
-              className="h-10 w-10 shrink-0 rounded-md object-cover"
-              style={{ imageRendering: "pixelated" }}
-            />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[14px] font-medium text-foreground">{name}</span>
-              {subtitle && (
-                <span className="truncate text-[12px] text-muted-foreground/70">{subtitle}</span>
-              )}
-            </span>
-            {isPending ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
-            ) : isSelected ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-            ) : null}
-          </SettingListItem>
+            <div className="flex items-center gap-3">
+              <img
+                src={GRASS_ICON}
+                alt=""
+                className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                style={{ imageRendering: "pixelated" }}
+              />
+              <div className="min-w-0 flex-1">
+                <SettingRow label={name} desc={subtitle}>
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : isSelected ? (
+                    // 选中：最右侧一个打勾图标 + 虚化光晕背景
+                    <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+                      <span
+                        aria-hidden
+                        className="absolute inset-0 scale-110 rounded-full bg-emerald-500/30 blur-md"
+                      />
+                      <Check className="relative h-4 w-4 text-emerald-500" />
+                    </span>
+                  ) : null}
+                </SettingRow>
+              </div>
+            </div>
+          </button>
         );
       })}
     </div>

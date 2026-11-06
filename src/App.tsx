@@ -15,7 +15,7 @@ import { PlayLink } from "./pages/play-link";
 import { Setting } from "./pages/setting";
 import { SettingLogin } from "./pages/setting/login";
 import { TaskQueue } from "./pages/task-queue";
-import { StorePlaceholder } from "./pages/placeholder";
+import { Store } from "./pages/store";
 import { InstancePage } from "./pages/instance";
 import { UpdatePage } from "./pages/update";
 import { DeviceBlocked } from "./pages/device-blocked";
@@ -57,7 +57,7 @@ import { VERSION } from "./lib/version";
 
 const pageMap = {
   home: Home,
-  store: StorePlaceholder,
+  store: Store,
   today: Today,
   "play-link": PlayLink,
   setting: Setting,

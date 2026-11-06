@@ -10,11 +10,17 @@
 
 import { useState } from "react";
 import { Button } from "@heroui/react";
-import { Gamepad2, Plus, Trash2, Check, UserRound } from "lucide-react";
+import { Gamepad2, Plus, Check, UserRound } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
-import { SettingCard, SettingBadge, type SettingBadgeVariant } from "@/components/setting";
+import { SettingCard, SettingRow, type SettingBadgeVariant } from "@/components/setting";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { AccountType, AuthAccount } from "@/api/auth-registry";
 import { AddAccountDialog } from "./AddAccountDialog";
 
@@ -34,7 +40,7 @@ function avatarSrc(account: AuthAccount): string | null {
   return null;
 }
 
-// 单行账号
+// 单行账号：右键弹出菜单（删除账号），左键点击整行设为当前
 function AccountRow({
   account,
   isActive,
@@ -52,68 +58,65 @@ function AccountRow({
   const initial = account.username.slice(0, 1).toUpperCase();
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onActivate}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onActivate()}
-      className={`flex items-center gap-3.5 px-4 py-3 rounded-xl border transition-all cursor-pointer ${
-        isActive
-          ? "border-primary/40 bg-primary/[0.04]"
-          : "border-border/40 dark:border-white/[0.06] hover:border-primary/25 hover:bg-foreground/[0.02]"
-      }`}
-    >
-      {/* 头像 */}
-      <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-foreground/[0.06] flex items-center justify-center">
-        {src && !imgFailed ? (
-          <img
-            src={src}
-            alt={account.username}
-            className="w-10 h-10 object-cover"
-            onError={() => setImgFailed(true)}
-          />
-        ) : initial ? (
-          <span className="text-[15px] font-bold text-foreground/50">{initial}</span>
-        ) : (
-          <UserRound className="w-5 h-5 text-foreground/40" />
-        )}
-      </div>
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={onActivate}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onActivate()}
+            className={`rounded-xl transition-all cursor-pointer ${
+              isActive
+                ? "ring-1 ring-primary/40"
+                : "hover:ring-1 hover:ring-black/[0.10] dark:hover:ring-white/[0.12]"
+            }`}
+          >
+            <SettingCard>
+              <div className="flex items-center gap-3.5">
+                {/* 头像 */}
+                <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-foreground/[0.06] flex items-center justify-center">
+                  {src && !imgFailed ? (
+                    <img
+                      src={src}
+                      alt={account.username}
+                      className="w-10 h-10 object-cover"
+                      onError={() => setImgFailed(true)}
+                    />
+                  ) : initial ? (
+                    <span className="text-[15px] font-bold text-foreground/50">{initial}</span>
+                  ) : (
+                    <UserRound className="w-5 h-5 text-foreground/40" />
+                  )}
+                </div>
 
-      {/* 账号信息 */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-foreground truncate">{account.username}</p>
-          <SettingBadge variant={meta.variant}>{meta.label}</SettingBadge>
-          {isActive && (
-            <SettingBadge variant="success">
-              <Check className="w-3 h-3" />
-              当前
-            </SettingBadge>
-          )}
-        </div>
-        <p className="text-[12px] text-muted-foreground/70 font-mono truncate mt-0.5">
-          UUID: {account.uuid}
-        </p>
-      </div>
+                {/* 账号信息 + 操作 */}
+                <div className="flex-1 min-w-0">
+                  <SettingRow label={account.username} desc={`${meta.label} · UUID ${account.uuid}`}>
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {isActive ? (
+                        // 当前账号：虚化对勾标记
+                        <Check className="w-4 h-4 text-primary/40 shrink-0" aria-label="当前账号" />
+                      ) : (
+                        <Button size="sm" variant="outline" onPress={onActivate}>
+                          设为当前
+                        </Button>
+                      )}
+                    </div>
+                  </SettingRow>
+                </div>
+              </div>
+            </SettingCard>
+          </div>
+        }
+      />
 
-      {/* 操作 */}
-      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-        {!isActive && (
-          <Button size="sm" variant="outline" onPress={onActivate}>
-            设为当前
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant="ghost"
-          isIconOnly
-          className="text-muted-foreground hover:text-red-500"
-          onPress={onDelete}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-    </div>
+      <ContextMenuContent>
+        <ContextMenuItem className="text-destructive" onClick={onDelete}>
+          删除账号
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
