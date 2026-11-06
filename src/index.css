@@ -579,6 +579,20 @@ html[data-transitioning] .silk-snapshot {
 }
 
 /* ============================================
+   无文字录制模式（开发者工具临时开关，不写配置）
+   除顶栏与开发者工具页面外，文字统一替换为方块，布局与图标不变
+   ============================================ */
+.textless-mode * {
+  -webkit-text-security: square;
+}
+.textless-mode .titlebar,
+.textless-mode .titlebar *,
+.textless-mode [data-textless-keep],
+.textless-mode [data-textless-keep] * {
+  -webkit-text-security: none;
+}
+
+/* ============================================
    壁纸切换渐入（BackgroundLayer 双层淡入）
    ============================================ */
 @keyframes bg-crossfade-in {

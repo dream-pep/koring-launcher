@@ -49,7 +49,10 @@ export type RouteKey =
   | "debug-routes"
   | "debug-auth"
   | "debug-instance"
-  | "debug-mods";
+  | "debug-mods"
+  | "debug-version-preview"
+  | "debug-textless"
+  | "debug-list-tool";
 export type TitleBarMode = "default" | "sub" | "window" | "oobe" | "blocked";
 
 /**
@@ -121,6 +124,14 @@ export const allRoutes: RouteItem[] = [
   { key: "debug-auth", label: "账号认证调试", path: "/debug/auth", hidden: true },
   { key: "debug-instance", label: "实例与启动调试", path: "/debug/instance", hidden: true },
   { key: "debug-mods", label: "资源搜索调试", path: "/debug/mods", hidden: true },
+  {
+    key: "debug-version-preview",
+    label: "临时版本信息",
+    path: "/debug/version-preview",
+    hidden: true,
+  },
+  { key: "debug-textless", label: "无文字录制模式", path: "/debug/textless", hidden: true },
+  { key: "debug-list-tool", label: "List 工具", path: "/debug/list-tool", hidden: true },
 ];
 
 const topLevelKeys = new Set(routes.map((r) => r.key));

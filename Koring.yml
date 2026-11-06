@@ -11,11 +11,11 @@ game:
   gameDirOrder:
     - C:\Users\ab090\AppData\Roaming\.minecraft
     - C:\Users\ab090\Desktop\VRCub1.1.1\.minecraft
-  selectedInstance: Create-Delight-Remake
+  selectedInstance: 1.21.9
 java:
   javaPath: C:\Program Files\Microsoft\jdk-21.0.7.6-hotspot\bin\java.exe
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1793975133133
+  checkedAt: 1793978972873
   version: 1.2.7

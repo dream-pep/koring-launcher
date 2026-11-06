@@ -8,6 +8,8 @@ import { RuntimeNotices } from "@/components/RuntimeNotices";
 import { ActivationGate } from "@/components/ActivationGate";
 import { Toaster } from "@/components/ui/sonner";
 import { useA11yStore } from "@/stores/a11yStore";
+import { useDevStore } from "@/stores/devStore";
+import { useRouteStore } from "@/stores/routeStore";
 import { installPointerOrigin } from "@/lib/pointer-origin";
 import clsx from "clsx";
 
@@ -26,6 +28,11 @@ export function RootLayout({
 }: RootLayoutProps) {
   const { reduceMotion, reduceTransparency, highContrast, contentBlurOpacity } = useA11yStore();
 
+  // 无文字录制模式（开发者工具临时开关）：除顶栏与开发者工具页面外，文字统一替换为方块
+  const textlessMode = useDevStore((s) => s.textlessMode);
+  const currentRoute = useRouteStore((s) => s.current);
+  const keepTextReadable = currentRoute.startsWith("debug");
+
   const blurOpacity = reduceTransparency ? 0 : contentBlurOpacity;
 
   // 记录最近指针位置：弹层「从触发位置长出来」的 transform-origin 依赖它
@@ -40,6 +47,7 @@ export function RootLayout({
         reduceMotion && "reduce-motion",
         reduceTransparency && "reduce-transparency",
         highContrast && "high-contrast",
+        textlessMode && "textless-mode",
       )}
       style={{ "--content-blur-opacity": `${blurOpacity / 100}` } as React.CSSProperties}
     >
@@ -51,6 +59,7 @@ export function RootLayout({
         id="app-content-scroll"
         className="absolute z-[1] left-0 right-0 bottom-0 top-[40px] overflow-auto"
         style={{ viewTransitionName: "content" } as React.CSSProperties}
+        data-textless-keep={keepTextReadable ? "" : undefined}
       >
         {children}
       </div>

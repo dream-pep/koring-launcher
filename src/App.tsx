@@ -33,6 +33,9 @@ import { RoutesDebug } from "./pages/debug/routes-debug";
 import { AuthDebug } from "./pages/debug/auth-debug";
 import { InstanceDebug } from "./pages/debug/instance-debug";
 import { ModsDebug } from "./pages/debug/mods-debug";
+import { VersionPreviewDebug } from "./pages/debug/version-preview-debug";
+import { TextlessDebug } from "./pages/debug/textless-debug";
+import { ListToolDebug } from "./pages/debug/list-tool-debug";
 import { Oobe } from "./pages/oobe";
 import { OobeLanguage } from "./pages/oobe/step-language";
 import { OobeDevice } from "./pages/oobe/step-device";
@@ -103,6 +106,9 @@ const pageMap = {
   "debug-auth": AuthDebug,
   "debug-instance": InstanceDebug,
   "debug-mods": ModsDebug,
+  "debug-version-preview": VersionPreviewDebug,
+  "debug-textless": TextlessDebug,
+  "debug-list-tool": ListToolDebug,
 } as const;
 
 function App() {

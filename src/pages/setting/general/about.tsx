@@ -4,6 +4,7 @@ import { BUILD_COMMIT, BUILD_ID } from "@/lib/buildInfo";
 import { ExternalLink, GitFork, RotateCcw, ChevronDown } from "lucide-react";
 import { Link, Select, ListBox, ListBoxItem } from "@heroui/react";
 import { useConfigStore } from "@/stores/configStore";
+import { useDevStore } from "@/stores/devStore";
 import { SettingCard, SettingRow, SettingSwitch, PageHeader, SectionTitle } from "@/components/setting";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +55,9 @@ export function AboutSetting(_props: AboutSettingProps) {
 
   const adv = useConfigStore((s) => s.config.advanced);
   const setAdvanced = useConfigStore((s) => s.setAdvanced);
+
+  // 开发者工具的临时覆盖（不写配置，重启恢复）：与 VersionCard 共用同一份预览版本名称
+  const previewVersionLabel = useDevStore((s) => s.previewVersionLabel);
 
   // 设备识别码 = SMBIOS UUID（Account API 用来追踪本机的标识）；
   // 取不到 SMBIOS 时主进程会回退到组合指纹，这里据实标注来源
@@ -158,7 +162,7 @@ export function AboutSetting(_props: AboutSettingProps) {
             </SettingCard>
             <SettingCard>
               <SettingRow label="构建模式">
-                <span className="text-[13px] text-muted-foreground">{modeLabels[BUILD_MODE] ?? BUILD_MODE}</span>
+                <span className="text-[13px] text-muted-foreground">{previewVersionLabel ?? modeLabels[BUILD_MODE] ?? BUILD_MODE}</span>
               </SettingRow>
             </SettingCard>
             <SettingCard>

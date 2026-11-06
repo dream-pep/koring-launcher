@@ -16,6 +16,9 @@ import {
   KeyRound,
   Gamepad2,
   Search,
+  Tag,
+  Type,
+  ListOrdered,
 } from "lucide-react";
 
 // 调试入口卡片
@@ -74,6 +77,14 @@ const toolGroups: { title: string; pages: DebugEntry[] }[] = [
         bg: "bg-cyan-500/10",
       },
       {
+        key: "debug-list-tool",
+        icon: ListOrdered,
+        title: "List 工具",
+        desc: "自定义任务标题/描述，创建永不结束或倒计时任务，并插入自定义通知",
+        color: "text-fuchsia-500",
+        bg: "bg-fuchsia-500/10",
+      },
+      {
         key: "debug-auth",
         icon: KeyRound,
         title: "账号认证调试",
@@ -117,6 +128,22 @@ const toolGroups: { title: string; pages: DebugEntry[] }[] = [
         desc: "测试 VersionCard 在不同模式与更新状态下的表现",
         color: "text-amber-500",
         bg: "bg-amber-500/10",
+      },
+      {
+        key: "debug-version-preview",
+        icon: Tag,
+        title: "临时修改版本卡状态与信息",
+        desc: "临时覆盖对外显示的版本号、模式颜色与版本名称（不写配置，重启恢复）",
+        color: "text-rose-500",
+        bg: "bg-rose-500/10",
+      },
+      {
+        key: "debug-textless",
+        icon: Type,
+        title: "无文字录制模式",
+        desc: "除顶栏与开发者工具页面外，界面文字变为方块，便于录制演示视频",
+        color: "text-slate-500",
+        bg: "bg-slate-500/10",
       },
     ],
   },

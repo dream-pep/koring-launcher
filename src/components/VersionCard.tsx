@@ -3,6 +3,7 @@ import { VERSION } from "@/lib/version";
 import { BUILD_COMMIT, BUILD_ID } from "@/lib/buildInfo";
 import { useUpdateStore } from "@/stores/updateStore";
 import { useRouteStore } from "@/stores/routeStore";
+import { useDevStore } from "@/stores/devStore";
 import Silk from "@/components/silk/Silk";
 import clsx from "clsx";
 import { ChevronRight } from "lucide-react";
@@ -27,6 +28,19 @@ const modeLabels: Record<string, string> = {
 };
 
 type UpdateState = "latest" | "hasUpdate" | "installed";
+
+/** 自定义模式颜色时，用它生成渐变的深色端（与内置渐变同为「主色 → 更暗的主色」） */
+function darkenHex(hex: string, amount = 0.18): string {
+  const matched = hex.trim().replace("#", "").match(/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+  if (!matched) return hex;
+  const raw = matched[1];
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  const num = parseInt(full, 16);
+  const r = Math.round(((num >> 16) & 0xff) * (1 - amount));
+  const g = Math.round(((num >> 8) & 0xff) * (1 - amount));
+  const b = Math.round((num & 0xff) * (1 - amount));
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
 
 interface VersionCardProps {
   className?: string;
@@ -56,16 +70,30 @@ export function VersionCard({
   isSettingPage = false,
   noViewTransition = false,
 }: VersionCardProps) {
-  const color = modeColors[overrideMode ?? BUILD_MODE] ?? modeColors.run;
-  const gradient = modeGradients[overrideMode ?? BUILD_MODE] ?? modeGradients.run;
-  const label = modeLabels[overrideMode ?? BUILD_MODE] ?? modeLabels.run;
+  // 开发者工具的临时覆盖（不写配置，重启恢复）：版本号 / 模式颜色 / 版本名称 / 更新状态。
+  // 覆盖值对所有 VersionCard 生效，因此设置页、更新页、弹窗里对外显示的信息会同步变化。
+  const previewVersion = useDevStore((s) => s.previewVersion);
+  const previewModeColor = useDevStore((s) => s.previewModeColor);
+  const previewVersionLabel = useDevStore((s) => s.previewVersionLabel);
+  const previewUpdateState = useDevStore((s) => s.previewUpdateState);
+
+  const modeKey = overrideMode ?? BUILD_MODE;
+  const color = previewModeColor ?? modeColors[modeKey] ?? modeColors.run;
+  const gradient = previewModeColor
+    ? `linear-gradient(135deg, ${previewModeColor}, ${darkenHex(previewModeColor)})`
+    : modeGradients[modeKey] ?? modeGradients.run;
+  const label = previewVersionLabel ?? modeLabels[modeKey] ?? modeLabels.run;
+  const versionText = previewVersion ?? VERSION;
 
   const { update, installed } = useUpdateStore();
 
   const current = useRouteStore((s) => s.current);
   const navigate = useRouteStore((s) => s.navigate);
 
-  const effectiveState: UpdateState = overrideState ?? (installed ? "installed" : update ? "hasUpdate" : "latest");
+  const effectiveState: UpdateState =
+    overrideState ??
+    previewUpdateState ??
+    (installed ? "installed" : update ? "hasUpdate" : "latest");
 
   // 设置页：整卡可点击，跳转检查更新页面（更新日志页自身不触发）
   const clickable = isSettingPage && !oobe && current !== "update";
@@ -156,7 +184,7 @@ export function VersionCard({
           className="w-40 h-auto drop-shadow-lg"
           style={{ filter: "brightness(0) invert(1)" }}
         />
-        <p className="text-sm text-white/70 font-medium">v{VERSION}</p>
+        <p className="text-sm text-white/70 font-medium">v{versionText}</p>
 
         {/* 构建来源（CI 构建时写入；本地开发不显示） */}
         {(BUILD_COMMIT || BUILD_ID !== "local") && (
