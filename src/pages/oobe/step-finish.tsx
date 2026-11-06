@@ -48,7 +48,7 @@ export function OobeFinish() {
         if (result.block === "force_upgrade") {
           const target = result.policy.data?.upgrade_target || "";
           setActivation({ upgradeTarget: target });
-          navigate("update");
+          navigate("forced-update");
           return;
         }
         setGateOk(true);

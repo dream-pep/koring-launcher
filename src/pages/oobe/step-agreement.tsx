@@ -89,7 +89,7 @@ export function OobeAgreement() {
         </label>
       </div>
 
-      <NextButton onClick={() => navigate("oobe/legal")} disabled={!checked} />
+      <NextButton onClick={() => navigate("oobe/about-version")} disabled={!checked} />
     </OobeLayout>
   );
 }

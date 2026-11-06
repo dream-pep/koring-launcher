@@ -19,6 +19,7 @@ import { TaskQueue } from "./pages/task-queue";
 import { Store } from "./pages/store";
 import { InstancePage } from "./pages/instance";
 import { UpdatePage } from "./pages/update";
+import { ForcedUpdate } from "./pages/forced-update";
 import { DeviceBlocked } from "./pages/device-blocked";
 import { Debug } from "./pages/debug";
 import { SplashDebug } from "./pages/debug/splash-debug";
@@ -46,6 +47,11 @@ import { OobeVersion } from "./pages/oobe/step-version";
 import { OobeAboutVersion } from "./pages/oobe/about-version";
 import { OobeBetaTest } from "./pages/oobe/step-beta-test";
 import { OobeActivation } from "./pages/oobe/step-activation";
+import { OobeQuickstart } from "./pages/oobe/quickstart";
+import { OobeQuickstartList } from "./pages/oobe/quickstart-list";
+import { OobeQuickstartGame } from "./pages/oobe/quickstart-game";
+import { OobeQuickstartCraeKote } from "./pages/oobe/quickstart-craekote";
+import { OobeQuickstartEnd } from "./pages/oobe/quickstart-end";
 import { OobeFinish } from "./pages/oobe/step-finish";
 import { OobeLegal } from "./pages/oobe/step-legal";
 import { OobeAboutInfo } from "./pages/oobe/about-info";
@@ -70,6 +76,7 @@ const pageMap = {
   gallery: InstancePage,
   "task-queue": TaskQueue,
   update: UpdatePage,
+  "forced-update": ForcedUpdate,
   "device-blocked": DeviceBlocked,
   oobe: Oobe,
   "oobe/language": OobeLanguage,
@@ -81,6 +88,11 @@ const pageMap = {
   "oobe/about-version": OobeAboutVersion,
   "oobe/beta-test": OobeBetaTest,
   "oobe/activation": OobeActivation,
+  "oobe/quickstart": OobeQuickstart,
+  "oobe/quickstart-list": OobeQuickstartList,
+  "oobe/quickstart-game": OobeQuickstartGame,
+  "oobe/quickstart-craekote": OobeQuickstartCraeKote,
+  "oobe/quickstart-end": OobeQuickstartEnd,
   "oobe/finish": OobeFinish,
   "oobe/about-info": OobeAboutInfo,
   "oobe/legal": OobeLegal,
@@ -211,6 +223,7 @@ function App() {
       current.startsWith("oobe") ||
       current.startsWith("upvp") ||
       current === "update" ||
+      current === "forced-update" ||
       current === "device-blocked" ||
       current.startsWith("debug")
     ) {

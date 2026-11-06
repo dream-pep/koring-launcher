@@ -155,7 +155,8 @@ export function ActivationGate() {
           const target = data.policy.data?.upgrade_target || "";
           setActivation({ versionOk: false, checkedAt: Date.now(), version: VERSION, upgradeTarget: target });
           setPhase("upgrade");
-          navigate("update");
+          // 强制升级唯一出路：强下载版本页面（自动下载目标版本 + 静默安装）
+          navigate("forced-update");
           break;
         }
         default:
@@ -235,17 +236,17 @@ export function ActivationGate() {
     });
   }, [navigate, setActivation]);
 
-  // 强制升级：升级完成前不允许离开版本更新页
+  // 强制升级：升级完成前不允许离开强制升级页
   useEffect(() => {
     if (phase !== "upgrade") return;
     const current = useRouteStore.getState().current;
-    if (current !== "update" && !current.startsWith("debug")) {
-      navigate("update");
+    if (current !== "forced-update" && !current.startsWith("debug")) {
+      navigate("forced-update");
     }
     return useRouteStore.subscribe(() => {
       const key = useRouteStore.getState().current;
-      if (key !== "update" && !key.startsWith("debug")) {
-        navigate("update");
+      if (key !== "forced-update" && !key.startsWith("debug")) {
+        navigate("forced-update");
       }
     });
   }, [phase, navigate]);
@@ -262,8 +263,8 @@ export function ActivationGate() {
     </button>
   );
 
-  // 强制升级：跳转到更新页后遮罩隐藏（由「不允许离开更新页」守卫继续约束）
-  if (phase === "upgrade" && currentRoute === "update") return null;
+  // 强制升级：跳转到强制升级页后遮罩隐藏（由「不允许离开强制升级页」守卫继续约束）
+  if (phase === "upgrade" && currentRoute === "forced-update") return null;
 
   /**
    * 开发模式（未打包）才出现的逃生口：后端在改策略时不要把开发环境锁死。
@@ -294,10 +295,10 @@ export function ActivationGate() {
           </p>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate("update")}
+              onClick={() => navigate("forced-update")}
               className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white bg-amber-500 hover:bg-amber-600 transition-colors cursor-pointer"
             >
-              前往版本更新
+              立即升级
             </button>
             {retryButton}
           </div>

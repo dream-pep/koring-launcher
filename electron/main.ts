@@ -21,6 +21,7 @@ import { startupCheck, startDeviceHeartbeat, stopDeviceHeartbeat } from './core/
 import { registerJavaHandlers } from './handlers/java';
 import { registerNewsHandlers } from './handlers/news';
 import { registerUpdateHandlers } from './handlers/update';
+import { registerForcedUpdateHandlers } from './handlers/forced-update';
 import { updateService } from './updater';
 import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
 import { findCachedBackgroundRaw, optimizeBackgroundFile, recoverBackgroundFromDataUrl } from './core/background-image';
@@ -241,6 +242,7 @@ function registerAllHandlers() {
   registerJavaHandlers();
   registerNewsHandlers();
   registerUpdateHandlers();
+  registerForcedUpdateHandlers();
 }
 
 app.whenReady().then(() => {

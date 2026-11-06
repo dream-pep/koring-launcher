@@ -14,6 +14,7 @@ export type RouteKey =
   | "gallery"
   | "task-queue"
   | "update"
+  | "forced-update"
   | "device-blocked"
   | "oobe"
   | "oobe/language"
@@ -23,6 +24,11 @@ export type RouteKey =
   | "oobe/about-version"
   | "oobe/beta-test"
   | "oobe/activation"
+  | "oobe/quickstart"
+  | "oobe/quickstart-list"
+  | "oobe/quickstart-game"
+  | "oobe/quickstart-craekote"
+  | "oobe/quickstart-end"
   | "oobe/login"
   | "oobe/welcome"
   | "oobe/finish"
@@ -88,6 +94,8 @@ export const allRoutes: RouteItem[] = [
   { key: "setting/login", label: "登录", path: "/setting/login", hidden: true, backable: true },
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
   { key: "update", label: "更新日志", path: "/update", hidden: true, backable: true },
+  // 强制升级页：随版本策略出现，顶栏用 OOBE 样式（无返回、无主导航）
+  { key: "forced-update", label: "强制升级", path: "/forced-update", hidden: true },
   { key: "device-blocked", label: "设备异常", path: "/device-blocked", hidden: true },
   { key: "oobe", label: "OOBE", path: "/oobe", hidden: true },
   { key: "oobe/language", label: "语言设置", path: "/oobe/language", hidden: true },
@@ -97,6 +105,11 @@ export const allRoutes: RouteItem[] = [
   { key: "oobe/about-version", label: "关于此版本", path: "/oobe/about-version", hidden: true },
   { key: "oobe/beta-test", label: "测试协议", path: "/oobe/beta-test", hidden: true },
   { key: "oobe/activation", label: "版本激活", path: "/oobe/activation", hidden: true },
+  { key: "oobe/quickstart", label: "快速上手", path: "/oobe/quickstart", hidden: true },
+  { key: "oobe/quickstart-list", label: "快速上手 · List", path: "/oobe/quickstart/list", hidden: true },
+  { key: "oobe/quickstart-game", label: "快速上手 · 启动", path: "/oobe/quickstart/game", hidden: true },
+  { key: "oobe/quickstart-craekote", label: "快速上手 · 直觉操作", path: "/oobe/quickstart/craekote", hidden: true },
+  { key: "oobe/quickstart-end", label: "快速上手 · 完成", path: "/oobe/quickstart/end", hidden: true },
   { key: "oobe/login", label: "登录", path: "/oobe/login", hidden: true },
   { key: "oobe/welcome", label: "欢迎", path: "/oobe/welcome", hidden: true },
   { key: "oobe/finish", label: "完成", path: "/oobe/finish", hidden: true },
@@ -139,6 +152,8 @@ const topLevelKeys = new Set(routes.map((r) => r.key));
 function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
   // 设备异常页：顶栏只保留品牌与窗口控制（无胶囊菜单、无任务按钮、无返回）
   if (key === "device-blocked") return "blocked";
+  // 强制升级页：复用 OOBE 顶栏（品牌 + 信息胶囊 + 窗口控制，无返回）
+  if (key === "forced-update") return "oobe";
   if (key === "oobe" || key.startsWith("oobe/") || key === "upvp" || key.startsWith("upvp/")) return "oobe";
   return topLevelKeys.has(key) ? "default" : "sub";
 }
@@ -147,6 +162,7 @@ function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
 const LEVEL_ONE_KEYS = new Set<RouteKey>([
   "setting/login",
   "update",
+  "forced-update",
   "task-queue",
   "device-blocked",
   "debug",
@@ -162,19 +178,27 @@ function getRouteDepth(key: RouteKey): number {
 
 /** 同一向导流程内的步骤顺序：步骤前进/后退必须带方向，而不是同级交叉淡化 */
 const FLOW_STEPS: Partial<Record<RouteKey, number>> = {
+  // 实际流程：language → device → agreement → about-version → (beta-test) → activation
+  //           → quickstart → quickstart-list → quickstart-game → quickstart-craekote → quickstart-end → finish
+  // 不在流程内（页面保留、仅可手动导航）：login / version / welcome / legal
   oobe: 0,
   "oobe/language": 1,
   "oobe/device": 2,
   "oobe/agreement": 3,
-  "oobe/login": 4,
-  "oobe/welcome": 5,
-  "oobe/version": 6,
-  "oobe/about-version": 7,
-  "oobe/beta-test": 8,
-  "oobe/activation": 9,
-  "oobe/finish": 10,
-  "oobe/about-info": 11,
-  "oobe/legal": 12,
+  "oobe/about-version": 4,
+  "oobe/beta-test": 5,
+  "oobe/activation": 6,
+  "oobe/quickstart": 7,
+  "oobe/quickstart-list": 8,
+  "oobe/quickstart-game": 9,
+  "oobe/quickstart-craekote": 10,
+  "oobe/quickstart-end": 11,
+  "oobe/finish": 12,
+  "oobe/about-info": 13,
+  "oobe/login": 14,
+  "oobe/version": 15,
+  "oobe/welcome": 16,
+  "oobe/legal": 17,
   upvp: 0,
   "upvp/complete": 1,
   "upvp/device": 2,

@@ -96,7 +96,7 @@ const DISCOVER_TIMEOUT_MS = 15000;
  */
 const DEFAULT_MIRRORS: string[] = ['https://gh.ddlc.top', 'https://gh-proxy.com', 'https://ghfast.top'];
 
-function getMirrors(): string[] {
+export function getMirrors(): string[] {
   const env = process.env.UPDATE_MIRRORS;
   if (env) {
     return env.split(',').map((s) => s.trim()).filter(Boolean);

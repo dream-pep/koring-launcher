@@ -49,6 +49,12 @@ interface ElectronAPI {
   compareVersions: (a: string, b: string) => Promise<unknown>;
   onUpdateStatus: (callback: (data: unknown) => void) => () => void;
 
+  // Forced update（强制升级页面）
+  prepareForcedUpdate: (targetVersion?: string) => Promise<unknown>;
+  installForcedUpdate: () => Promise<unknown>;
+  getForcedUpdateState: () => Promise<unknown>;
+  onForcedUpdateStatus: (callback: (data: unknown) => void) => () => void;
+
   // Koring Account 启动器 API（主进程发起；见 electron/core/launcher-api.ts）
   launcherEnvInfo: () => Promise<unknown>;
   launcherDeviceCheck: () => Promise<unknown>;

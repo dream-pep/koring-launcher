@@ -138,4 +138,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update:status', handler);
     return () => ipcRenderer.removeListener('update:status', handler);
   },
+
+  // Forced update（强制升级页面：绕过 electron-updater 直下安装包 + 静默安装）
+  prepareForcedUpdate: (targetVersion?: string) => ipcRenderer.invoke('forced-update:prepare', { targetVersion }),
+  installForcedUpdate: () => ipcRenderer.invoke('forced-update:install'),
+  getForcedUpdateState: () => ipcRenderer.invoke('forced-update:getState'),
+  onForcedUpdateStatus: (callback: (data: unknown) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on('forced-update:status', handler);
+    return () => ipcRenderer.removeListener('forced-update:status', handler);
+  },
 });

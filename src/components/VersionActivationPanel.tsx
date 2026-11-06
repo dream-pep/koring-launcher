@@ -28,8 +28,8 @@ interface VersionActivationPanelProps {
 /**
  * 程序版本激活校验面板（OOBE 与 UPVP 共用，Account API /launcher/version）：
  * - activation_blocked → 展示「不允许激活」+ 禁激活原因 + 版本情况，只可重试；
- * - 需要升级（force_upgrade 或低于 min_upgrade_version）→ 唯一出路是跳转版本更新页，
- *   并按要求的目标版本升级；
+ * - 需要升级（force_upgrade 或低于 min_upgrade_version）→ 唯一出路是跳转「强制升级」页面
+ *   （强下载版本页面：自动下载目标版本安装包 + 静默安装）；
  * - 通过 → 写入 activation.versionOk 后**立即进入下一步**（不显示成功页）；
  * - 请求失败 → 展示原因 + 重试，不允许继续（严格策略；未打包的开发模式可跳过）。
  */
@@ -160,8 +160,8 @@ export function VersionActivationPanel({ onPassed }: VersionActivationPanelProps
           <h2 className="text-lg font-bold text-foreground">需要升级后才能激活</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             {target
-              ? `当前版本需要升级至 v${target} 或更高版本，请前往版本更新页面完成升级。`
-              : "当前版本已被要求强制升级，请前往版本更新页面升级至最新版本。"}
+              ? `当前版本需要升级至 v${target} 或更高版本，点击下方按钮下载并安装。`
+              : "当前版本已被要求强制升级，点击下方按钮下载最新版本。"}
           </p>
         </div>
         <div className="w-full rounded-xl bg-foreground/[0.03] border border-border/40 px-4 py-3 text-left">
@@ -170,10 +170,10 @@ export function VersionActivationPanel({ onPassed }: VersionActivationPanelProps
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate("update")}
+            onClick={() => navigate("forced-update")}
             className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white bg-amber-500 hover:bg-amber-600 transition-colors cursor-pointer"
           >
-            前往版本更新
+            立即升级
           </button>
           {retryButton}
         </div>

@@ -3,10 +3,10 @@ interface NextButtonProps {
   disabled?: boolean;
 }
 
-/** 与 OOBE 相同的下一步圆形按钮 */
+/** 与 OOBE 相同的向导「下一步」按钮：固定在布局底部居中（相对 WizardLayout） */
 export function NextButton({ onClick, disabled = false }: NextButtonProps) {
   return (
-    <div className="absolute bottom-12">
+    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
       <button
         onClick={onClick}
         disabled={disabled}
