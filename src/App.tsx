@@ -14,6 +14,7 @@ import { Today } from "./pages/today";
 import { PlayLink } from "./pages/play-link";
 import { Setting } from "./pages/setting";
 import { SettingLogin } from "./pages/setting/login";
+import { AccountPage } from "./pages/account";
 import { TaskQueue } from "./pages/task-queue";
 import { Store } from "./pages/store";
 import { InstancePage } from "./pages/instance";
@@ -62,6 +63,7 @@ const pageMap = {
   "play-link": PlayLink,
   setting: Setting,
   "setting/login": SettingLogin,
+  account: AccountPage,
   gallery: InstancePage,
   "task-queue": TaskQueue,
   update: UpdatePage,

@@ -1,14 +1,36 @@
+import { useState } from "react";
 import { useConfigStore } from "@/stores/configStore";
+import { useBuildBadgeStore } from "@/stores/buildBadgeStore";
+import { BUILD_MODE } from "@/lib/mode";
+import { toast } from "@/lib/toast";
 import {
   SettingCard,
+  SettingRow,
   SettingSwitch,
   PageHeader,
   SectionTitle,
 } from "@/components/setting";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function UiSetting() {
   const ui = useConfigStore((s) => s.config.ui);
   const setUi = useConfigStore((s) => s.setUi);
+
+  // 非正式版徽章：只存在运行时状态里，不写配置文件（重启启动器即恢复显示）
+  const badgeHidden = useBuildBadgeStore((s) => s.hidden);
+  const hideBadge = useBuildBadgeStore((s) => s.hideBadge);
+  const showBadge = useBuildBadgeStore((s) => s.showBadge);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
     <div>
@@ -35,6 +57,31 @@ export function UiSetting() {
                 onChange={(v) => setUi({ showTaskButton: v })}
               />
             </SettingCard>
+
+            {/* 仅测试版 / 开发版有徽章可隐藏；正式版不显示这一项 */}
+            {BUILD_MODE !== "run" && (
+              <SettingCard>
+                <SettingRow
+                  label="暂时关闭非正式版提示徽章"
+                  desc="隐藏标题栏右侧的 DEV / BETA 徽章（仅本次运行有效，重启启动器后恢复显示）"
+                >
+                  <Button
+                    size="sm"
+                    variant={badgeHidden ? "outline" : "destructive"}
+                    onClick={() => {
+                      if (badgeHidden) {
+                        showBadge();
+                        toast.success("已恢复显示非正式版提示徽章");
+                      } else {
+                        setConfirmOpen(true);
+                      }
+                    }}
+                  >
+                    {badgeHidden ? "恢复" : "隐藏"}
+                  </Button>
+                </SettingRow>
+              </SettingCard>
+            )}
           </div>
         </div>
 
@@ -52,6 +99,29 @@ export function UiSetting() {
           </SettingCard>
         </div>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>您确定要隐藏吗？</AlertDialogTitle>
+            <AlertDialogDescription>
+              该徽章的目的是提醒您正在使用测试版本 Koring Launcher，您隐藏后重启启动器将会恢复显示，如果需要长期隐藏请更新至正式版。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              variant="secondary"
+              onClick={() => {
+                hideBadge();
+                toast.success("已暂时隐藏非正式版提示徽章，重启启动器后恢复显示");
+              }}
+            >
+              确认隐藏
+            </AlertDialogAction>
+            <AlertDialogCancel variant="destructive">取消隐藏</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

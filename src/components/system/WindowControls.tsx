@@ -4,6 +4,7 @@ import { TaskButton } from "@/components/task/TaskButton";
 import { Badge } from "@/components/ui/badge";
 import { useRouteStore } from "@/stores/routeStore";
 import { useConfigStore } from "@/stores/configStore";
+import { useBuildBadgeStore } from "@/stores/buildBadgeStore";
 import { Info } from "lucide-react";
 import clsx from "clsx";
 
@@ -28,6 +29,8 @@ export function WindowControls({
   const [isMaximized, setIsMaximized] = useState(false);
   const navigate = useRouteStore((s) => s.navigate);
   const showTaskButton = useConfigStore((s) => s.config.ui?.showTaskButton ?? true);
+  // 「暂时关闭非正式版提示徽章」：仅本次运行有效（不写配置，重启恢复）
+  const badgeHiddenTemporarily = useBuildBadgeStore((s) => s.hidden);
 
   useEffect(() => {
     window.electronAPI?.isMaximized().then(setIsMaximized);
@@ -45,7 +48,7 @@ export function WindowControls({
   const closeBtnClass = "flex items-center justify-center w-[25px] h-[25px] rounded transition-[background-color,color,transform] duration-150 active:scale-90 cursor-default hover:bg-red-500 text-black/70 dark:text-white/70 hover:text-white";
   const noDrag: React.CSSProperties = { WebkitAppRegion: "no-drag" };
 
-  const showBadge = BUILD_MODE !== "run";
+  const showBadge = BUILD_MODE !== "run" && !badgeHiddenTemporarily;
   const badgeLabel = BUILD_MODE === "dev" ? "DEV" : "BETA";
 
   const showTask = !isSub && !isOobe && !isBlocked && showTaskButton;

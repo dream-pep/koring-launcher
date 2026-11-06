@@ -10,6 +10,7 @@ export type RouteKey =
   | "play-link"
   | "setting"
   | "setting/login"
+  | "account"
   | "gallery"
   | "task-queue"
   | "update"
@@ -71,13 +72,16 @@ export const routes: RouteItem[] = [
   { key: "home", label: "首页", path: "/home" },
   { key: "gallery", label: "实例", path: "/gallery" },
   { key: "store", label: "资源", path: "/store" },
-  { key: "today", label: "资讯", path: "/today" },
   { key: "play-link", label: "联机", path: "/play-link" },
   { key: "setting", label: "设置", path: "/setting" },
 ];
 
 export const allRoutes: RouteItem[] = [
   ...routes,
+  // 资讯页：已从顶栏胶囊菜单移除（页面保留），需要时仍可用 navigate("today") 进入
+  { key: "today", label: "资讯", path: "/today", hidden: true, backable: true },
+  // 账户页：已从顶栏胶囊菜单移除头像入口（页面保留），需要时仍可用 navigate("account") 进入
+  { key: "account", label: "账户", path: "/account", hidden: true, backable: true },
   { key: "setting/login", label: "登录", path: "/setting/login", hidden: true, backable: true },
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
   { key: "update", label: "更新日志", path: "/update", hidden: true, backable: true },

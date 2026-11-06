@@ -1,9 +1,9 @@
 appVersion: 1.2.7
 oobe: false
+theme:
+  darkMode: auto
 a11y:
   contentBlurOpacity: 44
-background:
-  image: C:\Users\ab090\AppData\Roaming\koring-launcher\background-custom-mw4zlwcf7sdofe.png
 game:
   gameDir: C:\Users\ab090\AppData\Roaming\.minecraft
   gameDirs:
@@ -17,5 +17,5 @@ java:
 activation:
   versionOk: true
   deviceOk: true
-  checkedAt: 1793971078579
+  checkedAt: 1793975133133
   version: 1.2.7

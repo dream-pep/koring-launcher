@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
+import { JavaNewsSection } from "./JavaNewsSection";
 
 /**
  * 资源页 → Today 子页面。
  *
- * 目前只有「搜索入口」：居中一个胶囊形横向搜索框，上方一行提示文字。
+ * 布局：顶部居中一个胶囊形横向搜索框（上方一行提示文字），
+ * 搜索框下方是「Java 版资讯」卡片区（只展示 Java 类官方资讯）。
  * 搜索结果区还没接（后续补），回车暂时只阻止表单默认提交。
  */
 export function TodayView() {
   const [keyword, setKeyword] = useState("");
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-8">
-      <p className="text-[15px] text-muted-foreground">你今天要搜什么？</p>
+    <div className="flex min-h-full w-full flex-col items-center gap-4 px-8 pt-[11vh] pb-10">
+      <p className="text-[30px] text-muted-foreground">你今天要搜什么？</p>
 
       <form
         className="w-full max-w-[560px]"
@@ -37,6 +39,8 @@ export function TodayView() {
           />
         </div>
       </form>
+
+      <JavaNewsSection />
     </div>
   );
 }
