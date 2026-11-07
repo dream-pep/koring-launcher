@@ -898,9 +898,11 @@ export class TerracottaService {
   async host(payload: TcHostPayload): Promise<TerracottaStatus> {
     return this.withRunning(async () => {
       const client = createTcHttpClient(this.port);
+      const publicNodes = this.resolvePublicNodes();
+      log.info('[terracotta] host relay nodes', publicNodes);
       await client.scanning({
         player: this.resolvePlayer(payload.player),
-        publicNodes: this.resolvePublicNodes(payload.publicNodes),
+        publicNodes,
       });
       await this.refreshState();
       return this.getStatus();
@@ -915,10 +917,12 @@ export class TerracottaService {
     }
     return this.withRunning(async () => {
       const client = createTcHttpClient(this.port);
+      const publicNodes = this.resolvePublicNodes();
+      log.info('[terracotta] guest relay nodes', publicNodes);
       await client.guesting({
         room,
         player: this.resolvePlayer(payload.player),
-        publicNodes: this.resolvePublicNodes(payload.publicNodes),
+        publicNodes,
       });
       await this.refreshState();
       return this.getStatus();
