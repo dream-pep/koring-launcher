@@ -201,6 +201,20 @@ export interface TerracottaConfig {
   binaryPath: string;
 }
 
+/**
+ * 预置公共节点。
+ *
+ * 上游 v0.4.2 内置的 4 个节点里，`public.easytier.top` / `public2.easytier.cn` 两个域名
+ * 已经 NXDOMAIN，两个 zkitfly 节点又会按地区 / HTTP 版本返回不同内容，国内直连经常拿不到
+ * 真实地址。这里预置自建共享节点（只做打洞撮合，不转发流量）作为默认值。
+ *
+ * ⚠️ 渲染端 `src/api/terracotta.ts` 的 `TERRACOTTA_DEFAULT_PUBLIC_NODES` 需要同步修改。
+ */
+export const TERRACOTTA_DEFAULT_PUBLIC_NODES: string[] = [
+  'tcp://3.24.48.198:11010',
+  'udp://3.24.48.198:11010',
+];
+
 export interface NetworkConfig {
   securityId: SecurityIdConfig;
   terracotta: TerracottaConfig;
@@ -269,7 +283,7 @@ const DEFAULTS: AppConfig = {
   download: { source: 'bmclapi', threads: 16, customVersionManifest: '', customMavenHost: '', customAssetsHost: '' },
   network: {
     securityId: { enabled: false, authUrl: '' },
-    terracotta: { publicNodes: [], binaryPath: '' },
+    terracotta: { publicNodes: [...TERRACOTTA_DEFAULT_PUBLIC_NODES], binaryPath: '' },
   },
   ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: 'version', showQuickActions: true },
   activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: '', reason: '', upgradeTarget: '' },

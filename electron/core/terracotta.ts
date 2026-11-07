@@ -1205,6 +1205,11 @@ export class TerracottaService {
     return source.map((node) => node.trim()).filter((node) => node.length > 0);
   }
 
+  /** 当前配置里的公共节点（供设置页做连通性检测） */
+  getPublicNodes(): string[] {
+    return this.resolvePublicNodes();
+  }
+
   // ---------- 广播 ----------
 
   private emitStatus(force = false): void {

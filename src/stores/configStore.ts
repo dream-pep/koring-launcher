@@ -16,6 +16,7 @@ import {
   type ActivationConfig,
   type InstanceMeta,
 } from "@/api/config";
+import { TERRACOTTA_DEFAULT_PUBLIC_NODES } from "@/api/terracotta";
 import { DEFAULT_BG } from "@/lib/mode";
 
 /**
@@ -75,7 +76,7 @@ const DEFAULT_CONFIG: AppConfig = {
   download: { source: "bmclapi", threads: 16, customVersionManifest: "", customMavenHost: "", customAssetsHost: "" },
   network: {
     securityId: { enabled: false, authUrl: "" },
-    terracotta: { publicNodes: [], binaryPath: "" },
+    terracotta: { publicNodes: [...TERRACOTTA_DEFAULT_PUBLIC_NODES], binaryPath: "" },
   },
   ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: "version", showQuickActions: true },
   activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: "", reason: "", upgradeTarget: "" },

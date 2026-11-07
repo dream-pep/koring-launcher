@@ -198,6 +198,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   terracottaOpenDir: () => ipcRenderer.invoke('terracotta:open-dir'),
   terracottaPickBinary: () => ipcRenderer.invoke('terracotta:pick-binary'),
   terracottaClearBinary: () => ipcRenderer.invoke('terracotta:clear-binary'),
+  terracottaCheckNodes: (nodes?: string[]) => ipcRenderer.invoke('terracotta:check-nodes', { nodes }),
   onTerracottaStatus: (callback: (data: unknown) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
     ipcRenderer.on('terracotta:status', handler);

@@ -84,6 +84,16 @@ export interface TerracottaStatus {
   install: TcInstallState;
 }
 
+/** 公共节点连通性检测结果（主进程 DNS / TCP / HTTPS 探测） */
+export interface TerracottaNodeProbe {
+  node: string;
+  ok: boolean;
+  kind: "tcp" | "udp" | "https" | "unknown";
+  /** 取地址节点解析出的真实地址 */
+  resolved: string | null;
+  detail: string;
+}
+
 /** 渲染端首次渲染用的空状态（真实状态由 terracotta:status 拉取） */
 export const EMPTY_TERRACOTTA_STATUS: TerracottaStatus = {
   binary: { installed: false, path: "", version: "", source: "none" },
@@ -194,6 +204,20 @@ export async function clearTerracottaBinary(): Promise<TerracottaStatus> {
   return call<TerracottaStatus>("terracottaClearBinary", "terracotta:clear-binary");
 }
 
+/**
+ * 公共节点连通性检测：主进程只做 DNS / TCP / HTTPS 探测，不启动陶瓦进程。
+ * 传空则检测配置里已保存的节点。
+ */
+export async function checkTerracottaNodes(nodes?: string[]): Promise<TerracottaNodeProbe[]> {
+  // preload 专用方法的签名是 (nodes?: string[])；回退通道则直接传数组/空对象
+  const data = await call<{ nodes?: TerracottaNodeProbe[] }>(
+    "terracottaCheckNodes",
+    "terracotta:check-nodes",
+    nodes && nodes.length > 0 ? [nodes] : [],
+  );
+  return data?.nodes ?? [];
+}
+
 // ---------- 7.3 事件 ----------
 
 export function onTerracottaStatus(callback: (status: TerracottaStatus) => void): () => void {
@@ -216,6 +240,17 @@ export function onTerracottaInstallProgress(callback: (progress: TcInstallState)
 
 /** 上游文档站（AGPL 例外条款要求 UI 必须给出的上游链接） */
 export const TERRACOTTA_URL = "https://burningtnt.github.io/Terracotta/";
+
+/**
+ * 预置公共节点（与主进程 `electron/config.ts` 的 `TERRACOTTA_DEFAULT_PUBLIC_NODES` 保持一致）。
+ *
+ * 上游内置的 `public.easytier.top` / `public2.easytier.cn` 已失效，zkitfly 两个节点又会按
+ * 地区 / HTTP 版本返回不同内容，所以额外预置自建共享节点（只做打洞撮合，不转发流量）。
+ */
+export const TERRACOTTA_DEFAULT_PUBLIC_NODES: string[] = [
+  "tcp://3.24.48.198:11010",
+  "udp://3.24.48.198:11010",
+];
 
 /** 房间码负载长度 */
 export const ROOM_CODE_LENGTH = 16;

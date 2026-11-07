@@ -17,6 +17,7 @@ import {
   type TcHostPayload,
   type TcStartPayload,
 } from '../core/terracotta';
+import { probeTerracottaNodes } from '../core/terracotta-nodes';
 import { isValidRoomCode } from '../core/terracotta-protocol';
 
 const { ipcMain, dialog, shell, BrowserWindow } = electron;
@@ -121,5 +122,18 @@ export function registerTerracottaHandlers(win: WinRef) {
   // 清除自定义二进制路径，恢复自动定位
   ipcMain.handle('terracotta:clear-binary', () =>
     guard(() => terracottaService.clearCustomBinary()),
+  );
+
+  // 公共节点连通性检测：不启动任何进程，只做 DNS / TCP / HTTP 探测
+  ipcMain.handle('terracotta:check-nodes', (_event, payload: unknown) =>
+    guard(async () => {
+      // 兼容三种入参：string[]、{ nodes: string[] }、undefined（用配置里的节点）
+      const raw = payload as { nodes?: unknown } | string[] | undefined;
+      const requested = Array.isArray(raw) ? raw : Array.isArray(raw?.nodes) ? raw.nodes : null;
+      const source = (requested ?? terracottaService.getPublicNodes())
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean);
+      return { nodes: await probeTerracottaNodes(source) };
+    }),
   );
 }

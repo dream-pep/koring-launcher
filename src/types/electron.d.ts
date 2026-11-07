@@ -73,6 +73,7 @@ interface ElectronAPI {
   terracottaOpenDir: () => Promise<unknown>;
   terracottaPickBinary: () => Promise<unknown>;
   terracottaClearBinary: () => Promise<unknown>;
+  terracottaCheckNodes: (nodes?: string[]) => Promise<unknown>;
   onTerracottaStatus: (callback: (data: unknown) => void) => () => void;
   onTerracottaInstallProgress: (callback: (data: unknown) => void) => () => void;
 
