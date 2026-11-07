@@ -80,6 +80,41 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return null;
   },
 
+  // 背景视频 — 选择本地视频：复制到 userData 后返回文件路径（静音循环播放）。
+  pickBackgroundVideo: async (): Promise<string | null> => {
+    const result = await ipcRenderer.invoke('dialog:openFile', {
+      filters: [{ name: '视频', extensions: ['mp4', 'm4v', 'webm', 'ogv', 'ogg', 'mov'] }],
+    });
+    const picked = result?.success ? result.data : null;
+    if (!picked) return null;
+    const { srcPath } = picked as { srcPath: string };
+    const imported = await ipcRenderer.invoke('background:import-video', { srcPath });
+    if (imported && imported.success && typeof imported.data?.filePath === 'string' && imported.data.filePath) {
+      return imported.data.filePath;
+    }
+    return null;
+  },
+
+  // 删除受管背景文件（从多图轮播移除 / 更换视频）
+  removeBackgroundFile: async (filePath: string): Promise<boolean> => {
+    try {
+      const result = await ipcRenderer.invoke('background:remove-file', { filePath });
+      return Boolean(result && result.success && result.data?.removed);
+    } catch {
+      return false;
+    }
+  },
+
+  // 清理全部受管背景文件（恢复默认背景）
+  clearBackgroundFiles: async (): Promise<number> => {
+    try {
+      const result = await ipcRenderer.invoke('background:clear-files');
+      return result && result.success ? Number(result.data?.removed) || 0 : 0;
+    } catch {
+      return 0;
+    }
+  },
+
   // 把配置文件/Store 中的壁纸值解析为可显示的资源引用：
   // data:/http(s):/file: 及 /、./ 相对 URL → 原样返回；
   // userData 内受管壁纸文件路径 → koring-res:// 协议 URL（流式读取，无 base64 副本）。

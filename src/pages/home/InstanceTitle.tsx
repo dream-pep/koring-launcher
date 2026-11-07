@@ -16,7 +16,7 @@ export function InstanceTitle() {
       onClick={() => navigate("gallery")}
       className={clsx(
         "self-start pl-1 pr-1 py-1.5 rounded-lg cursor-pointer",
-        "text-5xl font-bold tracking-tight text-white",
+        "text-shadow-overlay text-5xl font-bold tracking-tight text-white",
         "hover:bg-black/20 hover:scale-[1.01] origin-left",
         "transition-[scale,transform,background-color] duration-200 ease-spring-soft",
         "select-none",

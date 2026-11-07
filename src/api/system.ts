@@ -1,4 +1,5 @@
 import { ipcInvoke } from './ipc';
+import { CACHE_TTL, cached } from '../lib/data-cache';
 
 export interface SystemInfo {
   app_version: string;
@@ -8,7 +9,7 @@ export interface SystemInfo {
 }
 
 export async function getSystemInfo(): Promise<SystemInfo> {
-  return ipcInvoke<SystemInfo>('system:info');
+  return cached('system:info', CACHE_TTL.long, () => ipcInvoke<SystemInfo>('system:info'));
 }
 
 /**

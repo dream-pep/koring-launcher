@@ -1,4 +1,5 @@
 import { ipcInvoke } from './ipc';
+import { CACHE_TTL, cacheKey, cached, put } from '../lib/data-cache';
 
 /** 单条 Minecraft 官方资讯（字段与主进程 electron/core/news.ts 保持一致） */
 export interface NewsEntry {
@@ -43,12 +44,35 @@ export interface NewsQuery {
   refresh?: boolean;
 }
 
+/** 资讯列表缓存 key（页面初始 state 可用 peek 同步取用） */
+export function newsListCacheKey(query: NewsQuery = {}): string {
+  const params = { ...query };
+  delete params.refresh;
+  return cacheKey('news:list', params);
+}
+
 /** 拉取 Minecraft 官方资讯（数据源 launchercontent.mojang.com，主进程带 10 分钟缓存） */
 export async function getNews(query: NewsQuery = {}): Promise<NewsListResult> {
-  return ipcInvoke<NewsListResult>('news:list', query);
+  const key = newsListCacheKey(query);
+  // 用户主动刷新时绕开缓存，顺手把新结果写回去
+  if (query.refresh) {
+    const result = await ipcInvoke<NewsListResult>('news:list', query);
+    put(key, result);
+    return result;
+  }
+  return cached(key, CACHE_TTL.medium, () => ipcInvoke<NewsListResult>('news:list', query));
 }
+
+/** 可用平台筛选项缓存 key */
+export const NEWS_TYPES_CACHE_KEY = 'news:types';
 
 /** 可用平台筛选项（Java / Bedrock / Dungeons / DungeonsII / Legends） */
 export async function getNewsTypes(refresh = false): Promise<string[]> {
-  return ipcInvoke<string[]>('news:types', { refresh });
+  const key = NEWS_TYPES_CACHE_KEY;
+  if (refresh) {
+    const result = await ipcInvoke<string[]>('news:types', { refresh });
+    put(key, result);
+    return result;
+  }
+  return cached(key, CACHE_TTL.long, () => ipcInvoke<string[]>('news:types', { refresh }));
 }

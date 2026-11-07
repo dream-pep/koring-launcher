@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "activeAccountId": "fc6aea2b-9373-48c5-9fce-074f6e870131",
+  "activeAccountId": "9ff5e925-ccb4-4094-90c7-e12841b4c925",
   "accounts": [
     {
-      "id": "fc6aea2b-9373-48c5-9fce-074f6e870131",
+      "id": "9ff5e925-ccb4-4094-90c7-e12841b4c925",
       "type": "offline",
-      "username": "demo",
-      "uuid": "63f2f2ba-086b-cb53-4311-c772468d3755",
-      "addedAt": 1794028805569,
-      "lastLoginAt": 1794028805569
+      "username": "dream_pep",
+      "uuid": "cb8357c5-2e4a-246c-306b-bbdda63ad46f",
+      "addedAt": 1794048981080,
+      "lastLoginAt": 1794048981080
     }
   ]
 }

@@ -12,9 +12,19 @@ export interface A11yConfig {
   contentBlurOpacity: number;
 }
 
+/** 背景呈现方式：单图 / 多图轮播 / 静音视频（color 为旧版纯色背景，继续兼容） */
+export type BackgroundMode = "image" | "slideshow" | "video" | "color";
+
 export interface BackgroundConfig {
-  bgType: string;
+  bgType: BackgroundMode;
+  /** 单图模式 / 旧版纯色模式的背景值（文件路径或颜色） */
   image: string;
+  /** 多图轮播的图片列表（userData 内受管文件路径） */
+  images: string[];
+  /** 视频模式的视频文件路径（userData 内受管文件） */
+  video: string;
+  /** 多图轮播间隔（秒） */
+  intervalSec: number;
   blur: number;
   opacity: number;
 }

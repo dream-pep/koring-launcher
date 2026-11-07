@@ -1,4 +1,5 @@
 import { ipcInvoke } from './ipc';
+import { CACHE_TTL, cacheKey, cached } from '../lib/data-cache';
 
 export interface ModSearchResult {
   id: string;
@@ -70,7 +71,7 @@ export async function searchMods(
   source: 'modrinth' | 'curseforge' = 'modrinth',
   index: ModSearchIndex = 'relevance'
 ): Promise<ModSearchResponse> {
-  return ipcInvoke<ModSearchResponse>('mods:search', {
+  const params = {
     query,
     gameVersion,
     loader,
@@ -80,22 +81,31 @@ export async function searchMods(
     offset,
     source,
     index,
-  });
+  };
+  return cached(cacheKey('mods:search', params), CACHE_TTL.medium, () =>
+    ipcInvoke<ModSearchResponse>('mods:search', params),
+  );
 }
 
 export async function getCategories(projectType: string = "mod"): Promise<ModCategory[]> {
-  return ipcInvoke<ModCategory[]>('mods:categories', { projectType });
+  return cached(cacheKey('mods:categories', projectType), CACHE_TTL.long, () =>
+    ipcInvoke<ModCategory[]>('mods:categories', { projectType }),
+  );
 }
 
 export async function getGameVersions(): Promise<string[]> {
-  return ipcInvoke<string[]>('mods:game-versions');
+  return cached('mods:game-versions', CACHE_TTL.long, () =>
+    ipcInvoke<string[]>('mods:game-versions'),
+  );
 }
 
 export async function getModDetail(
   projectId: string,
   source: 'modrinth' | 'curseforge'
 ): Promise<ModSearchResult> {
-  return ipcInvoke<ModSearchResult>('mods:detail', { projectId, source });
+  return cached(cacheKey('mods:detail', projectId, source), CACHE_TTL.long, () =>
+    ipcInvoke<ModSearchResult>('mods:detail', { projectId, source }),
+  );
 }
 
 export async function getModVersions(
@@ -104,12 +114,14 @@ export async function getModVersions(
   loader?: string,
   source: 'modrinth' | 'curseforge' = 'modrinth'
 ): Promise<ModVersionResult[]> {
-  return ipcInvoke<ModVersionResult[]>('mods:versions', {
-    projectId,
-    gameVersion,
-    loader,
-    source,
-  });
+  return cached(cacheKey('mods:versions', projectId, gameVersion, loader, source), CACHE_TTL.medium, () =>
+    ipcInvoke<ModVersionResult[]>('mods:versions', {
+      projectId,
+      gameVersion,
+      loader,
+      source,
+    }),
+  );
 }
 
 export async function installMod(

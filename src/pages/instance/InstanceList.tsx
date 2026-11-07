@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Check, Loader2, RefreshCw } from "lucide-react";
 import {
   getMinecraftVersionList,
+  instanceListCacheKey,
   listInstances,
   type InstanceInfo,
   type InstanceRuntime,
 } from "@/api/instance";
+import { CACHE_TTL, peek } from "@/lib/data-cache";
 import { versionTypeLabel } from "@/lib/version-type";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -64,9 +66,14 @@ interface InstanceListProps {
  * 内容页，全局单份 instances 在目录之间会互相覆盖。
  */
 export function InstanceList({ gamePath }: InstanceListProps) {
-  const [instances, setInstances] = useState<InstanceInfo[]>([]);
+  // 上次看过的列表直接拿来用（换页回来不再闪骨架屏）
+  const [instances, setInstances] = useState<InstanceInfo[]>(
+    () => peek<InstanceInfo[]>(instanceListCacheKey(gamePath), CACHE_TTL.short) ?? [],
+  );
   const [versionTypes, setVersionTypes] = useState<Map<string, string> | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => peek<InstanceInfo[]>(instanceListCacheKey(gamePath), CACHE_TTL.short) === undefined,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pendingName, setPendingName] = useState<string | null>(null);
 
@@ -77,8 +84,11 @@ export function InstanceList({ gamePath }: InstanceListProps) {
 
   const refresh = useCallback(() => {
     let cancelled = false;
-    setLoading(true);
     setError(null);
+    // 命中缓存时后台静默刷新，只有真正没数据才显示骨架屏
+    if (peek<InstanceInfo[]>(instanceListCacheKey(gamePath), CACHE_TTL.short) === undefined) {
+      setLoading(true);
+    }
     listInstances(gamePath)
       .then((list) => {
         if (cancelled) return;

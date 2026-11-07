@@ -106,13 +106,15 @@ export function UpdatePage() {
   const isDownloading = st === "downloading";
   const isPaused = st === "paused";
 
-  // 底部遮罩滚动感知：向下滚动（阅读发布说明）自动收起，向上滚动/回顶恢复。
+  // 底部遮罩滚动感知：向下滚动（阅读发布说明）自动折叠，向上滚动/回顶展开。
   // 下载/暂停/安装/检查等需要常驻进度条的状态下始终显示。
   const [barVisible, setBarVisible] = useState(true);
   useEffect(() => {
     const el = document.getElementById("app-content-scroll");
     if (!el) return;
     const busy = st === "downloading" || st === "paused" || st === "installing" || st === "checking";
+    // 更新状态变化（开始下载 / 检查出结果等）时把操作栏带回来，避免用户错过新的操作入口
+    setBarVisible(true);
     let lastY = el.scrollTop;
     let ticking = false;
     const onScroll = () => {
@@ -123,9 +125,9 @@ export function UpdatePage() {
         const delta = y - lastY;
         if (busy) {
           setBarVisible(true);
-        } else if (delta > 16 && y > 160) {
+        } else if (delta > 8 && y > 120) {
           setBarVisible(false);
-        } else if (delta < -16 || y < 80) {
+        } else if (delta < -8 || y < 72) {
           setBarVisible(true);
         }
         lastY = y;
@@ -302,8 +304,12 @@ export function UpdatePage() {
           阅读时向下滚动自动收起（translate-y-full），向上滚动/回顶恢复 */}
       <div
         className={clsx(
-          "fixed bottom-0 left-0 right-0 z-20 transition-[transform,opacity] duration-300 ease-spring-soft",
-          barVisible ? "translate-y-0" : "translate-y-full",
+          // Tailwind v4 里 translate-y-* 走的是 translate 属性（不再是 transform），
+          // 过渡必须声明 translate，否则收起/展开是瞬间跳变
+          "fixed bottom-0 left-0 right-0 z-20 transition-[translate,opacity] duration-300 ease-spring-soft",
+          barVisible
+            ? "translate-y-0 opacity-100"
+            : "translate-y-full opacity-0 pointer-events-none",
         )}
         style={{
           background: "var(--titlebar-bg)",

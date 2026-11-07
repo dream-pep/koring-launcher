@@ -10,6 +10,8 @@ interface AccountAvatarProps {
   /** 直径（px），正方形 */
   size: number;
   className?: string;
+  /** 头像框（圆形底）的类名；不传时用默认的前景低透明度底色 */
+  frameClassName?: string;
   alt?: string;
 }
 
@@ -19,7 +21,7 @@ interface AccountAvatarProps {
  * - 图片加载失败或没有图片 → 用户名首字符
  * - 未登录 → 人形图标
  */
-export function AccountAvatar({ picture, name, size, className, alt }: AccountAvatarProps) {
+export function AccountAvatar({ picture, name, size, className, frameClassName, alt }: AccountAvatarProps) {
   // 记录加载失败的地址：换账户（picture 变了）后会自动重试新地址
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
@@ -31,7 +33,7 @@ export function AccountAvatar({ picture, name, size, className, alt }: AccountAv
     <span
       className={clsx(
         "relative flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full",
-        "bg-foreground/[0.08] text-foreground/60",
+        frameClassName ?? "bg-foreground/[0.08] text-foreground/60",
         className,
       )}
       style={{ width: size, height: size }}

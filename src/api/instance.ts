@@ -1,4 +1,5 @@
 import { ipcInvoke, onIpcEvent } from './ipc';
+import { CACHE_TTL, cacheKey, cached, invalidate } from '../lib/data-cache';
 
 export interface InstanceRuntime {
   minecraft: string;
@@ -100,16 +101,25 @@ export async function createInstance(
     importMode?: ImportMode;
   }
 ): Promise<InstanceInfo> {
-  return ipcInvoke<InstanceInfo>('instance:create', {
+  const result = await ipcInvoke<InstanceInfo>('instance:create', {
     name,
     gamePath,
     runtime,
     ...options,
   });
+  invalidate('instances:');
+  return result;
+}
+
+/** 实例列表缓存 key（页面初始 state 可用 peek 同步取用） */
+export function instanceListCacheKey(gamePath: string): string {
+  return cacheKey('instances:list', gamePath);
 }
 
 export async function listInstances(gamePath: string): Promise<InstanceInfo[]> {
-  return ipcInvoke<InstanceInfo[]>('instance:list', { gamePath });
+  return cached(instanceListCacheKey(gamePath), CACHE_TTL.short, () =>
+    ipcInvoke<InstanceInfo[]>('instance:list', { gamePath }),
+  );
 }
 
 export async function getInstanceInfo(name: string, gamePath: string): Promise<InstanceInfo> {
@@ -117,7 +127,9 @@ export async function getInstanceInfo(name: string, gamePath: string): Promise<I
 }
 
 export async function deleteInstance(name: string, gamePath: string): Promise<{ deleted: string }> {
-  return ipcInvoke<{ deleted: string }>('instance:delete', { name, gamePath });
+  const result = await ipcInvoke<{ deleted: string }>('instance:delete', { name, gamePath });
+  invalidate('instances:');
+  return result;
 }
 
 export async function updateInstance(
@@ -125,7 +137,9 @@ export async function updateInstance(
   gamePath: string,
   patch: Partial<Omit<InstanceConfig, 'name' | 'creationDate'>>
 ): Promise<InstanceInfo> {
-  return ipcInvoke<InstanceInfo>('instance:update', { name, gamePath, patch });
+  const result = await ipcInvoke<InstanceInfo>('instance:update', { name, gamePath, patch });
+  invalidate('instances:');
+  return result;
 }
 
 /** 实例图标信息（图标文件为 data URL，远程地址原样返回） */
@@ -141,7 +155,9 @@ export interface InstanceIconInfo {
 
 /** 读取实例图标：实例目录下的 logo.png 等候选文件，其次 instance.json 的 icon 字段 */
 export async function getInstanceIcon(name: string, gamePath: string): Promise<InstanceIconInfo> {
-  return ipcInvoke<InstanceIconInfo>('instance:icon', { name, gamePath });
+  return cached(cacheKey('instances:icon', gamePath, name), CACHE_TTL.short, () =>
+    ipcInvoke<InstanceIconInfo>('instance:icon', { name, gamePath }),
+  );
 }
 
 /** 从本地图片设置实例图标（写入实例目录 logo.<ext>，上限 2 MB） */
@@ -150,19 +166,29 @@ export async function setInstanceIcon(
   gamePath: string,
   sourcePath: string
 ): Promise<InstanceIconInfo> {
-  return ipcInvoke<InstanceIconInfo>('instance:set-icon', { name, gamePath, sourcePath });
+  const result = await ipcInvoke<InstanceIconInfo>('instance:set-icon', {
+    name,
+    gamePath,
+    sourcePath,
+  });
+  invalidate('instances:');
+  return result;
 }
 
 /** 清除实例图标（删除候选图标文件并清空 instance.json 的 icon） */
 export async function resetInstanceIcon(name: string, gamePath: string): Promise<InstanceIconInfo> {
-  return ipcInvoke<InstanceIconInfo>('instance:reset-icon', { name, gamePath });
+  const result = await ipcInvoke<InstanceIconInfo>('instance:reset-icon', { name, gamePath });
+  invalidate('instances:');
+  return result;
 }
 
 export async function installInstance(
   name: string,
   gamePath: string
 ): Promise<{ requestId: string }> {
-  return ipcInvoke<{ requestId: string }>('instance:install', { name, gamePath });
+  const result = await ipcInvoke<{ requestId: string }>('instance:install', { name, gamePath });
+  invalidate('instances:');
+  return result;
 }
 
 /**
@@ -173,7 +199,9 @@ export async function repairInstance(
   name: string,
   gamePath: string
 ): Promise<{ requestId: string }> {
-  return ipcInvoke<{ requestId: string }>('instance:repair', { name, gamePath });
+  const result = await ipcInvoke<{ requestId: string }>('instance:repair', { name, gamePath });
+  invalidate('instances:');
+  return result;
 }
 
 /**
@@ -190,7 +218,9 @@ export async function repairInstanceAndWait(
     onProgress?.(data);
   });
   try {
-    return await ipcInvoke<InstanceInfo>('instance:repair-wait', { name, gamePath });
+    const result = await ipcInvoke<InstanceInfo>('instance:repair-wait', { name, gamePath });
+    invalidate('instances:');
+    return result;
   } finally {
     unlisten();
   }
@@ -245,7 +275,9 @@ export async function getInstanceLaunchInfo(
 
 /** 读取某个版本 JSON 里实际声明的加载器（用于识别当前实例装了哪些加载器） */
 export async function getVersionLoaders(gamePath: string, versionId: string): Promise<string[]> {
-  return ipcInvoke<string[]>('instance:version-loaders', { gamePath, versionId });
+  return cached(cacheKey('versions:loaders', gamePath, versionId), CACHE_TTL.medium, () =>
+    ipcInvoke<string[]>('instance:version-loaders', { gamePath, versionId }),
+  );
 }
 
 // 版本信息（含发布时间和类型）
@@ -261,8 +293,15 @@ export interface VersionListResult {
   latest: { release: string; snapshot: string };
 }
 
+/** 版本清单缓存 key（页面初始 state 可用 peek 同步取用） */
+export function versionManifestCacheKey(type?: string): string {
+  return cacheKey('versions:list', type ?? 'all');
+}
+
 export async function getMinecraftVersionList(type?: string): Promise<VersionListResult> {
-  return ipcInvoke<VersionListResult>('instance:version-list', { type });
+  return cached(versionManifestCacheKey(type), CACHE_TTL.long, () =>
+    ipcInvoke<VersionListResult>('instance:version-list', { type }),
+  );
 }
 
 // 扫描到的已安装版本信息
@@ -357,12 +396,14 @@ export async function importExistingInstance(
     mode?: ImportMode;
   }
 ): Promise<InstanceInfo> {
-  return ipcInvoke<InstanceInfo>('instance:import', {
+  const result = await ipcInvoke<InstanceInfo>('instance:import', {
     name,
     gamePath,
     versionId,
     ...options,
   });
+  invalidate('instances:');
+  return result;
 }
 
 // 通过系统对话框选择文件夹
@@ -376,19 +417,27 @@ export async function openPath(target: string): Promise<{ error: string }> {
 }
 
 export async function getForgeVersionList(mcVersion?: string): Promise<string[]> {
-  return ipcInvoke<string[]>('instance:forge-version-list', { mcVersion });
+  return cached(cacheKey('versions:forge', mcVersion ?? 'all'), CACHE_TTL.long, () =>
+    ipcInvoke<string[]>('instance:forge-version-list', { mcVersion }),
+  );
 }
 
 export async function getFabricVersionList(mcVersion?: string): Promise<string[]> {
-  return ipcInvoke<string[]>('instance:fabric-version-list', { mcVersion });
+  return cached(cacheKey('versions:fabric', mcVersion ?? 'all'), CACHE_TTL.long, () =>
+    ipcInvoke<string[]>('instance:fabric-version-list', { mcVersion }),
+  );
 }
 
 export async function getQuiltVersionList(mcVersion?: string): Promise<string[]> {
-  return ipcInvoke<string[]>('instance:quilt-version-list', { mcVersion });
+  return cached(cacheKey('versions:quilt', mcVersion ?? 'all'), CACHE_TTL.long, () =>
+    ipcInvoke<string[]>('instance:quilt-version-list', { mcVersion }),
+  );
 }
 
 export async function getNeoForgeVersionList(mcVersion?: string): Promise<string[]> {
-  return ipcInvoke<string[]>('instance:neoforge-version-list', { mcVersion });
+  return cached(cacheKey('versions:neoforge', mcVersion ?? 'all'), CACHE_TTL.long, () =>
+    ipcInvoke<string[]>('instance:neoforge-version-list', { mcVersion }),
+  );
 }
 
 // ==================== 安装表单所需的元数据接口 ====================
@@ -442,7 +491,9 @@ export interface InstallLocation {
 
 /** 列出所有可用安装位置（默认目录在首位） */
 export async function getInstallLocations(): Promise<InstallLocation[]> {
-  return ipcInvoke<InstallLocation[]>('instance:locations');
+  return cached('instances:locations', CACHE_TTL.short, () =>
+    ipcInvoke<InstallLocation[]>('instance:locations'),
+  );
 }
 
 /** 带归属信息的实例（多安装位置聚合后的条目） */
@@ -459,7 +510,9 @@ export async function listAllInstances(): Promise<{
   locations: InstallLocation[];
   instances: InstanceWithLocation[];
 }> {
-  return ipcInvoke('instance:list-all');
+  return cached('instances:all', CACHE_TTL.short, () =>
+    ipcInvoke('instance:list-all'),
+  );
 }
 
 /** 安装表单可选的加载器类型 */
@@ -483,7 +536,9 @@ export interface LoaderOption {
 
 /** 加载器目录：一次拿到所有加载器类型、可用性与版本列表 */
 export async function getLoaderCatalog(mcVersion?: string): Promise<LoaderOption[]> {
-  return ipcInvoke<LoaderOption[]>('instance:loader-catalog', { mcVersion });
+  return cached(cacheKey('versions:loader-catalog', mcVersion ?? 'all'), CACHE_TTL.long, () =>
+    ipcInvoke<LoaderOption[]>('instance:loader-catalog', { mcVersion }),
+  );
 }
 
 // Event listeners

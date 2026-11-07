@@ -2,7 +2,14 @@ import electron from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { loadConfig, saveConfig } from '../config';
-import { importUserBackground, isManagedBackgroundFile, isPathInside } from '../core/background-image';
+import {
+  clearManagedBackgroundFiles,
+  deleteManagedBackgroundFile,
+  importUserBackground,
+  importUserVideo,
+  isManagedBackgroundFile,
+  isPathInside,
+} from '../core/background-image';
 import { backgroundResourceUrl } from '../resource-protocol';
 
 const { ipcMain } = electron;
@@ -59,7 +66,11 @@ export function registerBackgroundHandlers() {
   ipcMain.handle('background:set-animation', async (_event, payload: { type: string; speed?: number }) => {
     try {
       // Animation config is not persisted in current design, return defaults
-      return { success: true, data: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 }, error: null };
+      return {
+        success: true,
+        data: { bgType: 'image', image: '/background.png', images: [], video: '', intervalSec: 30, blur: 0, opacity: 100 },
+        error: null,
+      };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }
@@ -88,7 +99,16 @@ export function registerBackgroundHandlers() {
   ipcMain.handle('background:reset', async () => {
     try {
       const config = loadConfig();
-      config.background = { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 };
+      config.background = {
+        bgType: 'image',
+        image: '/background.png',
+        images: [],
+        video: '',
+        intervalSec: 30,
+        blur: 0,
+        opacity: 100,
+      };
+      clearManagedBackgroundFiles();
       saveConfig(config);
       return { success: true, data: config.background, error: null };
     } catch (e: unknown) {
@@ -126,6 +146,37 @@ export function registerBackgroundHandlers() {
     try {
       const result = importUserBackground(payload.srcPath, payload.maxEdge || 4096);
       return { success: true, data: result, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 导入视频背景：复制到 userData 后返回文件路径（静音播放，不做转码/降采样）
+  ipcMain.handle('background:import-video', async (_event, payload: { srcPath: string }) => {
+    try {
+      const result = importUserVideo(payload?.srcPath);
+      if (!result) return { success: false, data: null, error: '不支持的视频格式或文件不可读' };
+      return { success: true, data: result, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 删除单个受管背景文件（从轮播列表移除 / 更换视频时调用）
+  ipcMain.handle('background:remove-file', async (_event, payload: { filePath?: string }) => {
+    try {
+      const filePath = typeof payload?.filePath === 'string' ? payload.filePath : '';
+      const removed = filePath ? deleteManagedBackgroundFile(filePath) : false;
+      return { success: true, data: { removed }, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  // 清理全部受管背景文件（「恢复默认」）
+  ipcMain.handle('background:clear-files', async () => {
+    try {
+      return { success: true, data: { removed: clearManagedBackgroundFiles() }, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
     }

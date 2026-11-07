@@ -81,14 +81,54 @@ export function registerResourceProtocol(): void {
         return new Response('Not Found', { status: 404 });
       }
 
+      const mime = mimeForFile(target);
+      const baseHeaders = {
+        'content-type': mime,
+        'accept-ranges': 'bytes',
+        'cache-control': 'no-store',
+      };
+
+      // Range 支持：视频背景靠 seek/分段请求播放，<video> 会带 Range 头；
+      // 图片同样受益（无害）。单个区间足够（Chromium 不会请求多区间）。
+      const rangeHeader = request.headers.get('range');
+      if (rangeHeader) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+        if (match) {
+          let start = match[1] ? Number.parseInt(match[1], 10) : 0;
+          let end = match[2] ? Number.parseInt(match[2], 10) : stat.size - 1;
+          // 后缀区间：bytes=-N（最后 N 字节）
+          if (!match[1] && match[2]) {
+            const suffix = Number.parseInt(match[2], 10);
+            start = Math.max(0, stat.size - suffix);
+            end = stat.size - 1;
+          }
+          if (Number.isNaN(start) || Number.isNaN(end) || start < 0 || end < start || start >= stat.size) {
+            return new Response(null, {
+              status: 416,
+              headers: { 'content-range': `bytes */${stat.size}` },
+            });
+          }
+          end = Math.min(end, stat.size - 1);
+          const partial = Readable.toWeb(fs.createReadStream(target, { start, end })) as unknown as BodyInit;
+          log.debug(`服务资源(分段) ${fileName} [${start}-${end}]/${stat.size}B, ${mime}`);
+          return new Response(partial, {
+            status: 206,
+            headers: {
+              ...baseHeaders,
+              'content-range': `bytes ${start}-${end}/${stat.size}`,
+              'content-length': String(end - start + 1),
+            },
+          });
+        }
+      }
+
       const body = Readable.toWeb(fs.createReadStream(target)) as unknown as BodyInit;
-      log.debug(`服务资源 ${fileName} (${stat.size}B, ${mimeForFile(target)})`);
+      log.debug(`服务资源 ${fileName} (${stat.size}B, ${mime})`);
       return new Response(body, {
         status: 200,
         headers: {
-          'content-type': mimeForFile(target),
+          ...baseHeaders,
           'content-length': String(stat.size),
-          'cache-control': 'no-store',
         },
       });
     } catch (e) {

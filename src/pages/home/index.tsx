@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useConfigStore } from "@/stores/configStore";
 import { useInstanceStore } from "@/stores/instanceStore";
+import { MinecraftAccountCard } from "@/components/account/MinecraftAccountCard";
 import { InstanceTitle } from "./InstanceTitle";
 import { StartCard } from "./StartCard";
 
@@ -35,6 +36,11 @@ export function Home() {
 
   return (
     <div className="relative h-full overflow-hidden">
+      {/* 左上角：Minecraft 游戏账户卡（与设置侧栏顶部账户卡同排版，点击进入游戏账户设置） */}
+      <div className="absolute left-6 top-6 z-20">
+        <MinecraftAccountCard />
+      </div>
+
       {/*
         底部感应区：
         - 默认：文字下移 gap+按钮占位高度（48px），底边恰好贴住底部内边距（自适应文字行数，单行/多行都贴底不裁切）

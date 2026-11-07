@@ -6,6 +6,7 @@
  */
 
 import { ipcInvoke } from './ipc';
+import { CACHE_TTL, cacheKey, cached, invalidate } from '../lib/data-cache';
 
 /** 存档（saves/ 下的一个目录） */
 export interface SaveInfo {
@@ -62,30 +63,42 @@ export interface DeleteResult {
 
 /** 扫描实例存档列表（按最后修改时间倒序） */
 export async function listInstanceSaves(instancePath: string): Promise<SaveInfo[]> {
-  return ipcInvoke<SaveInfo[]>('instance:saves-list', { instancePath });
+  return cached(cacheKey('instance-assets:saves', instancePath), CACHE_TTL.short, () =>
+    ipcInvoke<SaveInfo[]>('instance:saves-list', { instancePath }),
+  );
 }
 
 /** 删除指定存档目录（幂等；不存在视为已删除） */
 export async function deleteInstanceSaves(instancePath: string, dirNames: string[]): Promise<DeleteResult> {
-  return ipcInvoke<DeleteResult>('instance:saves-delete', { instancePath, dirNames });
+  const result = await ipcInvoke<DeleteResult>('instance:saves-delete', { instancePath, dirNames });
+  invalidate('instance-assets:');
+  return result;
 }
 
 /** 备份指定存档目录，返回备份目录绝对路径列表 */
 export async function backupInstanceSaves(instancePath: string, dirNames: string[]): Promise<string[]> {
-  return ipcInvoke<string[]>('instance:saves-backup', { instancePath, dirNames });
+  const result = await ipcInvoke<string[]>('instance:saves-backup', { instancePath, dirNames });
+  invalidate('instance-assets:');
+  return result;
 }
 
 /** 扫描实例截图列表（含缩略图，按修改时间倒序） */
 export async function listInstanceScreenshots(instancePath: string): Promise<ScreenshotInfo[]> {
-  return ipcInvoke<ScreenshotInfo[]>('instance:screenshots-list', { instancePath });
+  return cached(cacheKey('instance-assets:screenshots', instancePath), CACHE_TTL.short, () =>
+    ipcInvoke<ScreenshotInfo[]>('instance:screenshots-list', { instancePath }),
+  );
 }
 
 /** 删除指定截图文件（幂等；不存在视为已删除） */
 export async function deleteInstanceScreenshots(instancePath: string, fileNames: string[]): Promise<DeleteResult> {
-  return ipcInvoke<DeleteResult>('instance:screenshots-delete', { instancePath, fileNames });
+  const result = await ipcInvoke<DeleteResult>('instance:screenshots-delete', { instancePath, fileNames });
+  invalidate('instance-assets:');
+  return result;
 }
 
 /** 扫描资源包 / 光影包列表（只读） */
 export async function listInstanceResourcePacks(instancePath: string): Promise<ResourcePackInfo[]> {
-  return ipcInvoke<ResourcePackInfo[]>('instance:resourcepacks-list', { instancePath });
+  return cached(cacheKey('instance-assets:resourcepacks', instancePath), CACHE_TTL.short, () =>
+    ipcInvoke<ResourcePackInfo[]>('instance:resourcepacks-list', { instancePath }),
+  );
 }

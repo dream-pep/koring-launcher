@@ -11,18 +11,17 @@
 import { useRouteStore } from "@/stores/routeStore";
 import { QuickstartTutorial } from "./quickstart-tutorial";
 
-const CRAEKOTE_IMAGE = `${import.meta.env.BASE_URL}KCAE-2.0.png`;
+const PLAYLINK_GIF = `${import.meta.env.BASE_URL}Helper-vedio/koring-help-v03-playlink.gif`;
 
-/** 快速上手教程 3：CraeKote 动画组件带来的直觉化操作体验。 */
+/** 快速上手教程 3：陶瓦 & Koring Link 联机体验。 */
 export function OobeQuickstartCraeKote() {
   const navigate = useRouteStore((s) => s.navigate);
 
   return (
     <QuickstartTutorial
-      title="你可以按照直觉进行操作。"
-      description="得益于 CraeKote 动画组件，动画都遵守从哪来到哪里去，并且所有功能入口都进行了特调。"
-      gif={CRAEKOTE_IMAGE}
-      aspectRatio="4 / 3"
+      title="使用联机功能与好友同乐！"
+      description="使用 陶瓦联机 & Koring Link 联合服务，获得全新联机体验"
+      gif={PLAYLINK_GIF}
       onNext={() => navigate("oobe/quickstart-end")}
     />
   );

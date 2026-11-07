@@ -10,6 +10,7 @@
  */
 
 import { ipcInvoke } from './ipc';
+import { CACHE_TTL, cacheKey, cached, invalidate } from '../lib/data-cache';
 
 /** 从 jar 元数据识别到的 Mod 加载器；`unknown` = 未解析出 */
 export type LocalModLoader = 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'unknown';
@@ -56,7 +57,9 @@ export interface InstanceModsChangeResult {
 
 /** 列举实例内 Mod：启用放 mods，禁用放 disabled */
 export async function listInstanceMods(instancePath: string): Promise<InstanceModsList> {
-  return ipcInvoke<InstanceModsList>('instance:mods-list', { instancePath });
+  return cached(cacheKey('instance-mods:list', instancePath), CACHE_TTL.short, () =>
+    ipcInvoke<InstanceModsList>('instance:mods-list', { instancePath }),
+  );
 }
 
 /** 批量启用/禁用（禁用 = 追加 `.disabled`，启用 = 去掉后缀） */
@@ -65,11 +68,14 @@ export async function setInstanceModsEnabled(
   fileNames: string[],
   enabled: boolean
 ): Promise<InstanceModsChangeResult> {
-  return ipcInvoke<InstanceModsChangeResult>('instance:mods-set-enabled', {
+  const result = await ipcInvoke<InstanceModsChangeResult>('instance:mods-set-enabled', {
     instancePath,
     fileNames,
     enabled,
   });
+  invalidate('instance-mods:');
+  invalidate('instances:');
+  return result;
 }
 
 /** 批量删除实例内 Mod 文件 */
@@ -77,8 +83,11 @@ export async function deleteInstanceMods(
   instancePath: string,
   fileNames: string[]
 ): Promise<InstanceModsChangeResult> {
-  return ipcInvoke<InstanceModsChangeResult>('instance:mods-delete', {
+  const result = await ipcInvoke<InstanceModsChangeResult>('instance:mods-delete', {
     instancePath,
     fileNames,
   });
+  invalidate('instance-mods:');
+  invalidate('instances:');
+  return result;
 }

@@ -11,7 +11,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Accordion, Button, Card, Input, Skeleton } from "@heroui/react";
 import { Box, Search, ChevronDown, Plus, Sparkles, Beaker, RotateCcw } from "lucide-react";
-import { getMinecraftVersionList, type VersionEntry, type VersionListResult } from "@/api/instance";
+import {
+  getMinecraftVersionList,
+  versionManifestCacheKey,
+  type VersionEntry,
+  type VersionListResult,
+} from "@/api/instance";
+import { CACHE_TTL, peek } from "@/lib/data-cache";
 import { isAprilFoolId } from "@/lib/version-type";
 import { InstallDialog } from "./InstallDialog";
 import clsx from "clsx";
@@ -52,8 +58,10 @@ const GROUPS: { group: VersionGroup; label: string; icon: React.ReactNode }[] = 
 ];
 
 export function GameVersionView() {
-  const [data, setData] = useState<VersionListResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  // 版本清单几乎不变，直接用上次的结果做初始值，回来时不再转圈
+  const cached = peek<VersionListResult>(versionManifestCacheKey(), CACHE_TTL.long);
+  const [data, setData] = useState<VersionListResult | null>(() => cached ?? null);
+  const [loading, setLoading] = useState(() => cached === undefined);
   const [query, setQuery] = useState("");
   const [installVersion, setInstallVersion] = useState<string | null>(null);
 
@@ -63,7 +71,7 @@ export function GameVersionView() {
   // 加载版本清单
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    setLoading(peek<VersionListResult>(versionManifestCacheKey(), CACHE_TTL.long) === undefined);
     getMinecraftVersionList()
       .then((result) => { if (!cancelled) setData(result); })
       .catch(() => {})

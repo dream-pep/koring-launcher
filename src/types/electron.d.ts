@@ -32,6 +32,12 @@ interface ElectronAPI {
 
   // 壁纸（文件路径存储 → koring-res:// 资源引用，不使用 BASE64）
   pickBackgroundImage: () => Promise<string | null>;
+  /** 选择视频背景：导入 userData 后返回文件路径（静音循环播放） */
+  pickBackgroundVideo: () => Promise<string | null>;
+  /** 删除单个受管背景文件 */
+  removeBackgroundFile: (filePath: string) => Promise<boolean>;
+  /** 清理全部受管背景文件，返回清理数量 */
+  clearBackgroundFiles: () => Promise<number>;
   resolveBackgroundResource: (value: string) => Promise<{ url: string | null; bytes: number }>;
 
   // Auto-update

@@ -3,7 +3,8 @@ import { Button } from "@heroui/react";
 import { AlertCircle, ExternalLink, Newspaper, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "@/lib/toast";
-import { getNews, getNewsTypes, type NewsEntry } from "@/api/news";
+import { getNews, getNewsTypes, NEWS_TYPES_CACHE_KEY, newsListCacheKey, type NewsEntry, type NewsListResult } from "@/api/news";
+import { CACHE_TTL, peek } from "@/lib/data-cache";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** 每次加载的条数（3 列布局下正好一行） */
@@ -219,21 +220,32 @@ function NewsSkeleton() {
 }
 
 export function Today() {
-  const [entries, setEntries] = useState<NewsEntry[]>([]);
-  const [types, setTypes] = useState<string[]>([]);
-  const [total, setTotal] = useState(0);
-  const [fetchedAt, setFetchedAt] = useState(0);
-  const [initialLoading, setInitialLoading] = useState(true);
+  // 上次看过的第一页直接复用：返回本页不再闪骨架屏
+  const cachedPage = peek<NewsListResult>(
+    newsListCacheKey({ newsType: undefined, limit: PAGE_SIZE, offset: 0 }),
+    CACHE_TTL.medium,
+  );
+  const hasPageRef = useRef(cachedPage !== undefined);
+
+  const [entries, setEntries] = useState<NewsEntry[]>(() => cachedPage?.entries ?? []);
+  const [types, setTypes] = useState<string[]>(
+    () => peek<string[]>(NEWS_TYPES_CACHE_KEY, CACHE_TTL.long) ?? [],
+  );
+  const [total, setTotal] = useState(() => cachedPage?.total ?? 0);
+  const [fetchedAt, setFetchedAt] = useState(() => cachedPage?.fetchedAt ?? 0);
+  const [initialLoading, setInitialLoading] = useState(() => cachedPage === undefined);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [moreError, setMoreError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(
+    () => cachedPage !== undefined && cachedPage.entries.length < cachedPage.total,
+  );
   const [activeType, setActiveType] = useState<string | null>(null);
   const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null);
 
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
   /** 已加载到的偏移量（下一页起点） */
-  const offsetRef = useRef(0);
+  const offsetRef = useRef(cachedPage?.entries.length ?? 0);
   /** 是否有请求在飞（并发保护：滚动触发再多次也只发一个） */
   const loadingRef = useRef(false);
   /** 请求令牌：切换筛选/刷新后旧响应直接丢弃，避免串数据 */
@@ -258,7 +270,8 @@ export function Today() {
 
       const offset = options.reset ? 0 : offsetRef.current;
       if (options.reset) {
-        setInitialLoading(true);
+        // 已有缓存页时后台刷新，不闪骨架屏
+        setInitialLoading(!hasPageRef.current);
         setError(null);
       } else {
         setLoadingMore(true);
@@ -282,6 +295,7 @@ export function Today() {
         setHasMore(loaded < result.total);
 
         if (options.reset) {
+          hasPageRef.current = true;
           setEntries(result.entries);
         } else {
           // 追加走 transition：不阻塞滚动/输入

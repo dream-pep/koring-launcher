@@ -57,7 +57,7 @@ const DEFAULT_CONFIG: AppConfig = {
   app: { language: "zh-CN" },
   theme: { darkMode: "auto", parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
-  background: { bgType: "image", image: DEFAULT_BG, blur: 0, opacity: 100 },
+  background: { bgType: "image", image: DEFAULT_BG, images: [], video: "", intervalSec: 30, blur: 0, opacity: 100 },
   game: { gameDir: ".minecraft", resourceDir: "", isolation: "instance", gameDirs: [], gameDirOrder: [], selectedInstance: "", dirAliases: {} },
   java: {
     javaPath: "",

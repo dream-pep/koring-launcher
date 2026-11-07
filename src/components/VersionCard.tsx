@@ -185,7 +185,7 @@ export function VersionCard({
           className="w-40 h-auto drop-shadow-lg"
           style={{ filter: "brightness(0) invert(1)" }}
         />
-        <p className="text-sm text-white/70 font-medium">
+        <p className="text-shadow-overlay text-sm text-white/70 font-medium">
           <FadeText value={`v${versionText}`} />
         </p>
 

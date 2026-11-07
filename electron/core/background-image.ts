@@ -34,7 +34,21 @@ const EXT_MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.gif': 'image/gif',
   '.bmp': 'image/bmp',
+  // 视频背景（静音播放）：koring-res:// 需要正确的 content-type 才能被 <video> 解码
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/x-m4v',
+  '.webm': 'video/webm',
+  '.ogv': 'video/ogg',
+  '.ogg': 'video/ogg',
+  '.mov': 'video/quicktime',
 };
+
+/** 视频背景支持的扩展名 */
+export const VIDEO_EXTENSIONS = ['.mp4', '.m4v', '.webm', '.ogv', '.ogg', '.mov'] as const;
+
+export function isVideoFile(filePath: string): boolean {
+  return (VIDEO_EXTENSIONS as readonly string[]).includes(path.extname(filePath).toLowerCase());
+}
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': '.png',
@@ -57,7 +71,6 @@ export function recoverBackgroundFromDataUrl(dataUrl: string, userDataDir: strin
     const buffer = Buffer.from(match[2], 'base64');
     if (!buffer || buffer.length === 0) return null;
     if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
-    clearStaleBackgroundFiles(userDataDir, []);
     const rawPath = path.join(userDataDir, `background-custom-${uniqueSuffix()}${ext}`);
     fs.writeFileSync(rawPath, buffer);
     return rawPath;
@@ -154,8 +167,7 @@ export function optimizeBackgroundFile(rawFilePath: string, maxEdge = 4096): Opt
     const size = image.getSize();
     const longEdge = Math.max(size.width, size.height);
     if (longEdge <= maxEdge || size.width <= 0 || size.height <= 0) {
-      // 无需优化：清掉历史遗留的旧 opt/其它扩展名缓存后原样返回
-      clearStaleBackgroundFiles(outDir, [rawFilePath]);
+      // 无需优化：原样返回（不能清理其它文件：多图轮播会同时持有多个受管背景）
       return {
         filePath: rawFilePath,
         bytes: statSize(rawFilePath),
@@ -184,8 +196,8 @@ export function optimizeBackgroundFile(rawFilePath: string, maxEdge = 4096): Opt
     }
     if (!buffer || buffer.length === 0) return fail(rawFilePath);
 
-    // 先清理旧文件，再原子写入新文件（文件名带唯一后缀，保证每次导入路径都不同）
-    clearStaleBackgroundFiles(outDir, [rawFilePath]);
+    // 原子写入新文件（文件名带唯一后缀，保证每次导入路径都不同）
+    // 注意：不清理其它受管文件——多图轮播会同时引用多张图片。
     const optPath = path.join(outDir, `background-custom-opt-${uniqueSuffix()}${outExt}`);
     const tmpPath = `${optPath}.${process.pid}.tmp`;
     fs.writeFileSync(tmpPath, buffer);
@@ -221,8 +233,6 @@ export function importUserBackground(srcPath: string, maxEdge = 4096): Optimized
 
     const ext = path.extname(srcPath).toLowerCase() || '.png';
     const rawPath = path.join(userDataDir, `background-custom-${uniqueSuffix()}${ext}`);
-    // 删除旧的原始缓存
-    clearStaleBackgroundFiles(userDataDir, []);
     fs.copyFileSync(srcPath, rawPath);
     const result = optimizeBackgroundFile(rawPath, maxEdge);
     if (result) {
@@ -278,4 +288,66 @@ export function isPathInside(root: string, target: string): boolean {
 /** 是否为受管壁纸文件（供协议处理器白名单使用） */
 export function isManagedBackgroundFile(fileName: string): boolean {
   return fileName.startsWith('background-custom');
+}
+
+/**
+ * 导入视频背景：复制到 userData 的 `background-custom-video-<唯一后缀><ext>`。
+ * 视频不做降采样（交给 Chromium 解码），只校验文件存在且扩展名受支持。
+ */
+export function importUserVideo(srcPath: string): { filePath: string; bytes: number } | null {
+  try {
+    if (!srcPath || !fs.existsSync(srcPath) || !fs.statSync(srcPath).isFile()) return null;
+    if (!isVideoFile(srcPath)) {
+      log.warn(`不支持的视频格式：${srcPath}`);
+      return null;
+    }
+    const userDataDir = electron.app.getPath('userData');
+    if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
+    const ext = path.extname(srcPath).toLowerCase();
+    const dest = path.join(userDataDir, `background-custom-video-${uniqueSuffix()}${ext}`);
+    fs.copyFileSync(srcPath, dest);
+    const bytes = statSize(dest);
+    log.info(`导入视频背景完成 → ${path.basename(dest)} (${bytes}B)`);
+    return { filePath: dest, bytes };
+  } catch (e) {
+    log.error('导入视频背景失败:', e);
+    return null;
+  }
+}
+
+/** 删除单个受管背景文件（从轮播列表移除 / 更换视频时调用） */
+export function deleteManagedBackgroundFile(filePath: string): boolean {
+  try {
+    const userDataDir = electron.app.getPath('userData');
+    const fileName = path.basename(filePath);
+    if (!isManagedBackgroundFile(fileName)) return false;
+    const target = path.join(userDataDir, fileName);
+    if (!isPathInside(userDataDir, target)) return false;
+    if (fs.existsSync(target)) fs.unlinkSync(target);
+    return true;
+  } catch (e) {
+    log.warn('删除背景文件失败:', e);
+    return false;
+  }
+}
+
+/** 清理全部受管背景文件（「恢复默认」时调用） */
+export function clearManagedBackgroundFiles(): number {
+  let removed = 0;
+  try {
+    const userDataDir = electron.app.getPath('userData');
+    for (const name of fs.readdirSync(userDataDir)) {
+      if (!isManagedBackgroundFile(name)) continue;
+      try {
+        fs.unlinkSync(path.join(userDataDir, name));
+        removed += 1;
+      } catch {
+        // 忽略单个文件删除失败
+      }
+    }
+    log.info(`已清理受管背景文件：${removed} 个`);
+  } catch {
+    // userData 不存在等
+  }
+  return removed;
 }

@@ -36,9 +36,19 @@ export interface A11yConfig {
   contentBlurOpacity: number;
 }
 
+/** 背景呈现方式：单图 / 多图轮播 / 静音视频（color 为旧版纯色背景，继续兼容） */
+export type BackgroundMode = 'image' | 'slideshow' | 'video' | 'color';
+
 export interface BackgroundConfig {
-  bgType: string;
+  bgType: BackgroundMode;
+  /** 单图模式 / 旧版纯色模式的背景值（文件路径或颜色） */
   image: string;
+  /** 多图轮播的图片列表（userData 内受管文件路径） */
+  images: string[];
+  /** 视频模式的视频文件路径（userData 内受管文件） */
+  video: string;
+  /** 多图轮播间隔（秒） */
+  intervalSec: number;
   blur: number;
   opacity: number;
 }
@@ -241,7 +251,7 @@ const DEFAULTS: AppConfig = {
   app: { language: 'zh-CN' },
   theme: { darkMode: 'dark', parallax: true },/** 这里默认是auto,现在为了显示效果则选择dark */
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
-  background: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 },
+  background: { bgType: 'image', image: '/background.png', images: [], video: '', intervalSec: 30, blur: 0, opacity: 100 },
   game: { gameDir: '.minecraft', resourceDir: '', isolation: 'instance', gameDirs: [], gameDirOrder: [], selectedInstance: '', dirAliases: {} },
   java: {
     javaPath: '',
@@ -298,6 +308,16 @@ function migrate(config: AppConfig): AppConfig {
   // 版本隔离档位：非法值兜底成「隔离到实例目录」（旧配置没有该字段时 mergeDeep 已补默认值）
   const isolation = config.game.isolation as string | undefined;
   config.game.isolation = isolation === 'version' || isolation === 'none' ? isolation : 'instance';
+
+  // 背景配置：补齐新增字段并兜底非法值（旧配置没有这些键时 mergeDeep 已补默认值）
+  const bg = config.background;
+  const validModes: BackgroundMode[] = ['image', 'slideshow', 'video', 'color'];
+  if (!validModes.includes(bg.bgType)) bg.bgType = 'image';
+  bg.images = Array.isArray(bg.images)
+    ? [...new Set(bg.images.filter((v): v is string => typeof v === 'string' && v.trim().length > 0))]
+    : [];
+  bg.video = typeof bg.video === 'string' ? bg.video : '';
+  bg.intervalSec = Math.min(3600, Math.max(5, Number(bg.intervalSec) || 30));
 
   return config;
 }

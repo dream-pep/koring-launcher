@@ -1,4 +1,5 @@
 import { ipcInvoke } from './ipc';
+import { CACHE_TTL, cacheKey, cached } from '../lib/data-cache';
 
 export interface JavaInfo {
   path: string;
@@ -8,14 +9,18 @@ export interface JavaInfo {
 
 /** 扫描系统已安装的 Java（JAVA_HOME / PATH / 常见安装目录） */
 export async function scanJava(): Promise<JavaInfo[]> {
-  const data = await ipcInvoke<{ javaList: JavaInfo[] }>('java:scan');
-  return data?.javaList ?? [];
+  return cached('java:scan', CACHE_TTL.medium, async () => {
+    const data = await ipcInvoke<{ javaList: JavaInfo[] }>('java:scan');
+    return data?.javaList ?? [];
+  });
 }
 
 /** 校验指定路径是否为可用的 Java 可执行文件 */
 export async function resolveJava(path: string): Promise<JavaInfo | null> {
-  const data = await ipcInvoke<{ java: JavaInfo | null }>('java:resolve', { path });
-  return data?.java ?? null;
+  return cached(cacheKey('java:resolve', path), CACHE_TTL.medium, async () => {
+    const data = await ipcInvoke<{ java: JavaInfo | null }>('java:resolve', { path });
+    return data?.java ?? null;
+  });
 }
 
 export interface JavaCandidate {
@@ -35,5 +40,7 @@ export interface JavaPlan {
 
 /** Java 自动匹配方案：该版本要求的主版本 + 本机候选 + 自动选中的路径 */
 export async function getJavaPlan(minecraftVersion: string): Promise<JavaPlan> {
-  return ipcInvoke<JavaPlan>('java:plan', { minecraftVersion });
+  return cached(cacheKey('java:plan', minecraftVersion), CACHE_TTL.long, () =>
+    ipcInvoke<JavaPlan>('java:plan', { minecraftVersion }),
+  );
 }

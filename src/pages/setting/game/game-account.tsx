@@ -22,23 +22,15 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import type { AccountType, AuthAccount } from "@/api/auth-registry";
+import { ACCOUNT_TYPE_LABELS, minecraftAccountAvatar } from "@/lib/minecraft-account";
 import { AddAccountDialog } from "./AddAccountDialog";
 
 // 账号类型 → 徽标文案与样式
 const TYPE_META: Record<AccountType, { label: string; variant: SettingBadgeVariant }> = {
-  offline: { label: "离线账户", variant: "neutral" },
-  littleskin: { label: "LittleSkin", variant: "info" },
-  microsoft: { label: "微软账户", variant: "primary" },
+  offline: { label: ACCOUNT_TYPE_LABELS.offline, variant: "neutral" },
+  littleskin: { label: ACCOUNT_TYPE_LABELS.littleskin, variant: "info" },
+  microsoft: { label: ACCOUNT_TYPE_LABELS.microsoft, variant: "primary" },
 };
-
-// 计算头像地址：优先使用账号自带 avatarUrl；离线 / LittleSkin 回退到 mc-heads 渲染
-function avatarSrc(account: AuthAccount): string | null {
-  if (account.avatarUrl) return account.avatarUrl;
-  if (account.type === "offline" || account.type === "littleskin") {
-    return `https://mc-heads.net/avatar/${account.uuid.replace(/-/g, "")}/64`;
-  }
-  return null;
-}
 
 // 单行账号：右键弹出菜单（删除账号），左键点击整行设为当前
 function AccountRow({
@@ -53,7 +45,7 @@ function AccountRow({
   onDelete: () => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const src = avatarSrc(account);
+  const src = minecraftAccountAvatar(account);
   const meta = TYPE_META[account.type];
   const initial = account.username.slice(0, 1).toUpperCase();
 
