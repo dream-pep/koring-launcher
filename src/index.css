@@ -177,12 +177,34 @@
     margin: 0;
     overflow: hidden;
     }
+  /* Mica 材质模式：窗口本身透明，body 不能再画不透明底色，
+     否则会把系统材质完全盖住（由 BackgroundLayer 设置 data-bg-mode） */
+  html[data-bg-mode="mica"],
+  html[data-bg-mode="mica"] body {
+    background: transparent !important;
+  }
   html {
     @apply font-sans;
     overflow: hidden;
     /* 全局应用可变字体 Bevel 轴 = 0 */
     font-variation-settings: "BEVL" 0;
     }
+
+  /* 界面文本默认不可框选；只放行可编辑控件，避免影响输入/复制 */
+  html,
+  body,
+  body * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  [contenteditable=""] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 /* ============================================

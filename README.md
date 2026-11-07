@@ -195,7 +195,7 @@
 **正在完善**
 
 - [ ] **资源中心入口**：Minecraft 版本、Mod 与整合包的浏览 / 安装界面已具备主体实现，入口尚未在正式版本中开放（整合包安装仍在完善）；
-- [ ] **联机页**：以太联机与陶瓦联机仍为占位；
+- [ ] **联机页**：陶瓦联机（Terracotta）已实装 —— 打包内置上游未修改二进制、经主进程 HTTP API 连接；以太联机仍为占位；
 - [ ] **账号入口**：微软正版登录与 Koring 账户的界面入口待开放；
 - [ ] **多语言**：语言偏好已支持简体中文 / English，界面文案正在逐步外置；
 - [ ] **整合包**：整合包安装与导出、模组依赖检查与更新检测；
@@ -207,6 +207,7 @@
 
 - **问题反馈**：可在启动器「设置 → 服务与反馈」中打开在线反馈表单（[YouTrack 表单](https://lingke.youtrack.cloud/form/aa6a005d-2559-4e92-a0f5-d3898f377ef8)），或在仓库提交 [Issue](https://github.com/dream-pep/koring-launcher/issues)。
 - **参与开发**：欢迎 Fork 仓库并基于 `master` 提交 Pull Request。开发环境、构建方式与仓库约定请阅读 [DEV.md](DEV.md) 与 [AGENTS.md](AGENTS.md)。
+- **打包依赖**：`pnpm dist:*` 会先执行 `pnpm fetch:terracotta`，从上游 GitHub Release 预取陶瓦联机二进制到 `build/terracotta/` 并随安装包复制为 `resources/terracotta/`（失败仅警告、不阻断构建，可在应用内重新下载）。
 - 提交信息建议使用约定式（`feat:` / `fix:` / `docs:` / `refactor:` …）。
 
 ## 许可证
@@ -407,7 +408,9 @@ communicated explicitly and routed to the update page.
 - [ ] **Resource center entry**: the browsing and installation UI for Minecraft
       versions, mods and modpacks is largely implemented but not yet exposed in
       stable builds (modpack installation is still in progress);
-- [ ] **Online play**: Ether and Tawa online play pages are placeholders;
+- [ ] **Online play**: Tawa (Terracotta) online play is implemented — the upstream
+      binary is bundled unmodified and driven over its HTTP API by the main
+      process; Ether remains a placeholder;
 - [ ] **Account entries**: Microsoft and Koring account UI entries are pending;
 - [ ] **Localization**: Simplified Chinese / English preference exists; UI strings
       are being externalized;
@@ -425,6 +428,10 @@ communicated explicitly and routed to the update page.
 - Contributions are welcome: fork the repository and branch from `master`.
   See [DEV.md](DEV.md) and [AGENTS.md](AGENTS.md) for development and repository
   conventions. Conventional commit messages are preferred.
+- **Packaging dependency**: `pnpm dist:*` first runs `pnpm fetch:terracotta`,
+  which prefetches the Tawa (Terracotta) binary from the upstream GitHub Release
+  into `build/terracotta/`; electron-builder copies it to `resources/terracotta/`
+  (a failure only warns and does not block the build; the app can re-download it).
 
 ## License
 

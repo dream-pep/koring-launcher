@@ -12,9 +12,21 @@ export interface A11yConfig {
   contentBlurOpacity: number;
 }
 
+export type BackgroundMode = "mica" | "color" | "image" | "video" | "gif";
+
 export interface BackgroundConfig {
-  bgType: string;
+  /** 背景模式：Mica 材质 / 纯色 / 图片（可多张轮换）/ 视频 / GIF */
+  bgType: BackgroundMode;
+  /** 兼容旧配置：image 模式的第一张图（纯色模式回退为颜色值） */
   image: string;
+  /** 图片模式的多图轮换列表（首张同步写入 image） */
+  images: string[];
+  /** 图片轮换间隔（秒）；0 = 不轮换 */
+  imageRotateSeconds: number;
+  /** 视频文件路径（userData 内受管文件） */
+  video: string;
+  /** 纯色模式颜色（#rrggbb） */
+  color: string;
   blur: number;
   opacity: number;
 }
@@ -115,8 +127,20 @@ export interface SecurityIdConfig {
   authUrl: string;
 }
 
+export interface TerracottaConfig {
+  /** 昵称；留空 = 使用当前登录账户名 */
+  playerName: string;
+  /** 附加公共节点（host:port），与上游内置节点一起作为 public_nodes 传入 */
+  publicNodes: string[];
+  /** 进入联机页时自动启动陶瓦服务 */
+  autoStart: boolean;
+  /** 自定义二进制路径；留空 = 自动定位/下载 */
+  binaryPath: string;
+}
+
 export interface NetworkConfig {
   securityId: SecurityIdConfig;
+  terracotta: TerracottaConfig;
 }
 
 /** 更新进度持久化（主进程 updater 写入） */

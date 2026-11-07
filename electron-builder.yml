@@ -18,6 +18,13 @@ files:
 extraResources:
   - from: build/.env
     to: .env
+  # 陶瓦联机（Terracotta）二进制：由 scripts/fetch-terracotta.js 在构建期预取到
+  # build/terracotta/，整目录复制为 resources/terracotta（含 VCRUNTIME140.DLL，
+  # 缺 DLL 无法启动）。打包未修改二进制 + 仅通过官方 HTTP API 通信，见
+  # plans/terracotta-integration.md。脚本保证无论成败都创建该目录，避免
+  # extraResources 因目录缺失直接报错。
+  - from: build/terracotta
+    to: terracotta
 win:
   target: nsis
   icon: build/icon.ico

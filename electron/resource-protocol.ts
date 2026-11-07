@@ -81,14 +81,49 @@ export function registerResourceProtocol(): void {
         return new Response('Not Found', { status: 404 });
       }
 
+      const mime = mimeForFile(target);
+      const baseHeaders: Record<string, string> = {
+        'content-type': mime,
+        'accept-ranges': 'bytes',
+        'cache-control': 'no-store',
+      };
+
+      // 视频等媒体播放器会带 Range 请求（拖动进度/分段缓冲）→ 返回 206 分片
+      const rangeHeader = request.headers.get('range');
+      if (rangeHeader) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
+        if (match) {
+          const total = stat.size;
+          let start = match[1] ? Number(match[1]) : 0;
+          let end = match[2] ? Number(match[2]) : total - 1;
+          if (Number.isFinite(start) && Number.isFinite(end) && start <= end && start < total) {
+            end = Math.min(end, total - 1);
+            const chunk = fs.createReadStream(target, { start, end });
+            const body = Readable.toWeb(chunk) as unknown as BodyInit;
+            log.debug(`服务资源分片 ${fileName} [${start}-${end}/${total}] (${mime})`);
+            return new Response(body, {
+              status: 206,
+              headers: {
+                ...baseHeaders,
+                'content-range': `bytes ${start}-${end}/${total}`,
+                'content-length': String(end - start + 1),
+              },
+            });
+          }
+        }
+        return new Response('Range Not Satisfiable', {
+          status: 416,
+          headers: { ...baseHeaders, 'content-range': `bytes */${stat.size}` },
+        });
+      }
+
       const body = Readable.toWeb(fs.createReadStream(target)) as unknown as BodyInit;
-      log.debug(`服务资源 ${fileName} (${stat.size}B, ${mimeForFile(target)})`);
+      log.debug(`服务资源 ${fileName} (${stat.size}B, ${mime})`);
       return new Response(body, {
         status: 200,
         headers: {
-          'content-type': mimeForFile(target),
+          ...baseHeaders,
           'content-length': String(stat.size),
-          'cache-control': 'no-store',
         },
       });
     } catch (e) {

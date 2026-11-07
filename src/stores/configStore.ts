@@ -57,7 +57,7 @@ const DEFAULT_CONFIG: AppConfig = {
   app: { language: "zh-CN" },
   theme: { darkMode: "auto", parallax: true },
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
-  background: { bgType: "image", image: DEFAULT_BG, blur: 0, opacity: 100 },
+  background: { bgType: "image", image: DEFAULT_BG, images: [], imageRotateSeconds: 30, video: "", color: "#1c1c1e", blur: 0, opacity: 100 },
   game: { gameDir: ".minecraft", resourceDir: "", gameDirs: [], gameDirOrder: [], selectedInstance: "", dirAliases: {} },
   java: {
     javaPath: "",
@@ -73,7 +73,10 @@ const DEFAULT_CONFIG: AppConfig = {
   },
   advanced: { afterLaunch: "minimize", winMode: "default", customWidth: 854, customHeight: 480, gameArgs: "", preLaunchCmd: "", debugMode: false, server: { ip: "", port: 25565 } },
   download: { source: "bmclapi", threads: 16, customVersionManifest: "", customMavenHost: "", customAssetsHost: "" },
-  network: { securityId: { enabled: false, authUrl: "" } },
+  network: {
+    securityId: { enabled: false, authUrl: "" },
+    terracotta: { playerName: "", publicNodes: [], autoStart: true, binaryPath: "" },
+  },
   ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: "version", showQuickActions: true },
   activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: "", reason: "", upgradeTarget: "" },
   update: { state: "idle", version: "", percent: 0, transferred: 0, total: 0, source: "github", channel: "woker", error: "" },

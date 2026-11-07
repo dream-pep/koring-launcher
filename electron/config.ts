@@ -36,9 +36,21 @@ export interface A11yConfig {
   contentBlurOpacity: number;
 }
 
+export type BackgroundMode = 'mica' | 'color' | 'image' | 'video' | 'gif';
+
 export interface BackgroundConfig {
-  bgType: string;
+  /** 背景模式：Mica 材质 / 纯色 / 图片（可多张轮换）/ 视频 / GIF */
+  bgType: BackgroundMode;
+  /** 兼容旧配置：image 模式的第一张图（纯色模式则回退为颜色值） */
   image: string;
+  /** 图片模式的多图列表（轮换用；首张同步写入 image） */
+  images: string[];
+  /** 图片轮换间隔（秒）；0 = 不轮换，只显示第一张 */
+  imageRotateSeconds: number;
+  /** 视频文件路径（userData 内受管文件） */
+  video: string;
+  /** 纯色模式的颜色值（#rrggbb） */
+  color: string;
   blur: number;
   opacity: number;
 }
@@ -173,8 +185,21 @@ export interface InstanceMeta {
   playtime: number;
 }
 
+/** 陶瓦联机（Terracotta）配置 */
+export interface TerracottaConfig {
+  /** 游戏内显示名（开房/加入时使用；空则回退当前账户用户名） */
+  playerName: string;
+  /** 附加的 EasyTier 公共节点（会与上游内置节点合并） */
+  publicNodes: string[];
+  /** 启动器启动时自动启动陶瓦联机服务 */
+  autoStart: boolean;
+  /** 自定义二进制路径（空则自动定位：打包内置 → dev → userData） */
+  binaryPath: string;
+}
+
 export interface NetworkConfig {
   securityId: SecurityIdConfig;
+  terracotta: TerracottaConfig;
 }
 
 /** 更新进度持久化（主进程 updater 写入；重启后可恢复/展示） */
@@ -222,7 +247,7 @@ const DEFAULTS: AppConfig = {
   app: { language: 'zh-CN' },
   theme: { darkMode: 'dark', parallax: true },/** 这里默认是auto,现在为了显示效果则选择dark */
   a11y: { reduceMotion: false, reduceTransparency: false, highContrast: false, contentBlurOpacity: 50 },
-  background: { bgType: 'image', image: '/background.png', blur: 0, opacity: 100 },
+  background: { bgType: 'image', image: '/background.png', images: [], imageRotateSeconds: 30, video: '', color: '#1c1c1e', blur: 0, opacity: 100 },
   game: { gameDir: '.minecraft', resourceDir: '', gameDirs: [], gameDirOrder: [], selectedInstance: '', dirAliases: {} },
   java: {
     javaPath: '',
@@ -238,7 +263,10 @@ const DEFAULTS: AppConfig = {
   },
   advanced: { afterLaunch: 'minimize', winMode: 'default', customWidth: 854, customHeight: 480, gameArgs: '', preLaunchCmd: '', debugMode: false, server: { ip: '', port: 25565 } },
   download: { source: 'bmclapi', threads: 16, customVersionManifest: '', customMavenHost: '', customAssetsHost: '' },
-  network: { securityId: { enabled: false, authUrl: '' } },
+  network: {
+    securityId: { enabled: false, authUrl: '' },
+    terracotta: { playerName: '', publicNodes: [], autoStart: true, binaryPath: '' },
+  },
   ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: 'version', showQuickActions: true },
   activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: '', reason: '', upgradeTarget: '' },
   update: { state: 'idle', version: '', percent: 0, transferred: 0, total: 0, source: 'github', channel: 'woker', error: '' },
@@ -249,6 +277,34 @@ function migrate(config: AppConfig): AppConfig {
   if (config.version < 1) {
     config.version = 1;
   }
+
+  // 背景配置迁移：旧版只有 bgType(image|color) + image 单值
+  // → 新版补齐 mode 相关字段（images 多图列表、video、color、轮换间隔）
+  const bg = config.background as unknown as Partial<BackgroundConfig> & { bgType?: string };
+  const legacyType = bg.bgType === 'color' ? 'color' : 'image';
+  const legacyValue = typeof bg.image === 'string' ? bg.image : '';
+  if (!Array.isArray(bg.images)) bg.images = [];
+  if (typeof bg.imageRotateSeconds !== 'number' || !Number.isFinite(bg.imageRotateSeconds)) {
+    bg.imageRotateSeconds = DEFAULTS.background.imageRotateSeconds;
+  }
+  if (typeof bg.video !== 'string') bg.video = '';
+  if (typeof bg.color !== 'string' || !bg.color) {
+    bg.color = legacyType === 'color' && legacyValue ? legacyValue : DEFAULTS.background.color;
+  }
+  if (!Array.isArray(bg.images) || bg.images.length === 0) {
+    // 旧配置：单图即轮换列表的第一张；默认背景图/空值不写入列表（渲染端会回退默认壁纸）
+    if (legacyType === 'image' && legacyValue && legacyValue !== DEFAULTS.background.image) {
+      bg.images = [legacyValue];
+    }
+  }
+  if (bg.images.length > 0 && bg.image !== bg.images[0]) {
+    bg.image = bg.images[0];
+  }
+  const modes: BackgroundMode[] = ['mica', 'color', 'image', 'video', 'gif'];
+  bg.bgType = modes.includes(bg.bgType as BackgroundMode)
+    ? (bg.bgType as BackgroundMode)
+    : legacyType;
+  config.background = bg as BackgroundConfig;
 
   // 下载配置迁移：fileSource / versionSource / speedLimit → source + threads
   const legacy = config.download as unknown as {

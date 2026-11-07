@@ -157,7 +157,17 @@ export function AboutSetting(_props: AboutSettingProps) {
             </SettingCard>
             <SettingCard>
               <SettingRow label="动画引擎版本" desc="Koring CraeKote Animation Engine">
-                <span className="text-[13px] text-muted-foreground">2.0.1</span>
+                <span className="text-[13px] text-muted-foreground">2.0.2</span>
+              </SettingRow>
+            </SettingCard>
+            <SettingCard>
+              <SettingRow label="陶瓦·联机组件" desc="Terracotta 联机">
+                <span className="text-[13px] text-muted-foreground">AGPL 许可</span>
+              </SettingRow>
+            </SettingCard>
+            <SettingCard>
+              <SettingRow label="以太·联机组件" desc="Ether Link 联机">
+                <span className="text-[13px] text-muted-foreground">未安装</span>
               </SettingRow>
             </SettingCard>
             <SettingCard>
@@ -174,8 +184,8 @@ export function AboutSetting(_props: AboutSettingProps) {
               </SettingRow>
             </SettingCard>
             <SettingCard>
-              <SettingRow label="技术栈" desc="Electron + React 19 + TypeScript + @xmcl">
-                <span className="text-[13px] text-muted-foreground">Node.js</span>
+              <SettingRow label="运行模式" desc="该模式与应用编译打包时的参数相关">
+                <span className="text-[13px] text-muted-foreground">市场发行</span>
               </SettingRow>
             </SettingCard>
             <SettingCard>

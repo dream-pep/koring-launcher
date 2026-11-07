@@ -21,6 +21,7 @@ pnpm dev                            # 完整开发环境 (renderer + main)
 pnpm dev:renderer                   # 仅前端 (Vite, port 1420)
 pnpm dev:main                       # 仅主进程 (tsc + electron)
 pnpm build                          # 生产构建 (vite + tsc)
+pnpm fetch:terracotta               # 预取陶瓦联机二进制 → build/terracotta/
 pnpm dist:dev                       # dev 图标 + Windows 安装包
 pnpm dist:beta                      # beta 图标 + Windows 安装包
 pnpm dist:run                       # production 图标 + Windows 安装包
@@ -53,9 +54,17 @@ pnpm dev
 pnpm dist:beta
   → pnpm build                      # 1. 编译 renderer + main
   → pnpm icon:beta                  # 2. 复制 public/icons/beta/ → build/
-  → electron-builder --win          # 3. 读取 build/icon.ico 打包
+  → pnpm env:beta                   # 3. 生成 resources/.env
+  → pnpm fetch:terracotta           # 4. 预取陶瓦二进制 → build/terracotta/
+  → electron-builder --win          # 5. 读取 build/icon.ico 打包，并把
+                                    #    build/terracotta/ 复制为 resources/terracotta/
   → 输出 dist-electron/koring-launcher-1.0.0-setup.exe
 ```
+
+`fetch:terracotta` 从上游 GitHub Release 拉取对应平台资产（默认 `v0.4.2`，可用环境变量
+`TERRACOTTA_VERSION` 覆盖），解包 tar.gz 到 `build/terracotta/`（含 `VCRUNTIME140.DLL`
+与上游 `LICENSE`）。`--force` 强制重新下载；`TERRACOTTA_STRICT=1` 让失败以非零码退出
+（默认仅警告，并在目录内写 `NOTICE.txt`，不阻断打包）。不支持的平台同样只警告。
 
 ## 构建模式
 
@@ -195,9 +204,11 @@ koring-launcher/
 │   └── ...
 ├── build/                       # 构建资源 (gitignored, 由 switch-icon.js 生成)
 │   ├── icon.ico
-│   └── icon.png
+│   ├── icon.png
+│   └── terracotta/              # 陶瓦二进制 (由 fetch-terracotta.js 预取)
 ├── scripts/
-│   └── switch-icon.js           # 图标切换脚本
+│   ├── switch-icon.js           # 图标切换脚本
+│   └── fetch-terracotta.js      # 陶瓦联机二进制预取脚本
 ├── splash.html                  # 启动动画 HTML 入口
 ├── electron-builder.yml         # 打包配置
 ├── vite.config.ts               # Vite 配置
@@ -498,7 +509,7 @@ logout()                // 清除文件
 | `home` | 首页 | `pages/home/index.tsx` | StartCard 启动组件 |
 | `store` | 资源 | `pages/store/index.tsx` | 🚧 装修中 |
 | `today` | 资讯 | `pages/today/index.tsx` | 🚧 装修中 |
-| `play-link` | 联机 | `pages/play-link/index.tsx` | 🚧 装修中 |
+| `play-link` | 联机 | `pages/play-link/index.tsx` | 陶瓦联机已实装（以太联机占位） |
 | `setting` | 设置 | `pages/setting/index.tsx` | 侧边栏 + 内容区 |
 
 ### 隐藏路由
@@ -624,7 +635,7 @@ z-200 StartupPopup        启动弹窗 (环境变量控制)
 | 个性化 | 辅助功能 | 实装 | `a11y.*` |
 | 网络 | 下载 | 实装 | `download.source`（official\|bmclapi\|custom）/ `threads` / `customVersionManifest` / `customMavenHost` / `customAssetsHost` |
 | 网络 | 安全识别服务 | 实装 | `network.securityId` |
-| 网络 | 以太联机 / 陶瓦联机 | 占位 | 无后端接口 |
+| 网络 | 以太联机 / 陶瓦联机 | 陶瓦实装 / 以太占位 | 陶瓦：内置上游二进制 + `terracotta:*` IPC（`resources/terracotta/`）；以太：无后端接口 |
 | 其他 | 服务与反馈 / 赞助我们 / 开发者选项 | 保留 | — |
 
 ### 版本更新内容（AboutVersion）

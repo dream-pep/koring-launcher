@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "activeAccountId": "fc6aea2b-9373-48c5-9fce-074f6e870131",
+  "accounts": [
+    {
+      "id": "fc6aea2b-9373-48c5-9fce-074f6e870131",
+      "type": "offline",
+      "username": "demo",
+      "uuid": "63f2f2ba-086b-cb53-4311-c772468d3755",
+      "addedAt": 1794028805569,
+      "lastLoginAt": 1794028805569
+    }
+  ]
+}

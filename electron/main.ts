@@ -171,6 +171,9 @@ function createSplashWindow(): electron.BrowserWindow {
 
 function createMainWindow(): electron.BrowserWindow {
   const iconPath = getWindowIconPath();
+  // Mica 材质需要透明窗口 —— 透明与否只能在窗口创建时决定，
+  // 因此启动时读一次配置（运行中切换由 handlers/background 提示重启生效）。
+  const useMica = getConfig().background.bgType === 'mica';
 
   const main = new electron.BrowserWindow({
     width: 1100,
@@ -178,7 +181,8 @@ function createMainWindow(): electron.BrowserWindow {
     minWidth: 800,
     minHeight: 600,
     frame: false,
-    transparent: false,
+    transparent: useMica,
+    backgroundColor: useMica ? '#00000000' : undefined,
     resizable: true,
     show: false,
     icon: iconPath,
@@ -189,6 +193,17 @@ function createMainWindow(): electron.BrowserWindow {
       sandbox: false,
     },
   });
+
+  // 记录创建时的透明状态（供背景模式切换判断是否需要重启）
+  (main as unknown as { __bgTransparent?: boolean }).__bgTransparent = useMica;
+  if (useMica) {
+    try {
+      main.setBackgroundMaterial('mica');
+      main.setBackgroundColor('#00000000');
+    } catch {
+      // 非 Windows 11 / 平台不支持：静默降级为普通窗口
+    }
+  }
 
   if (isDev) {
     main.loadURL('http://localhost:1420');
@@ -229,7 +244,7 @@ function registerAllHandlers() {
   registerLaunchHandlers(win);
   registerModsHandlers();
   registerInstanceHandlers(win);
-  registerBackgroundHandlers();
+  registerBackgroundHandlers(win);
   registerInstanceModsHandlers();
   registerInstanceAssetsHandlers();
   registerCrashAnalysisHandlers();

@@ -8,6 +8,7 @@ export type RouteKey =
   | "store"
   | "today"
   | "play-link"
+  | "play-link/create"
   | "setting"
   | "setting/login"
   | "account"

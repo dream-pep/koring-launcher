@@ -95,15 +95,24 @@ export function registerWindowHandlers(win: WinRef) {
 
   // File dialog — 统一走 { success, data } 包装，渲染端用 ipcInvoke 读取；
   // preload 里的壁纸选择会取 result.data 再处理（见 preload.ts）。
+  // multi=true 时返回 files 数组（壁纸多图导入）。
   ipcMain.handle('dialog:openFile', async (_event, payload: {
     filters?: { name: string; extensions: string[] }[];
+    multi?: boolean;
   }) => {
     const result = await dialog.showOpenDialog(win.mainWindow!, {
-      properties: ['openFile'],
+      properties: payload?.multi ? ['openFile', 'multiSelections'] : ['openFile'],
       filters: payload?.filters,
     });
     if (result.canceled || result.filePaths.length === 0) {
       return { success: true, data: null };
+    }
+    if (payload?.multi) {
+      const files = result.filePaths.map((p) => ({
+        srcPath: p,
+        ext: path.extname(p).toLowerCase() || '.png',
+      }));
+      return { success: true, data: { files } };
     }
     const srcPath = result.filePaths[0];
     const ext = path.extname(srcPath).toLowerCase() || '.png';

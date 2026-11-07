@@ -23,6 +23,7 @@ import {
 import { useRouteStore } from "@/stores/routeStore";
 import { useDeveloperModeStore, refreshDeveloperMode } from "@/stores/developerModeStore";
 import { PageShell, type PageShellGroup } from "@/components/page-shell";
+import { SettingsAccountCard } from "@/components/account/SettingsAccountCard";
 
 import { HomeSetting } from "./general/home";
 // import { AccountSetting } from "./general/account";  // Koring 账户（暂时隐藏）
@@ -110,6 +111,7 @@ function buildMenuData(
 }
 
 export function Setting() {
+  // 每次进入设置页都回到「通用 → 主页」
   const [selected, setSelected] = useState("home");
   const routeNavigate = useRouteStore((s) => s.navigate);
   // 服务端下发的开发者模式（设备接口 data.developer_mode）；false 时隐藏「开发者选项」入口
@@ -128,6 +130,7 @@ export function Setting() {
       value={selected}
       onValueChange={setSelected}
       navLabel="设置导航"
+      sidebarHeader={<SettingsAccountCard />}
     />
   );
 }
