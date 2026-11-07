@@ -5,6 +5,7 @@ import { useUpdateStore } from "@/stores/updateStore";
 import { useRouteStore } from "@/stores/routeStore";
 import { useDevStore } from "@/stores/devStore";
 import Silk from "@/components/silk/Silk";
+import { FadeText } from "@/components/ui/fade-text";
 import clsx from "clsx";
 import { ChevronRight } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -139,7 +140,7 @@ export function VersionCard({
         "group isolate relative overflow-clip rounded-xl border border-white/10 min-h-[200px]",
         sharedTransition && "vt-card",
         clickable &&
-          "cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-[transform] duration-200 ease-spring",
+          "cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-[scale,transform] duration-200 ease-spring",
         className,
       )}
       onClick={handleCardClick}
@@ -184,7 +185,9 @@ export function VersionCard({
           className="w-40 h-auto drop-shadow-lg"
           style={{ filter: "brightness(0) invert(1)" }}
         />
-        <p className="text-sm text-white/70 font-medium">v{versionText}</p>
+        <p className="text-sm text-white/70 font-medium">
+          <FadeText value={`v${versionText}`} />
+        </p>
 
         {/* 构建来源（CI 构建时写入；本地开发不显示） */}
         {(BUILD_COMMIT || BUILD_ID !== "local") && (
@@ -198,13 +201,13 @@ export function VersionCard({
         {/* 更新状态提示（仅信息，不提供按钮；下载/安装操作在更新页底部完成） */}
         {effectiveState !== "latest" && (
           <p className="text-[12px] text-white/80">
-            {effectiveState === "hasUpdate" ? "有新的版本可用" : "更新已下载"}
+            <FadeText value={effectiveState === "hasUpdate" ? "有新的版本可用" : "更新已下载"} />
           </p>
         )}
 
         {/* 设置页：整卡可点击跳转更新页，显示入口小字 */}
         {clickable && (
-          <span className="inline-flex items-center gap-0.5 text-[11px] text-white/60 transition-colors group-hover:text-white">
+          <span className="inline-flex items-center gap-0.5 text-[11px] text-white/60 transition-[color,background-color,scale] group-hover:text-white">
             查看更新
             <ChevronRight className="w-3 h-3" />
           </span>

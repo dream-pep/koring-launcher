@@ -56,7 +56,7 @@ export function Oobe() {
       <div className="absolute bottom-12">
         <button
           onClick={() => navigate("oobe/language")}
-          className="w-12 h-12 rounded-full bg-foreground/[0.06] hover:bg-foreground/[0.12] flex items-center justify-center text-foreground/60 hover:text-foreground transition-[transform,background-color,color] duration-200 ease-spring-soft hover:scale-105 active:scale-95 text-xl"
+          className="w-12 h-12 rounded-full bg-foreground/[0.06] hover:bg-foreground/[0.12] flex items-center justify-center text-foreground/60 hover:text-foreground transition-[scale,transform,background-color,color] duration-200 ease-spring-soft hover:scale-105 active:scale-95 text-xl"
         >
           →
         </button>

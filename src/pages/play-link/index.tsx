@@ -1,37 +1,112 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@heroui/react";
-import { AlertCircle, Loader2, Square, X } from "lucide-react";
-import { EMPTY_TERRACOTTA_STATUS } from "@/api/terracotta";
+import { AlertCircle, Loader2, RotateCcw, X } from "lucide-react";
+import {
+  EMPTY_TERRACOTTA_STATUS,
+  formatRoomCodeInput,
+  roomCodePayload,
+  validateRoomCode,
+} from "@/api/terracotta";
+import { toast } from "@/lib/toast";
 import { useConfigStore } from "@/stores/configStore";
+import { useDeepLinkStore } from "@/stores/deepLinkStore";
+import { useJoinHistoryStore } from "@/stores/joinHistoryStore";
+import { useKoringAuthStore } from "@/stores/koringAuthStore";
 import { useTerracottaStore } from "@/stores/terracottaStore";
 import { cn } from "@/lib/utils";
-import { ExceptionCard } from "./ExceptionCard";
-import { GuestConnectingCard, GuestOkCard } from "./GuestCards";
-import { HostOkCard, HostScanningCard, HostStartingCard } from "./HostCards";
-import { InstallCard } from "./InstallCard";
-import { CrashedCard, IdleCard, StartingCard, UnknownCard } from "./ServiceCards";
-import { StateCard } from "./StateCard";
+import { LoginRequiredBanner } from "./LoginRequiredBanner";
 import { WaitingPanels } from "./WaitingPanels";
 
-const PHASE_META = {
-  stopped: { label: "未启动", cls: "border-border/40 bg-foreground/[0.05] text-muted-foreground" },
-  starting: { label: "启动中", cls: "border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-400" },
-  running: {
-    label: "运行中",
-    cls: "border-green-500/25 bg-green-500/10 text-green-600 dark:text-green-400",
-  },
-  crashed: { label: "已崩溃", cls: "border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400" },
-} as const;
+/** 与联机页/设置页一致的卡片外观 */
+const SURFACE_CLS =
+  "rounded-xl border border-black/[0.06] bg-white/85 shadow-sm backdrop-blur-[12px] dark:border-white/[0.07] dark:bg-black/45";
 
-/** 首次加载占位（避免在拿到真实状态前闪现「未安装」） */
-function LoadingCard() {
+/** exception 类型 → 面向用户的说明（上游 v0.4.2） */
+const EXCEPTION_TEXT: Record<number, string> = {
+  0: "无法连接房主，房间可能已关闭。",
+  1: "与房主的连接中断。",
+  2: "加入方 EasyTier 崩溃。",
+  3: "房主 EasyTier 崩溃。",
+  4: "房主的游戏服务器已失联。",
+  5: "脚手架协议错误。",
+};
+
+/** 过渡状态文案（上游状态机里不属于「双卡视图」的那些） */
+const TRANSITION_TEXT: Record<string, string> = {
+  "host-scanning": "正在扫描局域网中的游戏房间…",
+  "host-starting": "正在创建房间…",
+  "guest-connecting": "正在加入房间…",
+  "guest-starting": "正在连接房间…",
+};
+
+/**
+ * 双卡视图之外的最小状态提示：
+ * 只在「组件准备 / 服务启动 / 服务停止 / 异常 / 过渡状态」时出现，不另设整套状态卡。
+ */
+function StatusNotice() {
+  const status = useTerracottaStore((s) => s.status);
+  const pending = useTerracottaStore((s) => s.pending);
+  const start = useTerracottaStore((s) => s.start);
+  const reset = useTerracottaStore((s) => s.reset);
+
+  const { phase, binary, snapshot } = status;
+
+  let title = TRANSITION_TEXT[snapshot.state] ?? "正在同步联机状态…";
+  let description = "";
+  let action: { label: string; onPress: () => void } | null = null;
+
+  if (!binary.installed) {
+    title = "正在准备陶瓦联机组件";
+    description = "首次使用时需要自动准备联机组件，通常十几秒内完成。";
+  } else if (phase === "starting") {
+    title = "正在启动联机服务";
+    description = "马上就好，请稍等…";
+  } else if (phase === "crashed") {
+    title = "联机服务已停止";
+    description = "服务意外退出，可以重新启动后再试。";
+    action = { label: "重新启动", onPress: () => void start() };
+  } else if (phase === "stopped") {
+    title = "联机服务未运行";
+    description = "启动后即可创建或加入房间。";
+    action = { label: "启动联机服务", onPress: () => void start() };
+  } else if (snapshot.state === "exception") {
+    title = "联机出现异常";
+    description = EXCEPTION_TEXT[snapshot.exceptionType] ?? "房间连接中出现问题，请重试。";
+    action = { label: "返回", onPress: () => void reset() };
+  }
+
+  const busy = pending.start || pending.reset;
+
   return (
-    <StateCard
-      icon={<Loader2 className="w-5 h-5 animate-spin" />}
-      tone="primary"
-      title="正在读取联机状态…"
-      description="正在与主进程同步陶瓦联机的安装与运行状态。"
-    />
+    <div className={cn("w-full max-w-md p-6", SURFACE_CLS)}>
+      <div className="flex items-start gap-3">
+        {action ? (
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+        ) : (
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold text-foreground">{title}</p>
+          {description ? (
+            <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{description}</p>
+          ) : null}
+        </div>
+      </div>
+      {action ? (
+        <div className="mt-4 flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            onPress={action.onPress}
+            isDisabled={busy}
+            className="gap-1.5"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            {action.label}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -42,60 +117,104 @@ export function PlayLink() {
   const clearError = useTerracottaStore((s) => s.clearError);
   const init = useTerracottaStore((s) => s.init);
   const start = useTerracottaStore((s) => s.start);
-  const stop = useTerracottaStore((s) => s.stop);
-  const pendingStop = useTerracottaStore((s) => s.pending.stop);
-  const autoStart = useConfigStore((s) => s.config.network.terracotta?.autoStart ?? false);
-  const savedName = useConfigStore((s) => s.config.network.terracotta?.playerName ?? "");
+  const guest = useTerracottaStore((s) => s.guest);
+  const setError = useTerracottaStore((s) => s.setError);
+  // 联机服务要求登录 Koring Account（显示名也取自账号用户名）
+  const loggedIn = useKoringAuthStore((s) => Boolean(s.user));
+  const koringName = useKoringAuthStore((s) => s.user?.username ?? "");
+  const publicNodes = useConfigStore((s) => s.config.network.terracotta?.publicNodes ?? []);
+  // koring:// 深链带来的加入请求（浏览器点链接 → 唤醒启动器）
+  const pendingJoin = useDeepLinkStore((s) => s.pending);
+  const consumeRoomJoin = useDeepLinkStore((s) => s.consumeRoomJoin);
+  const recordJoinHistory = useJoinHistoryStore((s) => s.record);
+  // 同一房间只记录一次（轮询会不断刷新 profiles，避免重复写入）
+  const recordedRoomRef = useRef<string>("");
 
   // 订阅主进程状态事件，卸载时退订（服务本身保持运行）
   useEffect(() => init(), [init]);
 
-  // 自动启动：每个页面实例最多触发一次
-  const autoStartedRef = useRef(false);
-  useEffect(() => {
-    if (autoStartedRef.current) return;
-    if (!loaded || !autoStart) return;
-    if (!status.binary.installed) return;
-    if (status.phase !== "stopped") return;
-    autoStartedRef.current = true;
-    void start(savedName.trim() || undefined);
-  }, [loaded, autoStart, status.binary.installed, status.phase, start, savedName]);
-
   const phase = status.phase || EMPTY_TERRACOTTA_STATUS.phase;
   const snapshot = status.snapshot || EMPTY_TERRACOTTA_STATUS.snapshot;
-  const phaseMeta = PHASE_META[phase] ?? PHASE_META.stopped;
-  const version = status.meta?.version || status.binary.version;
 
-  // waiting 且服务运行中：整页只放两张卡片（居中、无标题无状态徽章）
-  const waiting = loaded && status.binary.installed && phase === "running" && snapshot.state === "waiting";
+  // 成功加入房间后写入「历史加入过的房间」（房间码 + 房主 + 时间）
+  useEffect(() => {
+    if (snapshot.state !== "guest-ok" || !snapshot.room) {
+      if (snapshot.state === "waiting") recordedRoomRef.current = "";
+      return;
+    }
+    const code = formatRoomCodeInput(`U/${roomCodePayload(snapshot.room)}`);
+    if (!code || recordedRoomRef.current === code) return;
+    recordedRoomRef.current = code;
+    const hostName = snapshot.profiles?.find((profile) => profile.kind === "HOST")?.name ?? "";
+    recordJoinHistory({ code, hostName });
+  }, [snapshot.state, snapshot.room, snapshot.profiles, recordJoinHistory]);
+
+  // 深链自动加入：等账号/组件/服务就绪后，用房间码直接加入
+  // - 已在房间中（房主/访客/连接中）：不重复加入，同房间静默提示、其它房间提示忽略
+  // - 未登录、未安装、启动中时保持 pending，条件满足后自动继续
+  useEffect(() => {
+    if (!pendingJoin) return;
+
+    const inRoom =
+      snapshot.state === "host-ok" ||
+      snapshot.state === "guest-ok" ||
+      snapshot.state === "guest-connecting" ||
+      snapshot.state === "guest-starting";
+    if (inRoom) {
+      const sameRoom =
+        !!snapshot.room && roomCodePayload(snapshot.room) === roomCodePayload(pendingJoin.code);
+      consumeRoomJoin();
+      toast.info(sameRoom ? "您已在该房间中" : "当前已有联机房间，已忽略新的邀请");
+      return;
+    }
+
+    if (!loaded || !loggedIn) return;
+    if (!status.binary.installed) return;
+    if (phase === "stopped") {
+      void start(koringName || undefined);
+      return;
+    }
+    if (phase !== "running" || snapshot.state !== "waiting") return;
+
+    const room = pendingJoin.code;
+    consumeRoomJoin();
+    const problem = validateRoomCode(room);
+    if (problem) {
+      setError(`邀请链接中的房间码无效：${problem}`);
+      return;
+    }
+    void guest(room, koringName || undefined, publicNodes);
+  }, [
+    pendingJoin,
+    loaded,
+    loggedIn,
+    status.binary.installed,
+    phase,
+    snapshot.state,
+    snapshot.room,
+    start,
+    guest,
+    setError,
+    consumeRoomJoin,
+    koringName,
+    publicNodes,
+  ]);
+
+  // 双卡视图：等待中 / 房间已开启 / 已加入房间
+  const cardsOnly =
+    loaded &&
+    loggedIn &&
+    status.binary.installed &&
+    phase === "running" &&
+    (snapshot.state === "waiting" || snapshot.state === "host-ok" || snapshot.state === "guest-ok");
+
+  // 未登录：只展示一条占满宽度的提示条（不暴露安装/服务细节）
+  const bannerOnly = loaded && !loggedIn;
 
   const renderBody = () => {
-    // ① 未安装
-    if (!status.binary.installed) return <InstallCard />;
-    // ②③④ 进程态
-    if (phase === "starting") return <StartingCard />;
-    if (phase === "crashed") return <CrashedCard />;
-    if (phase === "stopped") return <IdleCard />;
-    // ⑤~⑪ 上游状态机
-    switch (snapshot.state) {
-      case "waiting":
-        return <WaitingPanels />;
-      case "host-scanning":
-        return <HostScanningCard />;
-      case "host-starting":
-        return <HostStartingCard />;
-      case "host-ok":
-        return <HostOkCard />;
-      case "guest-connecting":
-      case "guest-starting":
-        return <GuestConnectingCard />;
-      case "guest-ok":
-        return <GuestOkCard />;
-      case "exception":
-        return <ExceptionCard />;
-      default:
-        return <UnknownCard />;
-    }
+    if (!loggedIn) return <LoginRequiredBanner />;
+    if (cardsOnly) return <WaitingPanels />;
+    return <StatusNotice />;
   };
 
   return (
@@ -103,51 +222,13 @@ export function PlayLink() {
       <div
         className={cn(
           "h-full overflow-y-auto scroll-area p-6",
-          waiting && "grid place-items-center",
+          (cardsOnly || bannerOnly) && "grid place-items-center",
         )}
       >
-        <div className={cn("w-full", waiting ? "max-w-4xl" : "mx-auto max-w-3xl space-y-4")}>
-          {/* 标题区（waiting 视图不显示） */}
-          {!waiting ? (
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-xl font-bold text-foreground">联机</h2>
-                <p className="mt-1 text-[13px] text-muted-foreground">
-                  使用陶瓦联机（Terracotta）与好友一起游玩单人存档，无需公网 IP。
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                    phaseMeta.cls,
-                  )}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  {phaseMeta.label}
-                </span>
-                {version ? (
-                  <span className="rounded-md border border-border/40 bg-foreground/[0.05] px-2 py-0.5 font-mono text-[11px] text-muted-foreground dark:border-white/[0.08]">
-                    v{version}
-                  </span>
-                ) : null}
-                {status.binary.installed && phase === "running" ? (
-                  <Button size="sm" variant="outline" onPress={() => void stop()} isDisabled={pendingStop}>
-                    {pendingStop ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Square className="w-3.5 h-3.5" />
-                    )}
-                    停止服务
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {/* 错误横幅 */}
+        <div className={cn("w-full", cardsOnly || bannerOnly ? "max-w-4xl" : "grid place-items-center")}>
+          {/* 错误横幅（提示条视图里也保留，便于看到深链/加入失败原因） */}
           {error ? (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/[0.07] px-4 py-3">
+            <div className="mb-4 flex w-full items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/[0.07] px-4 py-3">
               <AlertCircle className="mt-0.5 w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
               <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-red-600 dark:text-red-400">
                 {error}
@@ -163,7 +244,7 @@ export function PlayLink() {
             </div>
           ) : null}
 
-          {loaded ? renderBody() : <LoadingCard />}
+          {loaded ? renderBody() : <StatusNotice />}
         </div>
       </div>
     </div>

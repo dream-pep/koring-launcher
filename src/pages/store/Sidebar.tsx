@@ -134,7 +134,7 @@ function SidebarItem({
       ref={buttonRef}
       onClick={onClick}
       className={clsx(
-        "relative w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13.5px] transition-[color,background-color] duration-200 ease-spring-soft active:scale-[0.99]",
+        "relative w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13.5px] transition-[scale,color,background-color] duration-200 ease-spring-soft active:scale-[0.99]",
         active ? "text-foreground font-medium" : "text-foreground/50 hover:text-foreground/80 hover:bg-foreground/[0.04]",
       )}
     >

@@ -335,6 +335,57 @@ check(
   `${planRef.roots.source}/${planRef.roots.resourceRoot}`
 );
 
+// ==================== 版本隔离 ====================
+console.log('\n版本隔离（game.isolation）');
+const dataDirBase = { instancePath: bareInstance, resourceRoot: gameRoot };
+check(
+  'isolation=none 运行时目录放到资源根',
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'none', versionId: '1.20.1' }) === path.resolve(gameRoot),
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'none', versionId: '1.20.1' })
+);
+check(
+  'isolation=version 运行时目录放到 versions/<版本>',
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'version', versionId: '1.20.1' }) ===
+    path.join(path.resolve(gameRoot), 'versions', '1.20.1'),
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'version', versionId: '1.20.1' })
+);
+check(
+  'isolation=version 缺版本 id 时回退实例目录',
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'version' }) === path.resolve(bareInstance),
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'version' })
+);
+check(
+  'isolation=instance 运行时目录为实例目录',
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'instance' }) === path.resolve(bareInstance),
+  launchTarget.resolveGameDataDir({ ...dataDirBase, isolation: 'instance' })
+);
+
+const planIsolationNone = launchTarget.resolveLaunchPlan({
+  instancePath: bareInstance,
+  runtime: { minecraft: '1.20.1' },
+  sharedResourceDir: gameRoot,
+  isolation: 'none',
+});
+check(
+  'isolation=none 方案 gameRoot 指向资源根',
+  planIsolationNone.roots.gameRoot === path.resolve(gameRoot) &&
+    planIsolationNone.roots.resourceRoot === path.resolve(gameRoot),
+  `${planIsolationNone.roots.resourceRoot} / ${planIsolationNone.roots.gameRoot}`
+);
+
+const planIsolationVersion = launchTarget.resolveLaunchPlan({
+  instancePath: bareInstance,
+  runtime: { minecraft: '1.20.1' },
+  sharedResourceDir: gameRoot,
+  isolation: 'version',
+});
+check(
+  'isolation=version 方案 gameRoot 指向版本目录',
+  planIsolationVersion.roots.gameRoot === path.join(path.resolve(gameRoot), 'versions', '1.20.1') &&
+    planIsolationVersion.roots.resourceRoot === path.resolve(gameRoot),
+  `${planIsolationVersion.roots.resourceRoot} / ${planIsolationVersion.roots.gameRoot}`
+);
+
 const missingLibPath = path.join(gameRoot, 'libraries', 'com', 'example', 'lib', '1.0', 'lib-1.0.jar');
 fs.rmSync(missingLibPath);
 const planBroken = launchTarget.resolveLaunchPlan({
@@ -520,6 +571,13 @@ check(
   'updateInstance 未因元数据写入而失败',
   metaError === null,
   metaError && metaError.message
+);
+
+// 隔离档位对「实例运行数据目录」的影响（默认档位 = instance，应等于实例目录）
+check(
+  'resolveInstanceDataDir 默认档位指向实例目录',
+  instanceMod.resolveInstanceDataDir(instancePath) === path.resolve(instancePath),
+  instanceMod.resolveInstanceDataDir(instancePath)
 );
 
 // ==================== 收尾 ====================

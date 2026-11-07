@@ -228,7 +228,7 @@ export function TitleBar({
       <div className="flex items-center pl-3 shrink-0 relative z-10" style={{ WebkitAppRegion: "no-drag" }}>
         {/* 返回按钮 */}
         <div
-          className="overflow-hidden transition-[width,opacity,margin] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          className="overflow-hidden transition-[scale,width,opacity,margin] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
           style={{
             WebkitAppRegion: "no-drag",
             width: showBack ? 68 : 0,
@@ -238,7 +238,7 @@ export function TitleBar({
         >
           <button
             onClick={goBack}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/10 text-foreground/60 hover:text-foreground whitespace-nowrap"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md transition-[color,background-color,scale] hover:bg-black/5 dark:hover:bg-white/10 text-foreground/60 hover:text-foreground whitespace-nowrap"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 3L5 8L10 13" />
@@ -248,7 +248,7 @@ export function TitleBar({
         </div>
 
         <span
-          className="text-sm font-semibold tracking-wide text-foreground/80 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] whitespace-nowrap"
+          className="text-sm font-semibold tracking-wide text-foreground/80 transition-[scale,opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] whitespace-nowrap"
         >
           Koring Launcher
         </span>
@@ -278,8 +278,11 @@ export function TitleBar({
           >
             {/* 液态玻璃选择器：SVG 位移折射 + 环形高光 + 镜面漂移（见 index.css .liquid-pill） */}
             <div
-              className="absolute left-0 h-[28px]"
+              className="absolute left-0 h-[34px]"
               style={{
+                // 34px 胶囊垂直居中：top 50% + 负半高（避免与 translateX 共用 transform）
+                top: "50%",
+                marginTop: -17,
                 transform: `translateX(${indicator.left}px)`,
                 width: indicator.width,
                 transition: isDragging.current
@@ -323,7 +326,7 @@ export function TitleBar({
                   ref={(el) => { btnRefs.current[i] = el; }}
                   onClick={() => handleBtnClick(r.key)}
                   className={[
-                    "relative z-10 px-4 py-[5px] text-[13px] font-medium rounded-full transition-[color,transform] duration-200 cursor-default active:scale-95",
+                    "relative z-10 px-4 py-1 text-[13px] font-medium rounded-full transition-[scale,color,transform] duration-200 cursor-default active:scale-95",
                     active
                       ? "text-foreground"
                       : "text-foreground/40 hover:text-foreground/60",

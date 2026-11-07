@@ -23,6 +23,8 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { getConfig, updateConfig } from '../config';
 import { readAuthStore } from '../auth';
+import { readKoringAuth } from './koring-auth';
+import { reportRoomClose, reportRoomOpen } from './launcher-api';
 import { createLogger } from './logger';
 import {
   createTcHttpClient,
@@ -59,6 +61,8 @@ const PORT_FILE_POLL_MS = 100;
 const INSTALL_PROGRESS_THROTTLE_MS = 100;
 /** 安装进度变化时状态事件的节流（比进度事件稀疏） */
 const STATUS_DURING_INSTALL_THROTTLE_MS = 500;
+/** 网页房间上报失败后的重试间隔 */
+const ROOM_REPORT_RETRY_MS = 15_000;
 /** GitHub Release 接口超时 */
 const RELEASE_API_TIMEOUT_MS = 15_000;
 /** 二进制下载 socket 空闲超时 */
@@ -107,6 +111,13 @@ function normalizeVersion(value: string): string {
   return value.trim().replace(/^[vV]/, '');
 }
 
+/** 房间码补全 `U/` 前缀（上游 /state 的 room 不带前缀，网页链接需要完整码） */
+function fullRoomCode(room: string): string {
+  const value = (room ?? '').trim();
+  if (!value) return '';
+  return value.startsWith('U/') ? value : `U/${value}`;
+}
+
 function emptyInstallState(): TcInstallState {
   return { active: false, stage: 'idle', percent: 0, transferred: 0, total: 0, message: '' };
 }
@@ -122,6 +133,7 @@ function emptySnapshot(): TcSnapshot {
     profiles: [],
     error: '',
     exceptionType: -1,
+    latencyMs: 0,
   };
 }
 
@@ -172,6 +184,26 @@ function inferVersionFromPath(target: string): string {
     if (matched) return matched[1];
   }
   return '';
+}
+
+/**
+ * 本机已登录的 Koring 账号用户名（陶瓦联机显示名的唯一来源）。
+ * 优先读 koring-auth.json，回退配置文件里同步保存的 koringUser；未登录返回空串。
+ */
+function readKoringUsername(): string {
+  try {
+    const stored = readKoringAuth();
+    const name = stored?.user?.username?.trim();
+    if (name) return name;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const cached = (getConfig() as unknown as { koringUser?: { username?: string } }).koringUser;
+    return cached?.username?.trim() ?? '';
+  } catch {
+    return '';
+  }
 }
 
 // ==================== 下载 / 解包 ====================
@@ -418,6 +450,21 @@ export class TerracottaService {
   private profiles: TcProfile[] = [];
   private exceptionType = -1;
   private error = '';
+  /** 最近一次 /state 往返耗时（毫秒），供 UI 折线图展示服务响应 */
+  private latencyMs = 0;
+
+  /** 已上报到网页端的房间号（带 U/ 前缀），用于离开 host-ok 时上报关闭 */
+  private reportedRoom = '';
+
+  /** 正在尝试上报 open 的房间号（成功前不等于 reportedRoom） */
+  private openReportRoom = '';
+  /** open 上报失败后的重试时间点（服务端故障自愈用） */
+  private openReportBlockedUntil = 0;
+  /** open 失败只 warn 一次，避免 500 每 15s 刷屏 */
+  private openReportWarned = false;
+
+  /** 房间上报串行队列（open 一定先于 close 发出） */
+  private roomReportQueue: Promise<void> = Promise.resolve();
 
   private child: TerracottaChildProcess | null = null;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -466,6 +513,7 @@ export class TerracottaService {
         profiles: this.profiles.map((profile) => ({ ...profile })),
         error: this.error,
         exceptionType: this.exceptionType,
+        latencyMs: this.latencyMs,
       },
       install: { ...this.installState },
     };
@@ -648,6 +696,24 @@ export class TerracottaService {
 
   // ---------- 启动 / 停止 ----------
 
+  /**
+   * 启动器默认启动时调用：先确保联机组件存在（缺失则自动下载安装），再拉起本地服务。
+   * 任何一步失败都会抛出，由调用方记录日志（不影响启动器本身启动）。
+   */
+  async ensureReady(): Promise<TerracottaStatus> {
+    if (!this.getBinaryInfo().installed) {
+      log.info('[terracotta] 未检测到联机组件，开始自动安装');
+      this.install(false);
+      // install() 立即返回状态，真正进度在 installPromise 里
+      await this.installPromise?.catch(() => undefined);
+      if (!this.getBinaryInfo().installed) {
+        throw new Error('陶瓦联机组件安装未完成');
+      }
+      log.info('[terracotta] 联机组件安装完成');
+    }
+    return this.start();
+  }
+
   /** 启动服务；未安装时抛「陶瓦联机尚未安装」 */
   async start(_payload?: TcStartPayload): Promise<TerracottaStatus> {
     if (this.phase === 'running') return this.getStatus();
@@ -819,6 +885,8 @@ export class TerracottaService {
     this.meta = null;
     this.error = '';
     this.resetStateFields();
+    // 房间关闭上报（best-effort，最多等 1.5s，避免卡住退出）
+    await this.flushRoomReport(1500);
     log.info('[terracotta] 服务已停止');
     this.emitStatus(true);
     return this.getStatus();
@@ -950,7 +1018,9 @@ export class TerracottaService {
   private async pollOnce(): Promise<void> {
     if (this.phase !== 'running' || this.port <= 0) return;
     try {
+      const startedAt = Date.now();
       const snapshot = await createTcHttpClient(this.port).getState();
+      this.latencyMs = Math.max(1, Date.now() - startedAt);
       this.pollFailures = 0;
       this.applyState(snapshot);
       this.emitStatus();
@@ -966,6 +1036,8 @@ export class TerracottaService {
         this.port = 0;
         this.error = '陶瓦联机服务已退出或无法连接';
         this.stopPolling();
+        // 服务已死，房间不可能再被访问：把网页端房间也一并关闭
+        this.closeRoomReport();
         this.emitStatus(true);
         return;
       }
@@ -984,6 +1056,7 @@ export class TerracottaService {
     this.profiles = snapshot.profiles;
     this.exceptionType = snapshot.state === 'exception' ? snapshot.exceptionType : -1;
     this.error = snapshot.state === 'exception' ? describeTcException(snapshot.exceptionType) : '';
+    this.syncRoomReport();
   }
 
   private resetStateFields(): void {
@@ -995,13 +1068,108 @@ export class TerracottaService {
     this.profiles = [];
     this.exceptionType = -1;
     this.error = '';
+    this.latencyMs = 0;
+    // 服务停止 / 房间消失：把已上报的网页房间一并关闭
+    this.syncRoomReport();
+  }
+
+  // ---------- 网页房间上报 ----------
+
+  /**
+   * 房间上报：host-ok 期间把房间号登记到网页端（邀请链接靠它生效），
+   * 离开 host-ok（房主手动关闭、陶瓦自关、异常、停服、退出）时上报关闭。
+   * 全程 best-effort：未登录 / 网络失败只记 warn，绝不影响联机本身。
+   * 失败会自动重试（服务端故障恢复后无需重开房间）。
+   */
+  private syncRoomReport(): void {
+    const code = this.state === 'host-ok' ? fullRoomCode(this.room) : '';
+
+    if (!code) {
+      this.abandonRoomReport();
+      return;
+    }
+    if (code === this.reportedRoom) return;
+
+    if (code !== this.openReportRoom) {
+      // 新房间：重置尝试状态，并把旧房间（如果上报成功过）关掉
+      this.closeRoomReport();
+      this.openReportRoom = code;
+      this.openReportBlockedUntil = 0;
+      this.openReportWarned = false;
+    }
+    if (Date.now() < this.openReportBlockedUntil) return;
+    this.enqueueRoomReport('open', code);
+  }
+
+  /** 离开 host-ok：若已上报过则关闭，并清空尝试状态 */
+  private abandonRoomReport(): void {
+    this.closeRoomReport();
+    this.openReportRoom = '';
+    this.openReportBlockedUntil = 0;
+    this.openReportWarned = false;
+  }
+
+  /** 上报关闭（仅在 open 成功过之后才需要；失败也只 warn） */
+  private closeRoomReport(): void {
+    const code = this.reportedRoom;
+    this.reportedRoom = '';
+    this.openReportRoom = '';
+    if (!code) return;
+    this.enqueueRoomReport('close', code);
+  }
+
+  /** 上报排队执行：保证 open 先于 close，退出时还能等它落地 */
+  private enqueueRoomReport(action: 'open' | 'close', code: string): void {
+    this.roomReportQueue = this.roomReportQueue.then(() => this.runRoomReport(action, code));
+  }
+
+  /** 等待已排队的房间上报完成（退出流程用，最多等 timeoutMs） */
+  async flushRoomReport(timeoutMs = 1500): Promise<void> {
+    await Promise.race([
+      this.roomReportQueue.catch(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+  }
+
+  private async runRoomReport(action: 'open' | 'close', code: string): Promise<void> {
+    try {
+      const data = action === 'open' ? await reportRoomOpen(code) : await reportRoomClose(code);
+      if (action === 'open') {
+        this.reportedRoom = code;
+        this.openReportBlockedUntil = 0;
+        this.openReportWarned = false;
+      }
+      log.info(`[terracotta] 网页房间已上报 ${action}：${code} → ${data.state}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (action === 'close') {
+        // room_not_found（从未上报过）/ 服务端故障，都不该打扰玩家
+        log.debug(`[terracotta] 房间关闭上报跳过：${message}`);
+        return;
+      }
+      // 开启失败：15s 后自动重试（服务端 5xx / 网络抖动都能自愈），warn 只打一次
+      this.openReportBlockedUntil = Date.now() + ROOM_REPORT_RETRY_MS;
+      if (!this.openReportWarned) {
+        this.openReportWarned = true;
+        log.warn(
+          `[terracotta] 房间开启上报失败（${code}）：${message}；已改为每 ${Math.round(
+            ROOM_REPORT_RETRY_MS / 1000,
+          )}s 自动重试`,
+        );
+      } else {
+        log.debug(`[terracotta] 房间开启上报仍在失败：${message}`);
+      }
+    }
   }
 
   /** 主动刷新一次状态（开房/加入后立即给 UI 反馈） */
   private async refreshState(): Promise<void> {
     if (this.port <= 0) return;
     try {
-      this.applyState(await createTcHttpClient(this.port).getState());
+      const startedAt = Date.now();
+      const snapshot = await createTcHttpClient(this.port).getState();
+      this.latencyMs = Math.max(1, Date.now() - startedAt);
+      this.applyState(snapshot);
       this.emitStatus(true);
     } catch {
       /* 失败交给轮询处理 */
@@ -1010,13 +1178,16 @@ export class TerracottaService {
 
   // ---------- 参数默认值 ----------
 
-  /** 显示名缺省顺序：入参 → config.network.terracotta.playerName → 当前账户用户名 → '' */
+  /**
+   * 显示名缺省顺序：入参 → 本机已登录的 Koring 账号用户名。
+   * 不接受自定义昵称（设置页已移除该项），显示名始终跟随 Koring 账号。
+   */
   private resolvePlayer(input?: string): string {
     const direct = typeof input === 'string' ? input.trim() : '';
     if (direct) return direct;
 
-    const configured = (getConfig().network.terracotta?.playerName ?? '').trim();
-    if (configured) return configured;
+    const koringName = readKoringUsername();
+    if (koringName) return koringName;
 
     try {
       const store = readAuthStore();

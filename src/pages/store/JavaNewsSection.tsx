@@ -79,7 +79,7 @@ export function JavaNewsSection() {
           disabled={loading}
           aria-label="刷新 Java 版资讯"
           className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground/70
-            transition-colors hover:bg-black/[0.04] hover:text-foreground disabled:opacity-40
+            transition-[translate,color,background-color,scale] hover:bg-black/[0.04] hover:text-foreground disabled:opacity-40
             dark:hover:bg-white/[0.06]"
         >
           <RefreshCw className={clsx("h-3.5 w-3.5", loading && "animate-spin")} />
@@ -98,7 +98,7 @@ export function JavaNewsSection() {
           <button
             type="button"
             onClick={() => void load(true)}
-            className="text-primary/80 transition-colors hover:text-primary"
+            className="text-primary/80 transition-[translate,color,background-color,scale] hover:text-primary"
           >
             重试
           </button>
@@ -115,7 +115,7 @@ export function JavaNewsSection() {
               type="button"
               onClick={() => openLink(entry.readMoreLink)}
               className={clsx(
-                "group flex flex-col overflow-hidden rounded-2xl border text-left transition-[transform,box-shadow,border-color] duration-250 ease-spring-soft",
+                "group flex flex-col overflow-hidden rounded-2xl border text-left transition-[translate,scale,transform,box-shadow,border-color] duration-250 ease-spring-soft",
                 "border-border/40 bg-white/70 backdrop-blur-sm dark:border-white/[0.08] dark:bg-black/30",
                 "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md dark:hover:border-primary/40"
               )}
@@ -128,7 +128,7 @@ export function JavaNewsSection() {
                     loading="lazy"
                     decoding="async"
                     referrerPolicy="no-referrer"
-                    className="h-full w-full object-cover transition-transform duration-400 ease-spring-soft group-hover:scale-[1.03]"
+                    className="h-full w-full object-cover transition-[scale,transform] duration-300 ease-spring-soft group-hover:scale-[1.03]"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">

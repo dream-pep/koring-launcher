@@ -80,45 +80,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return null;
   },
 
-  // 背景 — 图片模式多图轮换：一次选多张，主进程复制到 userData 并优化落盘，
-  // 返回更新后的轮换列表（配置只存文件路径，不使用 BASE64）。
-  pickBackgroundImages: async (): Promise<string[]> => {
-    const result = await ipcRenderer.invoke('dialog:openFile', {
-      multi: true,
-      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }],
-    });
-    const files = result?.success ? result.data?.files : null;
-    if (!Array.isArray(files) || files.length === 0) return [];
-    const imported = await ipcRenderer.invoke('background:add-images', {
-      paths: files.map((f: { srcPath: string }) => f.srcPath),
-      maxEdge: computeMaxEdge(),
-    });
-    const bg = imported?.success ? imported.data?.background : null;
-    return Array.isArray(bg?.images) ? bg.images : [];
-  },
-
-  // 视频背景：复制进 userData（不重编码），返回最终文件路径
-  pickBackgroundVideo: async (): Promise<string | null> => {
-    const result = await ipcRenderer.invoke('dialog:openFile', {
-      filters: [{ name: '视频', extensions: ['mp4', 'webm', 'mov', 'mkv', 'm4v'] }],
-    });
-    const picked = result?.success ? result.data : null;
-    if (!picked?.srcPath) return null;
-    const imported = await ipcRenderer.invoke('background:set-video', { srcPath: picked.srcPath });
-    return imported?.success ? (imported.data?.video ?? null) : null;
-  },
-
-  // GIF 背景：保留动画，复制进 userData
-  pickBackgroundGif: async (): Promise<string | null> => {
-    const result = await ipcRenderer.invoke('dialog:openFile', {
-      filters: [{ name: 'GIF 动图', extensions: ['gif'] }],
-    });
-    const picked = result?.success ? result.data : null;
-    if (!picked?.srcPath) return null;
-    const imported = await ipcRenderer.invoke('background:set-gif', { srcPath: picked.srcPath });
-    return imported?.success ? (imported.data?.image ?? null) : null;
-  },
-
   // 把配置文件/Store 中的壁纸值解析为可显示的资源引用：
   // data:/http(s):/file: 及 /、./ 相对 URL → 原样返回；
   // userData 内受管壁纸文件路径 → koring-res:// 协议 URL（流式读取，无 base64 副本）。
@@ -211,5 +172,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
     ipcRenderer.on('terracotta:install-progress', handler);
     return () => ipcRenderer.removeListener('terracotta:install-progress', handler);
+  },
+
+  // koring:// 深链：浏览器点击 koring://room-join?code=… 唤醒启动器，主进程把房间码投递到这里
+  consumeDeepLinks: () => ipcRenderer.invoke('deep-link:consume'),
+  onDeepLinkRoomJoin: (callback: (payload: { type: string; code: string; id: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: { type: string; code: string; id: string }) =>
+      callback(payload);
+    ipcRenderer.on('deep-link:room-join', handler);
+    return () => ipcRenderer.removeListener('deep-link:room-join', handler);
   },
 });

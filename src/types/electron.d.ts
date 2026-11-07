@@ -32,12 +32,6 @@ interface ElectronAPI {
 
   // 壁纸（文件路径存储 → koring-res:// 资源引用，不使用 BASE64）
   pickBackgroundImage: () => Promise<string | null>;
-  /** 图片模式：多选图片导入，返回更新后的轮换列表 */
-  pickBackgroundImages: () => Promise<string[]>;
-  /** 视频模式：选择视频文件（复制进 userData，不重编码），返回文件路径 */
-  pickBackgroundVideo: () => Promise<string | null>;
-  /** GIF 模式：选择 GIF 动图，返回文件路径 */
-  pickBackgroundGif: () => Promise<string | null>;
   resolveBackgroundResource: (value: string) => Promise<{ url: string | null; bytes: number }>;
 
   // Auto-update
@@ -75,6 +69,10 @@ interface ElectronAPI {
   terracottaClearBinary: () => Promise<unknown>;
   onTerracottaStatus: (callback: (data: unknown) => void) => () => void;
   onTerracottaInstallProgress: (callback: (data: unknown) => void) => () => void;
+
+  // koring:// 深链（见 electron/deep-link.ts）：浏览器 `koring://room-join?code=…` 唤醒启动器
+  consumeDeepLinks: () => Promise<unknown>;
+  onDeepLinkRoomJoin: (callback: (payload: { type: string; code: string; id: string }) => void) => () => void;
 
   // Koring Account 启动器 API（主进程发起；见 electron/core/launcher-api.ts）
   launcherEnvInfo: () => Promise<unknown>;

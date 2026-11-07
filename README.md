@@ -67,6 +67,7 @@
   - 截图：缩略图网格预览，可打开或删除；
   - 资源包 / 光影包：识别启用状态，快速查看与打开目录。
 - **体检与修复**：随时检查实例完整性，一键补全缺失的原版文件、加载器与依赖库。
+- **版本隔离**：设置 → 游戏可切换 PCL2 式三档隔离（隔离到实例目录 / 隔离到版本目录 / 不隔离），决定 mods、存档与配置的落盘位置；切换档位不会搬动已有文件。
 - **收藏与选中**：标记常用实例，选择后由首页负责启动，实例页只负责管理，职责清晰。
 
 ### 崩溃分析与日志
@@ -282,6 +283,8 @@ notices, crash analysis, a task queue and an in-app feedback entry.
   browse, back up or delete saves; preview and delete screenshots; inspect resource
   and shader packs.
 - Instance health check and one-click repair of vanilla files, loaders and libraries.
+- PCL2-style version isolation (Settings → Game): per-instance, per-version or none,
+  deciding where mods, saves and config live; switching never moves existing files.
 - Favorites, plus a clear separation: the instance page selects a version, the home
   page launches it.
 

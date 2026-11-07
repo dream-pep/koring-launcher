@@ -10,6 +10,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { useA11yStore } from "@/stores/a11yStore";
 import { useDevStore } from "@/stores/devStore";
 import { useRouteStore } from "@/stores/routeStore";
+import { useTerracottaStore } from "@/stores/terracottaStore";
+import { useJoinNotice } from "@/pages/play-link/useJoinNotice";
 import { installPointerOrigin } from "@/lib/pointer-origin";
 import clsx from "clsx";
 
@@ -39,6 +41,12 @@ export function RootLayout({
   useEffect(() => {
     installPointerOrigin();
   }, []);
+
+  // 陶瓦联机：房主态下有人加入时全局提示（不依赖当前停留在哪个页面——房主通常在游戏里）
+  // 只订阅「成员数组 + 房主态」两个稳定值，避免 500ms 轮询把整个布局一起重渲染
+  const terracottaProfiles = useTerracottaStore((s) => s.status.snapshot.profiles);
+  const terracottaHosting = useTerracottaStore((s) => s.status.snapshot.state === "host-ok");
+  useJoinNotice(terracottaProfiles, terracottaHosting);
 
   return (
     <div

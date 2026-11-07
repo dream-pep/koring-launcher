@@ -21,6 +21,7 @@ import {
 import { ExternalLink, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button, Link } from "@heroui/react";
 import { toast } from "@/lib/toast";
+import { FadeText } from "@/components/ui/fade-text";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -262,8 +263,9 @@ export function UpdatePage() {
             <SettingCard>
               <div className="flex items-center justify-between gap-2 mb-3">
                 <span className="text-[12px] text-muted-foreground">
-                  版本 v{notes.version}
-                  {notesTag ? "（最新）" : "（当前）"}
+                  <FadeText
+                    value={`版本 v${notes.version}${notesTag ? "（最新）" : "（当前）"}`}
+                  />
                   <span className="ml-2 opacity-70">
                     · 来源：{notes.source === "github" ? "GitHub" : `加速源 ${notes.source}`}
                   </span>

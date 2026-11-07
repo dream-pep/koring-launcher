@@ -50,6 +50,8 @@ export interface TcSnapshot {
   error: string;
   /** exception 类型；无则 -1 */
   exceptionType: number;
+  /** 最近一次 /state 往返耗时（毫秒）；未知 0 */
+  latencyMs: number;
 }
 
 export interface TcBinaryInfo {
@@ -98,6 +100,7 @@ export const EMPTY_TERRACOTTA_STATUS: TerracottaStatus = {
     profiles: [],
     error: "",
     exceptionType: -1,
+    latencyMs: 0,
   },
   install: { active: false, stage: "idle", percent: 0, transferred: 0, total: 0, message: "" },
 };
@@ -221,6 +224,21 @@ export const ROOM_CODE_LENGTH = 16;
 export const ROOM_CODE_CHARSET = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 const ROOM_CODE_PREFIX = "U/";
+
+/** 网页邀请落地页（只承载 /room，其余路径 308 回 account.koring.space） */
+export const ROOM_INVITE_BASE = "https://link.koring.space/room";
+
+/**
+ * 生成分享用的网页邀请链接。
+ * 好友点开后网页会引导唤起 `koring://room-join?code=…` 由启动器直接进房；
+ * 房间码里的 `/` 保持原样（其余字符仍然编码）。
+ */
+export function terracottaInviteLink(code: string): string {
+  const value = (code ?? "").trim();
+  if (!value) return "";
+  const full = value.startsWith(ROOM_CODE_PREFIX) ? value : `${ROOM_CODE_PREFIX}${value}`;
+  return `${ROOM_INVITE_BASE}?code=${encodeURIComponent(full).replace(/%2F/g, "/")}`;
+}
 
 /**
  * 输入框格式化：自动转大写、每 4 位插入 `-`、保留可选的 `U/` 前缀。

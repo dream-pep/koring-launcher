@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Input, TextArea } from "@heroui/react";
+import { Button, TextArea } from "@heroui/react";
 import {
   AlertCircle,
   Download,
@@ -13,10 +13,10 @@ import {
 } from "lucide-react";
 import { TERRACOTTA_URL } from "@/api/terracotta";
 import type { TerracottaConfig } from "@/api/config";
-import { SettingBadge, SettingCard, SettingRow, SettingSwitch, PageHeader, SectionTitle, fieldCls } from "@/components/setting";
+import { SettingBadge, SettingCard, SettingRow, PageHeader, SectionTitle, fieldCls } from "@/components/setting";
 import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
 import { useConfigStore } from "@/stores/configStore";
-import { useAuthStore } from "@/stores/authStore";
+import { useKoringAuthStore } from "@/stores/koringAuthStore";
 import { useTerracottaStore } from "@/stores/terracottaStore";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
@@ -40,7 +40,7 @@ function openUpstream() {
 export function TawaOnlineSetting() {
   const tcConfig = useConfigStore((s) => s.config.network.terracotta);
   const setNetwork = useConfigStore((s) => s.setNetwork);
-  const accountName = useAuthStore((s) => s.user?.username ?? "");
+  const koringName = useKoringAuthStore((s) => s.user?.username ?? "");
   const openConfirm = useConfirmDialogStore((s) => s.openDialog);
 
   const status = useTerracottaStore((s) => s.status);
@@ -54,15 +54,8 @@ export function TawaOnlineSetting() {
   const openDir = useTerracottaStore((s) => s.openDir);
   const pending = useTerracottaStore((s) => s.pending);
 
-  const playerName = tcConfig?.playerName ?? "";
   const publicNodes = tcConfig?.publicNodes ?? [];
   const savedBinaryPath = tcConfig?.binaryPath ?? "";
-
-  // 显示名：本地编辑，失焦/回车保存
-  const [nameDraft, setNameDraft] = useState(playerName);
-  useEffect(() => {
-    setNameDraft(playerName);
-  }, [playerName]);
 
   // 公共节点：本地编辑（保存时 trim + 过滤空行 + 去重）
   const nodesJoined = publicNodes.join("\n");
@@ -77,20 +70,11 @@ export function TawaOnlineSetting() {
   const patchTerracotta = (patch: Partial<TerracottaConfig>) => {
     setNetwork({
       terracotta: {
-        playerName: tcConfig?.playerName ?? "",
         publicNodes: tcConfig?.publicNodes ?? [],
-        autoStart: tcConfig?.autoStart ?? true,
         binaryPath: tcConfig?.binaryPath ?? "",
         ...patch,
       },
     });
-  };
-
-  const savePlayerName = () => {
-    const next = nameDraft.trim();
-    if (next === (playerName ?? "")) return;
-    patchTerracotta({ playerName: next });
-    toast.success("显示名已保存");
   };
 
   const saveNodes = () => {
@@ -146,7 +130,7 @@ export function TawaOnlineSetting() {
     <div>
       <PageHeader
         title="陶瓦联机"
-        desc="配置陶瓦联机（Terracotta）服务：显示名、公共节点，以及联机程序的安装与版本。"
+        desc="配置陶瓦联机（Terracotta）服务：公共节点、联机程序的安装与版本。"
       />
 
       {error ? (
@@ -165,43 +149,6 @@ export function TawaOnlineSetting() {
       ) : null}
 
       <div className="space-y-6">
-        {/* ---------- 基础 ---------- */}
-        <div>
-          <SectionTitle>基础</SectionTitle>
-          <div className="space-y-3">
-            <SettingCard>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">显示名</p>
-                <p className="text-[13px] text-muted-foreground">
-                  创建/加入房间时展示给其他玩家的昵称。留空则使用当前账户名
-                  {accountName ? `（${accountName}）` : ""}。
-                </p>
-                <Input
-                  aria-label="显示名"
-                  value={nameDraft}
-                  onChange={(event) => setNameDraft(event.target.value)}
-                  onBlur={savePlayerName}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") savePlayerName();
-                  }}
-                  placeholder="留空则使用当前账户名"
-                  maxLength={32}
-                  fullWidth
-                  className={fieldCls}
-                />
-              </div>
-            </SettingCard>
-            <SettingCard>
-              <SettingSwitch
-                label="自动启动联机服务"
-                desc="进入「联机」页面时自动启动后台服务；关闭后需要手动点击启动。"
-                checked={tcConfig?.autoStart ?? true}
-                onChange={(value) => patchTerracotta({ autoStart: value })}
-              />
-            </SettingCard>
-          </div>
-        </div>
-
         {/* ---------- 网络 ---------- */}
         <div>
           <SectionTitle>网络</SectionTitle>
@@ -239,6 +186,14 @@ export function TawaOnlineSetting() {
           <div className="space-y-3">
             <SettingCard>
               <div className="space-y-4">
+                <SettingRow label="房间内显示名" desc="跟随 Koring 账号，不支持自定义">
+                  <span
+                    className={cn("text-[13px]", koringName ? "text-foreground" : "text-muted-foreground")}
+                    title={koringName || "未登录 Koring Account"}
+                  >
+                    {koringName || "未登录 Koring Account"}
+                  </span>
+                </SettingRow>
                 <SettingRow label="安装状态" desc="陶瓦联机可执行文件的当前状态">
                   {binary.installed ? (
                     <SettingBadge variant="success">已安装</SettingBadge>

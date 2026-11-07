@@ -13,6 +13,7 @@ import type { Task } from "@/types/task";
 import { useTaskStore } from "@/stores/taskStore";
 import { Button } from "@/components/ui/button";
 import { Progress, ProgressValue } from "@/components/ui/progress";
+import { FadeText } from "@/components/ui/fade-text";
 import {
   ChevronDown,
   X,
@@ -102,12 +103,12 @@ export function TaskCard({ task, surface = "default" }: TaskCardProps) {
             <div className="flex items-center gap-2 mb-1">
               <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
               <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${sc.color}`}>
-                {sc.label}
+                <FadeText value={sc.label} />
               </span>
               {/* @xmcl/task 原始状态徽标 */}
               {task.xmclState && (
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium shrink-0 bg-primary/10 text-primary/80">
-                  {xmclStateLabels[task.xmclState] ?? task.xmclState}
+                  <FadeText value={xmclStateLabels[task.xmclState] ?? task.xmclState} />
                 </span>
               )}
             </div>

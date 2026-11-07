@@ -1,5 +1,6 @@
 import electron from 'electron';
 import { searchMods, getModDetail, getModVersions, installMod, getCategories, getGameVersions } from '../core/modrinth';
+import { resolveInstanceDataDir } from '../core/instance';
 
 const { ipcMain } = electron;
 
@@ -98,7 +99,8 @@ export function registerModsHandlers() {
       const data = await installMod(
         payload.projectId,
         payload.versionId,
-        payload.gamePath,
+        // 全局版本隔离下 mods 目录不在实例目录里
+        resolveInstanceDataDir(payload.gamePath),
         payload.source as 'modrinth' | 'curseforge'
       );
       return { success: true, data, error: null };

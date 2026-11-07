@@ -8,10 +8,12 @@ import { syncA11yFromConfig } from "./stores/a11yStore";
 import { syncBackgroundFromConfig } from "./stores/backgroundStore";
 import { useAuthStore } from "./stores/authStore";
 import { useKoringAuthStore } from "./stores/koringAuthStore";
+import { useDeepLinkStore } from "./stores/deepLinkStore";
 import type { AppConfig } from "./api/config";
 import { Home } from "./pages/home";
 import { Today } from "./pages/today";
 import { PlayLink } from "./pages/play-link";
+import { CreateRoom } from "./pages/play-link/create";
 import { Setting } from "./pages/setting";
 import { SettingLogin } from "./pages/setting/login";
 import { AccountPage } from "./pages/account";
@@ -70,6 +72,7 @@ const pageMap = {
   store: Store,
   today: Today,
   "play-link": PlayLink,
+  "play-link/create": CreateRoom,
   setting: Setting,
   "setting/login": SettingLogin,
   account: AccountPage,
@@ -129,6 +132,30 @@ function App() {
   const Page = pageMap[current];
   const configLoaded = useConfigStore((s) => s.loaded);
   const oobePending = useConfigStore((s) => s.config.oobe);
+
+  // koring:// 深链：浏览器点击 koring://room-join?code=… 唤醒启动器后，
+  // 直接跳到联机页并交由联机页自动加入房间（引导流程中先不打断，保留待处理状态）
+  useEffect(() => {
+    const handlePayload = (payload: unknown) => {
+      if (!payload || typeof payload !== "object") return;
+      const { code, id } = payload as { code?: unknown; id?: unknown };
+      if (typeof code !== "string" || !code || typeof id !== "string" || !id) return;
+      useDeepLinkStore.getState().requestRoomJoin({ code, id });
+      const route = useRouteStore.getState().current;
+      if (route.startsWith("oobe") || route.startsWith("upvp") || route.startsWith("forced-update")) return;
+      useRouteStore.getState().navigate("play-link");
+    };
+
+    const api = window.electronAPI;
+    const unsubscribe = api?.onDeepLinkRoomJoin?.(handlePayload);
+    // 启动早期到达、尚无监听者时排队在主线程序列里，这里主动取一次
+    void Promise.resolve(api?.consumeDeepLinks?.())
+      .then((items) => {
+        if (Array.isArray(items)) items.forEach(handlePayload);
+      })
+      .catch(() => undefined);
+    return () => unsubscribe?.();
+  }, []);
 
   useEffect(() => {
     let done = false;

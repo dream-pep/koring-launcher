@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { FadeText } from "@/components/ui/fade-text";
 import { useConfigStore } from "@/stores/configStore";
 import { useInstanceStore } from "@/stores/instanceStore";
 import {
@@ -472,7 +473,9 @@ export function GameDirSetting() {
                     </Button>
                   </div>
                 </SettingRow>
-                <p className="text-[12px] text-muted-foreground font-mono break-all">{mainDir}</p>
+                <p className="text-[12px] text-muted-foreground font-mono break-all">
+                  <FadeText value={mainDir} />
+                </p>
 
                 {/* 手动添加目录：不依赖系统选择框，直接输入路径 */}
                 <div className="flex items-center gap-2">
@@ -526,7 +529,7 @@ export function GameDirSetting() {
                   </div>
                 </SettingRow>
                 <p className="text-[12px] text-muted-foreground font-mono break-all">
-                  {resourceDir || "未设置（实例自包含）"}
+                  <FadeText value={resourceDir || "未设置（实例自包含）"} />
                 </p>
               </div>
             </SettingCard>

@@ -29,7 +29,7 @@ export function OobeLogin() {
         <div className="text-center space-y-1">
           <h2 className="text-lg font-bold text-foreground">登录 Koring 账户</h2>
           <p className="text-xs text-muted-foreground">
-            扫码登录以同步数据、皮肤与个人配置
+            已自动打开浏览器授权页，也可扫码登录以同步数据、皮肤与个人配置
           </p>
         </div>
 

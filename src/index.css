@@ -177,12 +177,6 @@
     margin: 0;
     overflow: hidden;
     }
-  /* Mica 材质模式：窗口本身透明，body 不能再画不透明底色，
-     否则会把系统材质完全盖住（由 BackgroundLayer 设置 data-bg-mode） */
-  html[data-bg-mode="mica"],
-  html[data-bg-mode="mica"] body {
-    background: transparent !important;
-  }
   html {
     @apply font-sans;
     overflow: hidden;
@@ -452,6 +446,22 @@
 /* 指针来源（弹层从触发位置“长出来”） */
 .origin-pointer {
   transform-origin: var(--origin-x, 50%) var(--origin-y, 50%);
+}
+
+/* 原地文字更新：旧文字淡出 → 换值 → 新文字淡入（见 components/ui/fade-text.tsx） */
+.fade-text {
+  display: inline-block;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+.fade-text[data-phase="out"] {
+  opacity: 0;
+  transform: translateY(-2px);
+}
+.fade-text[data-phase="in"] {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ============================================

@@ -73,7 +73,7 @@ const NewsCard = memo(function NewsCard({ entry }: NewsCardProps) {
       type="button"
       onClick={() => openLink(entry.readMoreLink)}
       className={clsx(
-        "group flex flex-col overflow-hidden rounded-2xl border text-left transition-[transform,box-shadow,border-color] duration-250 ease-spring-soft",
+        "group flex flex-col overflow-hidden rounded-2xl border text-left transition-[translate,scale,transform,box-shadow,border-color] duration-250 ease-spring-soft",
         "border-border/40 dark:border-white/[0.08] bg-white/70 dark:bg-black/30 backdrop-blur-sm",
         "hover:-translate-y-0.5 hover:shadow-md hover:border-primary/40 dark:hover:border-primary/40"
       )}
@@ -86,7 +86,7 @@ const NewsCard = memo(function NewsCard({ entry }: NewsCardProps) {
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            className="h-full w-full object-cover transition-transform duration-400 ease-spring-soft group-hover:scale-[1.03]"
+            className="h-full w-full object-cover transition-[scale,transform] duration-300 ease-spring-soft group-hover:scale-[1.03]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
@@ -141,7 +141,7 @@ const FeaturedNews = memo(function FeaturedNews({ entry }: FeaturedNewsProps) {
       className={clsx(
         "group relative block w-full overflow-hidden rounded-2xl border text-left",
         "border-border/40 dark:border-white/[0.08]",
-        "hover:border-primary/40 dark:hover:border-primary/40 transition-colors"
+        "hover:border-primary/40 dark:hover:border-primary/40 transition-[translate,color,background-color,scale]"
       )}
     >
       <div className="relative aspect-[772/350] w-full bg-foreground/[0.04] dark:bg-white/[0.04]">
@@ -151,7 +151,7 @@ const FeaturedNews = memo(function FeaturedNews({ entry }: FeaturedNewsProps) {
             alt={entry.title}
             decoding="async"
             referrerPolicy="no-referrer"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-cover transition-[scale,transform] duration-300 ease-spring-soft group-hover:scale-[1.02]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
@@ -424,7 +424,7 @@ export function Today() {
             type="button"
             onClick={() => selectType(null)}
             className={clsx(
-              "h-8 rounded-lg border px-2.5 text-[12px] transition-colors",
+              "h-8 rounded-lg border px-2.5 text-[12px] transition-[translate,color,background-color,scale]",
               activeType === null
                 ? "border-primary/40 bg-primary/10 text-primary"
                 : "border-border/40 dark:border-white/[0.08] text-muted-foreground hover:text-foreground"
@@ -438,7 +438,7 @@ export function Today() {
               type="button"
               onClick={() => selectType(type)}
               className={clsx(
-                "h-8 rounded-lg border px-2.5 text-[12px] transition-colors",
+                "h-8 rounded-lg border px-2.5 text-[12px] transition-[translate,color,background-color,scale]",
                 activeType === type
                   ? "border-primary/40 bg-primary/10 text-primary"
                   : "border-border/40 dark:border-white/[0.08] text-muted-foreground hover:text-foreground"

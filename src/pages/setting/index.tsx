@@ -19,6 +19,7 @@ import {
   MessageSquareHeart,
   Heart,
   Code,
+  UserCircle,
 } from "lucide-react";
 import { useRouteStore } from "@/stores/routeStore";
 import { useDeveloperModeStore, refreshDeveloperMode } from "@/stores/developerModeStore";
@@ -26,7 +27,7 @@ import { PageShell, type PageShellGroup } from "@/components/page-shell";
 import { SettingsAccountCard } from "@/components/account/SettingsAccountCard";
 
 import { HomeSetting } from "./general/home";
-// import { AccountSetting } from "./general/account";  // Koring 账户（暂时隐藏）
+import { AccountSetting } from "./general/account";
 import { AboutSetting } from "./general/about";
 import { CopyrightSetting } from "./general/copyright";
 import { GameSetting } from "./game/game";
@@ -61,9 +62,9 @@ function buildMenuData(
     {
       title: "通用",
       items: [
+        // 账户页不在侧栏列出：由侧栏顶部的账户卡片点击进入（hidden 后仍可切换显示）
+        { key: "account", label: "账户", icon: <UserCircle className={iconCls} />, content: <AccountSetting />, hidden: true },
         { key: "home", label: "主页", icon: <Home className={iconCls} />, content: <HomeSetting onNavigate={switchPage} sharedTransition={selected === "home"} /> },
-        // Koring 账户（暂时隐藏）
-        // { key: "account", label: "Koring 账户", icon: <UserCircle className={iconCls} />, content: <AccountSetting /> },
         { key: "about", label: "关于", icon: <Info className={iconCls} />, content: <AboutSetting sharedTransition={selected === "about"} /> },
         { key: "copyright", label: "版权", icon: <Copyright className={iconCls} />, content: <CopyrightSetting /> },
       ],
@@ -111,11 +112,18 @@ function buildMenuData(
 }
 
 export function Setting() {
-  // 每次进入设置页都回到「通用 → 主页」
-  const [selected, setSelected] = useState("home");
+  // 默认每次进入设置页回到「通用 → 主页」；若别处指定了目标分区（如联机页「登录」跳账户页），则直接打开
+  const requestedSection = useRouteStore((s) => s.settingsSection);
+  const setSettingsSection = useRouteStore((s) => s.setSettingsSection);
+  const [selected, setSelected] = useState(requestedSection ?? "home");
   const routeNavigate = useRouteStore((s) => s.navigate);
   // 服务端下发的开发者模式（设备接口 data.developer_mode）；false 时隐藏「开发者选项」入口
   const developerMode = useDeveloperModeStore((s) => s.enabled);
+
+  // 一次性消费目标分区，避免下次进入设置页仍停在该分区
+  useEffect(() => {
+    if (requestedSection) setSettingsSection(null);
+  }, [requestedSection, setSettingsSection]);
 
   // 进入设置页时按需复查一次（冷却 5 分钟，超时才真正发请求；见 developerModeStore）
   useEffect(() => {
@@ -130,7 +138,7 @@ export function Setting() {
       value={selected}
       onValueChange={setSelected}
       navLabel="设置导航"
-      sidebarHeader={<SettingsAccountCard />}
+      sidebarHeader={<SettingsAccountCard onOpenAccount={() => setSelected("account")} />}
     />
   );
 }

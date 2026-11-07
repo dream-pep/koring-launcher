@@ -21,6 +21,7 @@ import electron from 'electron';
 import { createLogger } from './logger';
 import { getEnv, getEnvBase } from './env';
 import { getOsInfo, getSmbiosUuid, type SmbiosUuidSource } from './device-id';
+import { readKoringAuth, refreshAccessToken, saveKoringAuth } from './koring-auth';
 import { compareVersionTags } from '../updater';
 
 const { app } = electron;
@@ -204,6 +205,8 @@ interface RequestOptions {
   method?: 'GET' | 'POST';
   query?: Record<string, string | undefined>;
   body?: unknown;
+  /** Koring Account access_token；需要用户身份的接口（如房间上报）才传 */
+  bearer?: string;
 }
 
 /**
@@ -227,6 +230,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       headers: {
         'X-API-Key': key,
         Accept: 'application/json',
+        ...(options.bearer ? { Authorization: `Bearer ${options.bearer}` } : {}),
         ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -263,12 +267,20 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   const err = envelope?.error;
+  const failCode = err?.code || 'internal_error';
+  if (envelope?.ok !== true) {
+    // 失败时把服务端返回的错误体记下来（含 5xx 的原始响应片段），便于排查
+    log.warn(
+      `[launcher-api] ${method} ${path} 失败：code=${failCode} status=${res.status} ` +
+        `message=${err?.message ?? '-'} body=${raw.slice(0, 400).replace(/\s+/g, ' ') || '-'}`,
+    );
+  }
   let message = err?.message || `请求失败（HTTP ${res.status}）`;
   const details = err?.details as { retry_after_seconds?: number } | undefined;
   if (err?.code === 'rate_limited' && details?.retry_after_seconds) {
     message = `${message}（请 ${details.retry_after_seconds} 秒后重试）`;
   }
-  throw new LauncherApiError(err?.code || 'internal_error', message, res.status, err?.details);
+  throw new LauncherApiError(failCode, message, res.status, err?.details);
 }
 
 // ==================== 设备接口 ====================
@@ -575,4 +587,80 @@ async function runStartupCheck(): Promise<StartupCheckResult> {
 /** 调试用：清空启动检查缓存 */
 export function resetStartupCache(): void {
   startupCache = null;
+}
+
+// ==================== 游戏房间（P2P 联机） ====================
+
+/** 网页邀请落地页（只承载 /room，其余路径 308 回 account.koring.space） */
+export const ROOM_INVITE_BASE = 'https://link.koring.space/room';
+
+export interface RoomReportData {
+  id: string;
+  code: string;
+  state: 'open' | 'closed' | 'expired';
+  /** ISO 8601 */
+  opened_at: string;
+  /** opened_at + 48h */
+  expires_at: string;
+  closed_at: string | null;
+}
+
+/**
+ * 分享用的网页邀请链接：好友点开 → 网页引导唤起 `koring://room-join?code=…`。
+ * 房间码里的 `/` 按文档保持原样（其余字符仍然编码）。
+ */
+export function roomInviteLink(code: string): string {
+  const value = code.trim();
+  if (!value) return '';
+  const full = value.startsWith('U/') ? value : `U/${value}`;
+  return `${ROOM_INVITE_BASE}?code=${encodeURIComponent(full).replace(/%2F/g, '/')}`;
+}
+
+/** 取本机已登录的 Koring Account access_token（未登录返回空串） */
+function koringAccessToken(): string {
+  try {
+    return readKoringAuth()?.access_token?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 带 Access Token 调用房间接口：401 时用 refresh_token 续一次再重试。
+ * 未登录直接抛 auth_required（调用方只需 warn，不影响联机功能）。
+ */
+async function withKoringToken<T>(call: (token: string) => Promise<T>): Promise<T> {
+  let token = koringAccessToken();
+  if (!token) throw new LauncherApiError('auth_required', '需要登录 Koring Account 才能上报房间');
+  try {
+    return await call(token);
+  } catch (e) {
+    if (!(e instanceof LauncherApiError) || e.httpStatus !== 401) throw e;
+    const refreshToken = readKoringAuth()?.refresh_token?.trim() ?? '';
+    if (!refreshToken) throw e;
+    const refreshed = await refreshAccessToken(refreshToken);
+    saveKoringAuth(refreshed);
+    token = refreshed.access_token;
+    return call(token);
+  }
+}
+
+/**
+ * 上报房间打开。幂等：同一个房间码重复上报等价于「重开这一局」
+ * （清空 closed_at、opened_at 拨到当下），因此启动器重试是安全的。
+ */
+export function reportRoomOpen(code: string): Promise<RoomReportData> {
+  return withKoringToken((token) =>
+    request<RoomReportData>('/api/v1/room/open', { method: 'POST', body: { code }, bearer: token }),
+  );
+}
+
+/**
+ * 上报房间关闭。幂等：已经关闭 / 已失效也会返回成功，
+ * 因此退出流程调用它不需要额外判断（404 room_not_found 由调用方忽略）。
+ */
+export function reportRoomClose(code: string): Promise<RoomReportData> {
+  return withKoringToken((token) =>
+    request<RoomReportData>('/api/v1/room/close', { method: 'POST', body: { code }, bearer: token }),
+  );
 }

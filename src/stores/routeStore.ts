@@ -93,6 +93,8 @@ export const allRoutes: RouteItem[] = [
   // 账户页：已从顶栏胶囊菜单移除头像入口（页面保留），需要时仍可用 navigate("account") 进入
   { key: "account", label: "账户", path: "/account", hidden: true, backable: true },
   { key: "setting/login", label: "登录", path: "/setting/login", hidden: true, backable: true },
+  // 创建房间：联机页的二级子页（进入后自动匹配「对局域网开放」的实例）
+  { key: "play-link/create", label: "创建房间", path: "/play-link/create", hidden: true, backable: true },
   { key: "task-queue", label: "任务队列", path: "/task-queue", hidden: true },
   { key: "update", label: "更新日志", path: "/update", hidden: true, backable: true },
   // 强制升级页：随版本策略出现，顶栏用 OOBE 样式（无返回、无主导航）
@@ -271,9 +273,12 @@ interface RouteState {
   history: RouteKey[];
   /** 资源中心选中的分类（原版游戏 / MOD / 整合包） */
   storeSection: "game" | "mod" | "modpack";
+  /** 下次进入设置页时要直接打开的二级分区（一次性消费，如「账户」） */
+  settingsSection: string | null;
   navigate: (key: RouteKey) => void;
   setTitleBarMode: (mode: TitleBarMode) => void;
   setStoreSection: (section: "game" | "mod" | "modpack") => void;
+  setSettingsSection: (section: string | null) => void;
   goBack: () => void;
 }
 
@@ -283,6 +288,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   direction: "forward",
   history: [],
   storeSection: "game",
+  settingsSection: null,
   navigate: (key) => {
     const prev = get().current;
     if (prev === key) return;
@@ -303,6 +309,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   },
   setTitleBarMode: (mode) => set({ titleBarMode: mode }),
   setStoreSection: (section) => set({ storeSection: section }),
+  setSettingsSection: (section) => set({ settingsSection: section }),
   goBack: () => {
     const { history, current } = get();
     if (history.length === 0) return;

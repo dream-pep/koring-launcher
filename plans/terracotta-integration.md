@@ -113,12 +113,8 @@
 
 ```ts
 export interface TerracottaConfig {
-  /** 昵称；留空 = 使用当前登录账户名 */
-  playerName: string;
   /** 附加公共节点（host:port），与上游内置节点一起作为 public_nodes 传入 */
   publicNodes: string[];
-  /** 进入联机页时自动启动陶瓦服务 */
-  autoStart: boolean;
   /** 自定义二进制路径；留空 = 自动定位/下载 */
   binaryPath: string;
 }
@@ -129,7 +125,9 @@ export interface NetworkConfig {
 }
 ```
 
-`DEFAULTS.network.terracotta = { playerName: '', publicNodes: [], autoStart: true, binaryPath: '' }`。
+`DEFAULTS.network.terracotta = { publicNodes: [], binaryPath: '' }`。
+显示名不可自定义：固定取当前登录 Koring Account 的用户名（主进程 `resolvePlayer` 兜底同样读 `koring-auth.json`）；未登录不支持联机。
+联机组件不需要用户配置开关：启动器启动时由 `terracottaService.ensureReady()` 自动检查/安装并拉起服务。
 
 渲染端 `src/api/config.ts` 的 `AppConfig` 镜像同步补上同名字段。配置读写走现有 `config:update` / `configStore`，不要新增配置文件。
 
@@ -229,7 +227,7 @@ export interface TerracottaStatus {
 - `start`：未安装 → 报错「陶瓦联机尚未安装」。已运行 → 直接返回当前状态。启动超时 20s。
 - `host` / `guest`：若未运行则先 `start`；`guest` 先用本地校验房间码，非法直接返回 `success:false` + 可读文案（不要等上游 400）。
 - `reset`：调用 `/state/ide`；进程若已消失（预期内的已知缺陷）则置 `phase='stopped'` 并返回成功，由 UI 提供「重新启动」。
-- 所有 `player` 缺省值解析顺序：入参 → `config.network.terracotta.playerName` → 当前账户用户名 → `''`。
+- 所有 `player` 缺省值解析顺序：入参 → 已登录 Koring Account 用户名（`koring-auth.json`）→ 当前游戏账户用户名 → `''`；不支持自定义昵称，未登录不提供联机服务。
 - `publicNodes` 缺省取配置值；与上游内置节点合并方式为直接重复传参（上游支持多个 `public_nodes`）。
 
 ### 7.3 事件（主进程 → 渲染进程 `webContents.send`）
@@ -275,8 +273,9 @@ onTerracottaInstallProgress(cb: (data: unknown) => void): () => void;
 
 | 条件 | 展示 |
 | --- | --- |
+| 未登录 Koring Account | 占满整行的提示条：「受到相关条例，我们需要您登录 Koring Account 才能提供联机服务。」+ 「登录」按钮（跳转设置 → 账户） |
 | `!binary.installed` | 说明 + 「下载并安装」（带进度条）+「选择本地二进制」+ 版权链接 |
-| `phase === 'stopped'` | 介绍文案 + 「启动陶瓦联机」；`autoStart` 开启且未启动时自动触发一次 |
+| `phase === 'stopped'` | 介绍文案 + 「启动陶瓦联机」；启动器启动时已由 `ensureReady()` 自动拉起，此处仅手动补偿 |
 | `phase === 'starting'` | 加载态「正在启动联机服务…」 |
 | `phase === 'crashed'` | 错误态 + 「重新启动」 |
 | `state === 'waiting'` | 双卡：**创建房间**（昵称输入，默认取配置）/ **加入房间**（房间码输入） |
@@ -295,10 +294,11 @@ onTerracottaInstallProgress(cb: (data: unknown) => void): () => void;
 
 沿用 `PageHeader` + `SettingCard` / `SettingRow`（参考同目录 `security-id.tsx`、`download.tsx`）：
 
-1. **基础**：显示名（Input，占位「留空则使用当前账户名」）、自动启动（Switch）
-2. **网络**：公共节点（Textarea，每行一个 `host:port`，保存时 trim + 过滤空行）
-3. **程序与版本**：已安装版本/来源/路径（只读展示）、重新安装、打开数据目录、选择本地二进制、恢复自动定位
-4. **版权**：`Powered by Terracotta · 陶瓦联机` 说明段 + 上游链接
+1. **网络**：公共节点（Textarea，每行一个 `host:port`，保存时 trim + 过滤空行）
+2. **程序与版本**：房间内显示名（只读，跟随 Koring 账号）、已安装版本/来源/路径（只读展示）、EasyTier 版本、当前端口、重新安装、打开数据目录、选择本地二进制、恢复自动定位
+3. **版权**：`Powered by Terracotta · 陶瓦联机` 说明段 + 上游链接
+
+> 需求变更：已删除「基础」分区（自定义显示名 + 自动启动开关）。显示名不可自定义，固定用 Koring Account 用户名；联机组件由启动器启动时自动检查安装。
 
 写入配置：`useConfigStore` 的既有更新入口（读同目录页面的用法，不要自造通道）。
 
@@ -341,3 +341,26 @@ pnpm fetch:terracotta    # 生成 build/terracotta/，冒烟确认 exe + DLL 存
 ## 12. 版本升级
 
 上游发版后只需：更新 `scripts/fetch-terracotta.js` 与 `electron/core/terracotta.ts` 里的默认版本常量 → 重新打包。API 向后兼容风险点：`/state` 字段增删（解析需容忍未知字段、缺字段给默认值）。
+
+## 13. 深链协议（`koring://`）
+
+浏览器分享链接 → 唤醒启动器 → 自动加入房间。
+
+- 协议：`koring://room-join?code=U/NNNN-NNNN-SSSS-SSSS`（`code` 必填，原样保留 `U/` 前缀与连字符）。
+- 主进程 `electron/deep-link.ts`：
+  - `findDeepLink(argv)`：从启动参数挑出 `koring://` 链接（Windows/Linux 走 argv）
+  - `parseDeepLink(raw)`：只认 `room-join` 路由，返回 `{ type, code, id }`；不认识的链接一律忽略
+  - 队列 + 唯一 `id` 投递：窗口未加载完先入队，`did-finish-load` 后补投递；渲染端也可经 `deep-link:consume` 主动取走积压
+  - 渲染端按 `id` 去重（事件与队列可能双投递，避免重复加入）
+- 主进程 `electron/main.ts`：
+  - `app.requestSingleInstanceLock()`：第二实例把 argv 交给已运行实例后 `app.exit(0)`
+  - `second-instance` → `handleDeepLink(argv 深链, win)`，顺便聚焦主窗口
+  - `app.on('open-url')` 覆盖 macOS
+  - `app.setAsDefaultProtocolClient('koring')`；**开发模式**必须带 `execPath + [入口脚本]`，否则浏览器只会拉起裸 electron
+- 渲染端：
+  - `src/stores/deepLinkStore.ts`：`pending`（待加入房间码）+ `seen` 去重
+  - `src/App.tsx`：订阅 `onDeepLinkRoomJoin` + 启动时 `consumeDeepLinks()`；OOBE / 升级流程中不打断（只登记不跳转）
+  - `src/pages/play-link/index.tsx`：条件满足（已登录 + 已安装 + 运行中 + `waiting`）后 `guest(code)`；未启动则先 `start()`；房间码非法 → 本地校验报错，不发请求
+- 打包：`electron-builder.yml` 的 `protocols` 声明 `koring`（Windows 由 NSIS 写注册表，macOS 写 `CFBundleURLTypes`）。
+- 验证：`koring://room-join?code=U/2D0M-04L3-25M7-HSQ0` 在浏览器打开 → 启动器聚焦并跳到联机页 → 状态进入 `guest-connecting`。
+

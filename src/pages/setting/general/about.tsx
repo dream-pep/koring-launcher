@@ -6,6 +6,7 @@ import { Link, Select, ListBox, ListBoxItem } from "@heroui/react";
 import { useConfigStore } from "@/stores/configStore";
 import { useDevStore } from "@/stores/devStore";
 import { SettingCard, SettingRow, SettingSwitch, PageHeader, SectionTitle } from "@/components/setting";
+import { ServiceStatusBadge } from "@/components/system/ServiceStatusBadge";
 import { Button } from "@/components/ui/button";
 import {
   getUpdateChannels,
@@ -250,6 +251,20 @@ export function AboutSetting(_props: AboutSettingProps) {
                 checked={adv?.debugMode ?? false}
                 onChange={(v) => setAdvanced({ debugMode: v })}
               />
+            </SettingCard>
+          </div>
+        </div>
+
+        <div>
+          <SectionTitle>服务状态</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              <SettingRow
+                label="Koring 服务状态"
+                desc="来自 status.koring.space 的实时状态，点击徽章可查看详情"
+              >
+                <ServiceStatusBadge />
+              </SettingRow>
             </SettingCard>
           </div>
         </div>

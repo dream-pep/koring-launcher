@@ -48,6 +48,35 @@ export interface LaunchRoots {
   source: 'instance-custom' | 'instance' | 'shared';
 }
 
+/**
+ * 版本隔离档位（与 electron/config.ts 的 `game.isolation` 同义，PCL2 三档）：
+ * - `instance`：运行数据隔离在实例目录（默认）；
+ * - `version`：运行数据隔离到资源根的 `versions/<版本 id>/`；
+ * - `none`：不隔离，运行数据放在资源根目录（所有实例共用）。
+ */
+export type GameIsolation = 'instance' | 'version' | 'none';
+
+/**
+ * 计算运行数据目录（mods / saves / config / resourcepacks / screenshots / logs）。
+ *
+ * 与 `resolveLaunchRoots()` 的区别：这里只管「玩家数据落在哪」，
+ * `resourceRoot` 永远提供 versions/libraries/assets，不参与隔离判定。
+ */
+export function resolveGameDataDir(input: {
+  instancePath: string;
+  isolation: GameIsolation;
+  resourceRoot: string;
+  /** 实际启动的版本 id（隔离到版本目录时用），缺省回落到实例目录 */
+  versionId?: string;
+}): string {
+  if (input.isolation === 'none') return path.resolve(input.resourceRoot);
+  if (input.isolation === 'version') {
+    if (!input.versionId) return path.resolve(input.instancePath);
+    return path.resolve(input.resourceRoot, 'versions', input.versionId);
+  }
+  return path.resolve(input.instancePath);
+}
+
 export type LaunchErrorCode =
   | 'INSTANCE_NOT_FOUND'
   | 'LAUNCH_VERSION_NOT_FOUND'
@@ -518,6 +547,11 @@ export interface LaunchPlanInput {
   sharedResourceDir?: string;
   /** 实例显式指定的启动版本 id（instance.json 的 launchVersion） */
   preferredVersionId?: string;
+  /**
+   * 全局版本隔离档位。缺省 / `instance` = 沿用实例自带 gameRoot（旧行为），
+   * `version` / `none` 会按 `resolveGameDataDir()` 改写 `roots.gameRoot`。
+   */
+  isolation?: GameIsolation;
 }
 
 export interface LaunchPlan {
@@ -543,6 +577,17 @@ export function resolveLaunchPlan(input: LaunchPlanInput): LaunchPlan {
   const versionsDir = path.join(roots.resourceRoot, 'versions');
   const resolved = resolveLaunchVersionId(versionsDir, input.runtime, input.preferredVersionId);
   const dependencies = checkDependencies(roots.resourceRoot, resolved.id);
+
+  // 版本隔离：只改写运行数据目录（--gameDir），资源根不变
+  const isolation = input.isolation;
+  if (isolation === 'none' || isolation === 'version') {
+    roots.gameRoot = resolveGameDataDir({
+      instancePath: input.instancePath,
+      isolation,
+      resourceRoot: roots.resourceRoot,
+      versionId: resolved.id,
+    });
+  }
 
   const issues = [...resolved.warnings, ...dependencies.warnings];
   if (!dependencies.ready) issues.push(describeDependencyReport(dependencies));

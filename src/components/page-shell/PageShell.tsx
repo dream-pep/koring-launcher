@@ -33,6 +33,11 @@ export interface PageShellItem {
    * 提供后条目可右键唤出菜单；不传则保持普通按钮。
    */
   contextMenu?: ReactNode;
+  /**
+   * 不在侧边栏列出（仍可被外部切换显示其子页，例如由自定义入口打开的页面）。
+   * 子页内容与切换动画照常工作。
+   */
+  hidden?: boolean;
 }
 
 /** 侧边栏分组（分组之间自动画分隔线） */
@@ -123,11 +128,14 @@ export function PageShell({
   keepAlive = true,
   className,
 }: PageShellProps) {
-  const visibleGroups = groups.filter((group) => group.items.length > 0);
-  const items = visibleGroups.flatMap((group) => group.items);
+  // 侧边栏只列出非 hidden 条目；hidden 条目仍参与子页渲染与切换（内容不受影响）
+  const sidebarGroups = groups
+    .map((group) => ({ ...group, items: group.items.filter((item) => !item.hidden) }))
+    .filter((group) => group.items.length > 0);
+  const items = groups.flatMap((group) => group.items);
   // 可切换条目的顺序：决定子页切换方向（动作项没有子页，不参与）
   const switchableItems = items.filter((item) => !item.onSelect);
-  const firstKey = switchableItems[0]?.key;
+  const firstKey = (switchableItems.find((item) => !item.hidden) ?? switchableItems[0])?.key;
 
   // 非受控 / 受控两种用法
   const isControlled = value !== undefined;
@@ -225,7 +233,7 @@ export function PageShell({
     (item) => item.content !== undefined && (keepAlive ? visited[item.key] : item.key === selected),
   );
 
-  const showSidebar = visibleGroups.length > 0 || sidebarEmpty !== undefined;
+  const showSidebar = sidebarGroups.length > 0 || sidebarEmpty !== undefined;
 
   return (
     <PageShellContext.Provider value={{ activeKey: selected, navigate }}>
@@ -239,7 +247,7 @@ export function PageShell({
             style={{ width: sidebarWidth }}
           >
             {sidebarHeader}
-            {visibleGroups.length > 0 ? (
+            {sidebarGroups.length > 0 ? (
               <nav ref={navRef} aria-label={navLabel} className="relative space-y-6">
                 {/* 选中指示条：单个元素在侧栏内滑动（spring），而不是每个条目各弹一条 */}
                 {hasActive && (
@@ -252,7 +260,7 @@ export function PageShell({
                     }}
                   />
                 )}
-                {visibleGroups.map((group, groupIndex) => (
+                {sidebarGroups.map((group, groupIndex) => (
                   <div key={group.title ?? groupIndex}>
                     {groupIndex > 0 && <div className="mx-3 mb-3 border-t border-border/40" />}
                     {group.title && (
@@ -275,7 +283,7 @@ export function PageShell({
                               typeof item.description === "string" ? item.description : item.label
                             }
                             className={cn(
-                              "relative w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13.5px] transition-[color,background-color] duration-200 ease-spring-soft active:scale-[0.99]",
+                              "relative w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13.5px] transition-[scale,color,background-color] duration-200 ease-spring-soft active:scale-[0.99]",
                               active
                                 ? "text-foreground font-medium"
                                 : "text-foreground/50 hover:text-foreground/80 hover:bg-foreground/[0.04]",

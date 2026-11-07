@@ -1,6 +1,7 @@
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useRouteStore } from "@/stores/routeStore";
 import { useConfigStore } from "@/stores/configStore";
+import { FadeText } from "@/components/ui/fade-text";
 import clsx from "clsx";
 
 export function InstanceTitle() {
@@ -17,13 +18,17 @@ export function InstanceTitle() {
         "self-start pl-1 pr-1 py-1.5 rounded-lg cursor-pointer",
         "text-5xl font-bold tracking-tight text-white",
         "hover:bg-black/20 hover:scale-[1.01] origin-left",
-        "transition-[transform,background-color] duration-200 ease-spring-soft",
+        "transition-[scale,transform,background-color] duration-200 ease-spring-soft",
         "select-none",
       )}
     >
-      {currentInstance
-        ? currentInstance.config.name || currentInstance.config.description || currentInstance.name
-        : "选择实例"}
+      <FadeText
+        value={
+          currentInstance
+            ? currentInstance.config.name || currentInstance.config.description || currentInstance.name
+            : "选择实例"
+        }
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
   resetTerracotta,
   startTerracotta,
   stopTerracotta,
+  type TcProfile,
   type TerracottaStatus,
 } from "@/api/terracotta";
 
@@ -47,8 +48,35 @@ const EMPTY_PENDING: TcPending = {
   "fetch-log": false,
 };
 
-/** 把底层异常转成面向用户的中文提示（主进程通常已给出中文 error） */
-export function toReadableError(error: unknown): string {
+function sameProfile(a: TcProfile, b: TcProfile): boolean {
+  return a.machineId === b.machineId && a.name === b.name && a.kind === b.kind;
+}
+
+function sameProfiles(a: readonly TcProfile[], b: readonly TcProfile[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (!sameProfile(a[index], b[index])) return false;
+  }
+  return true;
+}
+
+/**
+ * 主进程每 500ms 广播一次状态（延迟在变、成员多数时候不变）。
+ * 成员列表没变时复用上一份数组引用，避免下游 useMemo / memo 全部失效——
+ * 这是「实时更新成员列表」与「不因轮询抖动重渲染」的平衡点。
+ */
+function withStableProfiles(previous: TerracottaStatus | undefined, next: TerracottaStatus): TerracottaStatus {
+  const previousProfiles = previous?.snapshot?.profiles;
+  const nextProfiles = next.snapshot?.profiles;
+  if (!previousProfiles || !nextProfiles) return next;
+  if (sameProfiles(previousProfiles, nextProfiles)) {
+    return { ...next, snapshot: { ...next.snapshot, profiles: previousProfiles } };
+  }
+  return next;
+}
+
+/** 把底层异常转成面向用户的中文提示（主进程通常已给出中文 error） */export function toReadableError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
   const trimmed = message.trim();
   if (!trimmed) return "操作失败，请稍后重试";
@@ -86,6 +114,8 @@ interface TerracottaState {
   clearBinary: () => Promise<void>;
   openDir: () => Promise<string | null>;
   fetchLog: () => Promise<string | null>;
+  /** 直接写入一条错误提示（供深链校验等渲染端内部流程使用） */
+  setError: (message: string) => void;
   clearError: () => void;
   clearLog: () => void;
 }
@@ -97,7 +127,7 @@ export const useTerracottaStore = create<TerracottaState>((set, get) => {
     try {
       const next = await task();
       if (next && next.snapshot) {
-        set({ status: next, loaded: true });
+        set((state) => ({ status: withStableProfiles(state.status, next), loaded: true }));
       } else {
         // 部分契约通道只返回局部字段，动作内部自行处理，这里补一次状态刷新
         await get().refresh();
@@ -119,7 +149,7 @@ export const useTerracottaStore = create<TerracottaState>((set, get) => {
     init: () => {
       const unsubscribeStatus = onTerracottaStatus((status) => {
         if (!status || !status.snapshot) return;
-        set({ status, loaded: true });
+        set((state) => ({ status: withStableProfiles(state.status, status), loaded: true }));
       });
       const unsubscribeProgress = onTerracottaInstallProgress((progress) => {
         if (!progress) return;
@@ -138,7 +168,7 @@ export const useTerracottaStore = create<TerracottaState>((set, get) => {
       set((state) => ({ pending: { ...state.pending, refresh: true } }));
       try {
         const status = await getTerracottaStatus();
-        if (status?.snapshot) set({ status, loaded: true });
+        if (status?.snapshot) set((state) => ({ status: withStableProfiles(state.status, status), loaded: true }));
       } catch (error) {
         set({ error: toReadableError(error), loaded: true });
       } finally {
@@ -203,6 +233,7 @@ export const useTerracottaStore = create<TerracottaState>((set, get) => {
       }
     },
 
+    setError: (message) => set({ error: message }),
     clearError: () => set({ error: "" }),
     clearLog: () => set({ log: "" }),
   };

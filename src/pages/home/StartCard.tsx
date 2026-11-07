@@ -1,4 +1,5 @@
 import { Play, Loader2 } from "lucide-react";
+import { FadeText } from "@/components/ui/fade-text";
 import { toast } from "@/lib/toast";
 import { useRouteStore } from "@/stores/routeStore";
 import { useInstanceStore } from "@/stores/instanceStore";
@@ -47,7 +48,7 @@ export function StartCard() {
         "font-medium text-sm text-primary",
         "cursor-pointer shrink-0 hover:bg-background/40",
         "active:scale-[0.97] hover:scale-[1.02]",
-        "transition-[transform,background-color] duration-150 ease-spring",
+        "transition-[scale,transform,background-color] duration-150 ease-spring",
         "disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100",
       )}
     >
@@ -56,7 +57,7 @@ export function StartCard() {
       ) : (
         <Play className="w-3.5 h-3.5 fill-current" />
       )}
-      {launching ? "正在启动..." : running ? "游戏中" : "启动游戏"}
+      <FadeText value={launching ? "正在启动..." : running ? "游戏中" : "启动游戏"} />
     </button>
   );
 }

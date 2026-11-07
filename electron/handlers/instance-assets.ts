@@ -15,6 +15,7 @@ import {
   deleteInstanceScreenshots,
   listInstanceResourcePacks,
 } from '../core/instance-assets';
+import { resolveInstanceDataDir } from '../core/instance';
 
 const { ipcMain } = electron;
 
@@ -29,7 +30,9 @@ function fail(e: unknown) {
 /** 从 payload 中取实例路径（缺省当空字符串，核心函数会按空处理） */
 function readInstancePath(payload: { instancePath?: unknown } | null | undefined): string {
   const instancePath = payload?.instancePath;
-  return typeof instancePath === 'string' ? instancePath : '';
+  if (typeof instancePath !== 'string' || !instancePath.trim()) return '';
+  // 全局版本隔离为「不隔离 / 隔离到版本目录」时，存档/截图/资源包不在实例目录里
+  return resolveInstanceDataDir(instancePath);
 }
 
 /** 从 payload 中取名称数组（非数组按空处理） */

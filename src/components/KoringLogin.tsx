@@ -22,7 +22,19 @@ export function KoringLogin({ onLoginSuccess }: KoringLoginProps) {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** 已自动打开过的授权链接，避免重复拉起浏览器（StrictMode 双挂载 / 重复渲染） */
+  const autoOpenedRef = useRef("");
   const setUser = useKoringAuthStore((s) => s.setUser);
+
+  /**
+   * 进入登录页 / 重新获取设备码后，直接打开浏览器授权页
+   * （形如 `https://account.koring.space/device?code=1234-1234`，带上用户码省一次手输）。
+   */
+  const autoOpenVerify = useCallback((url: string) => {
+    if (!url || autoOpenedRef.current === url) return;
+    autoOpenedRef.current = url;
+    window.electronAPI?.openExternal(url);
+  }, []);
 
   const cleanup = useCallback(() => {
     if (pollRef.current) {
@@ -44,6 +56,7 @@ export function KoringLogin({ onLoginSuccess }: KoringLoginProps) {
         setVerifyUri(res.verification_uri);
         setVerifyUriComplete(res.verification_uri_complete);
         setStep("scan");
+        autoOpenVerify(res.verification_uri_complete || res.verification_uri);
         startPolling(res.device_code, res.expires_in, cancelled);
       } catch (e: any) {
         if (!cancelled) {
@@ -94,6 +107,7 @@ export function KoringLogin({ onLoginSuccess }: KoringLoginProps) {
       setVerifyUri(res.verification_uri);
       setVerifyUriComplete(res.verification_uri_complete);
       setStep("scan");
+      autoOpenVerify(res.verification_uri_complete || res.verification_uri);
       startPolling(res.device_code, res.expires_in, false);
     } catch (e: any) {
       setError(e.message || "请求设备码失败");
@@ -108,7 +122,7 @@ export function KoringLogin({ onLoginSuccess }: KoringLoginProps) {
   };
 
   const openVerify = () => {
-    window.electronAPI?.openExternal(verifyUri);
+    window.electronAPI?.openExternal(verifyUriComplete || verifyUri);
   };
 
   if (step === "loading") {
@@ -143,9 +157,9 @@ export function KoringLogin({ onLoginSuccess }: KoringLoginProps) {
 
       {/* 提示文字 */}
       <p className="text-sm text-muted-foreground text-center leading-relaxed">
-        请使用任意二维码扫描器打开
+        已自动在浏览器中打开授权页面
         <br />
-        或访问以下链接并输入验证码
+        也可以扫描二维码，或点下方链接手动打开
       </p>
 
       {/* 验证链接 */}
@@ -153,7 +167,7 @@ export function KoringLogin({ onLoginSuccess }: KoringLoginProps) {
         onClick={openVerify}
         className="inline-flex items-center gap-1.5 text-[13px] text-primary hover:underline"
       >
-        {verifyUri}
+        {verifyUriComplete || verifyUri}
         <ExternalLink className="w-3 h-3" />
       </button>
 

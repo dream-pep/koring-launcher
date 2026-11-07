@@ -58,6 +58,8 @@ export interface TcSnapshot {
   error: string;
   /** exception 类型；无则 -1 */
   exceptionType: number;
+  /** 最近一次 /state 往返耗时（毫秒）；未知 0 */
+  latencyMs: number;
 }
 
 export interface TcBinaryInfo {

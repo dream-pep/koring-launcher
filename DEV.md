@@ -275,6 +275,7 @@ background:
 game:
   gameDir: .minecraft
   resourceDir: ""
+  isolation: instance    # instance | version | none（全局版本隔离）
   savesDir: ""
   instancesDir: .minecraft/instances
   gameDirs: []            # 已添加的游戏目录列表
@@ -407,7 +408,11 @@ launchStore.launch(instanceName, gamePath)
 **启动方案（`electron/core/launch-target.ts`）**——决定「从哪读版本、启动哪个版本、能不能启动」：
 
 - `resolveLaunchRoots()`：`instance-custom`（实例 `resourcePath`）→ `instance`（实例自带 `versions/`）→
-  `shared`（`game.resourceDir`）；`gameRoot` 恒为实例目录，运行期数据不写进共享目录。
+  `shared`（`game.resourceDir`）；`resourceRoot` 提供 versions/libraries/assets。
+- `resolveGameDataDir()` + `LaunchPlanInput.isolation`：全局版本隔离（设置 → 游戏 → 版本隔离）
+  `instance`（默认，实例目录）/ `version`（`<resourceRoot>/versions/<实际启动版本>`）/ `none`（资源根）；
+  只改写 `roots.gameRoot`（`--gameDir`），`resourceRoot` 不变。运行期数据（mods / saves / 截图 / 日志）的读写、
+  实例页统计与 `instance:mods-*` / `instance:saves-*` / `mods:install` 都经 `resolveInstanceDataDir()` 换算同一目录。
 - `resolveLaunchVersionId()`：`launchVersion` → 按加载器匹配 → 原版 id → 名称近似匹配（`via` 分别为
   `configured` / `loader` / `base` / `fallback`），失败抛 `LAUNCH_VERSION_NOT_FOUND`。
 - `checkDependencies()`：校验版本 JSON、客户端 JAR 与 `rules` 过滤后的 `libraries`（含 `inheritsFrom` 链），
@@ -625,6 +630,7 @@ z-200 StartupPopup        启动弹窗 (环境变量控制)
 | 分组 | 页面 | 状态 | 对接 |
 |---|---|---|---|
 | 通用 | 主页 / Koring 账户 / 关于 / 版权 | 保留 | — |
+| 游戏 | 游戏（总览） | 实装 | `advanced.afterLaunch` / `advanced.winMode` / 全局版本隔离 `game.isolation`（instance\|version\|none）/ 进服 `advanced.server` / `java.preferredIpStack` |
 | 游戏 | 游戏账户&档案 | 实装 | `auth:offline-login`（离线账号）+ 启动档案（`--username` / `--uuid` / 认证方式）；微软按钮占位 |
 | 游戏 | Java虚拟机与内存 | 实装 | `java:scan` / `java:resolve` / `java:plan`（自动匹配预览）/ `java.*` |
 | 游戏 | 游戏目录 | 实装 | `instance:inspect-dir` / `instance:discover-dirs` / `instance:scan-dir` / `instance:import`（mode: reference\|copy）+ 共享资源目录 |

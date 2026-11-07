@@ -35,6 +35,7 @@ import {
   describeDependencyReport,
   describeIntegrityReport,
   loaderRequests,
+  resolveGameDataDir,
   resolveLaunchPlan,
   resolveLaunchRoots,
   resolveLaunchVersionId,
@@ -629,6 +630,7 @@ function buildLaunchStatus(
       resourcePath: config.resourcePath,
       sharedResourceDir: getConfig().game.resourceDir || undefined,
       preferredVersionId: config.launchVersion,
+      isolation: getConfig().game.isolation,
     });
     return {
       launch: {
@@ -679,15 +681,17 @@ export function getInstanceInfo(name: string, gamePath: string): InstanceInfo {
   const instancePath = path.join(gamePath, 'instances', name);
   const config = readInstanceConfig(instancePath);
   const status = buildLaunchStatus(instancePath, config);
+  // 统计口径跟随实际运行目录：全局版本隔离为「不隔离 / 隔离到版本目录」时数据不在实例目录里
+  const dataRoot = status.launch.gameRoot;
 
   return {
     name,
     path: instancePath,
     config,
-    modCount: countFiles(path.join(instancePath, 'mods'), '.jar'),
-    resourcePackCount: countFiles(path.join(instancePath, 'resourcepacks'), '.zip'),
-    screenshotCount: countFiles(path.join(instancePath, 'screenshots')),
-    saveCount: countFiles(path.join(instancePath, 'saves')),
+    modCount: countFiles(path.join(dataRoot, 'mods'), '.jar'),
+    resourcePackCount: countFiles(path.join(dataRoot, 'resourcepacks'), '.zip'),
+    screenshotCount: countFiles(path.join(dataRoot, 'screenshots')),
+    saveCount: countFiles(path.join(dataRoot, 'saves')),
     healthy: status.issues.length === 0,
     issues: status.issues,
     launch: status.launch,
@@ -710,6 +714,7 @@ export function planInstanceLaunch(
     resourcePath: instance.config.resourcePath,
     sharedResourceDir: getConfig().game.resourceDir || undefined,
     preferredVersionId: instance.config.launchVersion,
+    isolation: getConfig().game.isolation,
   });
 
   if (!plan.dependencies.ready) {
@@ -721,6 +726,47 @@ export function planInstanceLaunch(
   }
 
   return { instance, plan };
+}
+
+/**
+ * 实例的实际运行数据目录（mods / saves / resourcepacks / screenshots / config…）。
+ *
+ * 与 `resolveLaunchPlan().roots.gameRoot` 同口径：
+ * - `instance`（默认）：实例自带 gameRoot（一般是实例目录；引用式导入时是资源根）；
+ * - `version`：资源根的 `versions/<实际启动版本>/`；
+ * - `none`：资源根目录。
+ *
+ * 解析失败（实例损坏 / 版本缺失）时回退实例目录，保证 IPC 不因此报错。
+ */
+export function resolveInstanceDataDir(instancePath: string): string {
+  const resolvedPath = path.resolve(instancePath);
+  try {
+    const config = readInstanceConfig(resolvedPath);
+    const isolation = getConfig().game.isolation;
+    const roots = resolveLaunchRoots({
+      instancePath: resolvedPath,
+      runtime: config.runtime,
+      resourcePath: config.resourcePath,
+      sharedResourceDir: getConfig().game.resourceDir || undefined,
+    });
+    if (isolation === 'none') return roots.resourceRoot;
+    if (isolation === 'version') {
+      const resolved = resolveLaunchVersionId(
+        path.join(roots.resourceRoot, 'versions'),
+        config.runtime,
+        config.launchVersion
+      );
+      return resolveGameDataDir({
+        instancePath: resolvedPath,
+        isolation,
+        resourceRoot: roots.resourceRoot,
+        versionId: resolved.id,
+      });
+    }
+    return roots.gameRoot;
+  } catch {
+    return resolvedPath;
+  }
 }
 
 /** 实例文件完整性信息（大小 / SHA1 深度校验） */
@@ -1001,6 +1047,7 @@ export async function repairInstance(
         resourcePath: instance.config.resourcePath,
         sharedResourceDir: getConfig().game.resourceDir || undefined,
         preferredVersionId: instance.config.launchVersion,
+        isolation: getConfig().game.isolation,
       });
     } catch {
       return null;
@@ -1065,6 +1112,7 @@ export async function repairInstance(
       resourcePath: instance.config.resourcePath,
       sharedResourceDir: getConfig().game.resourceDir || undefined,
       preferredVersionId: fallback.id,
+      isolation: getConfig().game.isolation,
     });
   }
 

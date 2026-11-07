@@ -1,6 +1,7 @@
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink, Info } from "lucide-react";
 import { Button } from "@heroui/react";
 import { useConfigStore } from "@/stores/configStore";
+import type { GameConfig } from "@/api/config";
 import { useRouteStore } from "@/stores/routeStore";
 import {
   PageHeader,
@@ -35,14 +36,36 @@ const ipStackOptions = [
   { value: "ipv6", label: "IPv6 优先（-Djava.net.preferIPv6Stack=true）" },
 ];
 
+/** 版本隔离（对齐 PCL2 的「版本隔离」三档） */
+const isolationOptions = [
+  {
+    value: "instance",
+    label: "隔离到实例目录",
+    desc: "推荐：每个实例的 mods / saves / config 互不干扰",
+  },
+  {
+    value: "version",
+    label: "隔离到版本目录",
+    desc: "同一启动版本的所有实例共用一个数据目录（存放在资源根的 versions/<版本> 下）",
+  },
+  {
+    value: "none",
+    label: "不隔离",
+    desc: "所有实例共用资源根目录的 mods / saves（多数启动器的默认行为）",
+  },
+];
+
 export function GameSetting() {
   const adv = useConfigStore((s) => s.config.advanced);
   const java = useConfigStore((s) => s.config.java);
+  const gameConfig = useConfigStore((s) => s.config.game);
   const setAdvanced = useConfigStore((s) => s.setAdvanced);
   const setJava = useConfigStore((s) => s.setJava);
+  const setGame = useConfigStore((s) => s.setGame);
   const navigate = useRouteStore((s) => s.navigate);
 
   const afterLaunchDesc = afterLaunchOptions.find((item) => item.value === adv.afterLaunch)?.desc;
+  const isolationDesc = isolationOptions.find((item) => item.value === gameConfig.isolation)?.desc;
 
   return (
     <div>
@@ -148,6 +171,30 @@ export function GameSetting() {
           </div>
         </div>
 
+        {/* 版本隔离 */}
+        <div>
+          <SectionTitle>版本隔离</SectionTitle>
+          <div className="space-y-3">
+            <SettingCard>
+              <div className="space-y-2">
+                <SettingSelect
+                  label="运行数据（mods / 存档 / 配置）隔离方式"
+                  desc={isolationDesc}
+                  value={gameConfig.isolation}
+                  options={isolationOptions}
+                  onChange={(v) => setGame({ isolation: v as GameConfig["isolation"] })}
+                />
+                {gameConfig.isolation !== "instance" && (
+                  <p className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    切换档位不会搬动已有文件：已存在的 mods / 存档仍留在原目录，新档位只决定后续读写位置。
+                  </p>
+                )}
+              </div>
+            </SettingCard>
+          </div>
+        </div>
+
         {/* 网络协议 */}
         <div>
           <SectionTitle>网络协议</SectionTitle>
@@ -175,13 +222,12 @@ export function GameSetting() {
                 </p>
                 <ul className="space-y-1.5 text-[12px] text-muted-foreground">
                   <li>· 游戏窗口标题 / 左下角版本信息：需要进程内注入或窗口句柄改写，@xmcl 无此能力；</li>
-                  <li>· 默认实例隔离档位：我们采用「实例自包含 + 共享资源目录」模型，隔离在创建实例时决定，可在实例设置里改；</li>
                   <li>· 进程优先级 / 高性能显卡 / 渲染器：需要 Win32 或显卡驱动层能力，尚未接入；</li>
                   <li>· 正版验证方式：账户模块目前固定设备代码流，暂不暴露为设置。</li>
                 </ul>
                 <Button size="sm" variant="ghost" onPress={() => navigate("gallery")}>
                   <ExternalLink className="h-3.5 w-3.5" />
-                  去实例设置里改隔离 / 资源目录
+                  去实例页管理实例与资源目录
                 </Button>
               </div>
             </SettingCard>

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "@/lib/toast";
+import { FadeText } from "@/components/ui/fade-text";
 import { directionFromIndex, runViewTransition } from "@/lib/view-transition";
 import {
   diagnoseInstance,
@@ -479,7 +480,9 @@ export function InstanceDetail({
                 </>
               ) : (
                 <>
-                  <h2 className="truncate text-lg font-bold text-foreground">{displayName}</h2>
+                  <h2 className="truncate text-lg font-bold text-foreground">
+                    <FadeText value={displayName} />
+                  </h2>
                   <button
                     type="button"
                     onClick={startRename}
@@ -650,7 +653,9 @@ export function InstanceDetail({
                   onClick={() => switchTab(item.tab)}
                   className="rounded-xl border border-border/40 px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.04] dark:border-white/[0.08]"
                 >
-                  <p className="text-xl font-bold text-foreground">{item.value}</p>
+                  <p className="text-xl font-bold text-foreground">
+                    <FadeText value={item.value} />
+                  </p>
                   <p className="text-[11px] text-muted-foreground">{item.label}</p>
                 </button>
               ))}

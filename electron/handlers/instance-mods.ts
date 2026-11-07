@@ -16,6 +16,7 @@ import {
   setInstanceModsEnabled,
   deleteInstanceMods,
 } from '../core/instance-mods';
+import { resolveInstanceDataDir } from '../core/instance';
 import { createLogger } from '../core/logger';
 
 const { ipcMain } = electron;
@@ -38,12 +39,17 @@ interface InstanceModsPayload {
   fileNames?: string[];
 }
 
-/** 校验实例路径：必须是非空字符串（绝对路径由核心层 path.resolve 归一化） */
+/**
+ * 校验实例路径：必须是非空字符串，并换算成实际运行数据目录。
+ *
+ * 全局版本隔离（`game.isolation`）为「不隔离 / 隔离到版本目录」时，
+ * mods 并不在实例目录里，`resolveInstanceDataDir()` 会给出正确目录。
+ */
 function requireInstancePath(instancePath: unknown): string {
   if (typeof instancePath !== 'string' || !instancePath.trim()) {
     throw new Error('缺少实例路径（instancePath）');
   }
-  return instancePath;
+  return resolveInstanceDataDir(instancePath);
 }
 
 export function registerInstanceModsHandlers() {

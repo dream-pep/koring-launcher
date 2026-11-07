@@ -22,11 +22,18 @@ import { registerJavaHandlers } from './handlers/java';
 import { registerNewsHandlers } from './handlers/news';
 import { registerUpdateHandlers } from './handlers/update';
 import { registerForcedUpdateHandlers } from './handlers/forced-update';
+import { registerTerracottaHandlers } from './handlers/terracotta';
+import { terracottaService } from './core/terracotta';
 import { updateService } from './updater';
 import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
 import { findCachedBackgroundRaw, optimizeBackgroundFile, recoverBackgroundFromDataUrl } from './core/background-image';
 import { registerResourceSchemePrivileges, registerResourceProtocol } from './resource-protocol';
-import { createLogger, setDebugModeProvider, installIpcLogging, registerRendererLogBridge } from './core/logger';
+import {
+  DEEP_LINK_PROTOCOL,
+  findDeepLink,
+  handleDeepLink,
+  registerDeepLinkHandlers,
+} from './deep-link';import { createLogger, setDebugModeProvider, installIpcLogging, registerRendererLogBridge } from './core/logger';
 import { loadEnv } from './core/env';
 import { dataBasePath } from './core/paths';
 
@@ -58,10 +65,64 @@ app.commandLine.appendSwitch('enable-zero-copy');
 // 自定义资源协议（koring-res://）特权注册：必须在 app ready 之前完成
 registerResourceSchemePrivileges();
 
+// ---------- koring:// 深链协议 ----------
+// 单实例锁：浏览器唤醒启动器时会再起一个进程，它必须把 argv 里的深链转交给已有实例后立刻退出
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  log.info('检测到启动器已在运行，本实例退出（深链转交给已有实例）');
+  app.exit(0);
+}
+
+/** 启动参数里携带的深链（Windows 下由系统追加在 argv 末尾） */
+const startupDeepLink = findDeepLink(process.argv);
+
 const win: { mainWindow: electron.BrowserWindow | null; splashWindow: electron.BrowserWindow | null } = {
   mainWindow: null,
   splashWindow: null,
 };
+
+/**
+ * 把 koring:// 注册为系统默认协议处理程序。
+ * 打包后直接关联 app 本体；开发模式（electron .）需要把入口脚本一并传给系统，
+ * 否则浏览器唤醒时只会拉起一个空的 electron 可执行文件。
+ */
+function registerDeepLinkProtocolClient(): void {
+  try {
+    if (process.defaultApp) {
+      const entry = process.argv[1];
+      if (!entry) return;
+      app.setAsDefaultProtocolClient(DEEP_LINK_PROTOCOL, process.execPath, [path.resolve(entry)]);
+    } else {
+      app.setAsDefaultProtocolClient(DEEP_LINK_PROTOCOL);
+    }
+    log.info(`已注册 ${DEEP_LINK_PROTOCOL}:// 协议处理程序`);
+  } catch (e) {
+    log.warn(`注册 ${DEEP_LINK_PROTOCOL}:// 协议失败：${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+registerDeepLinkProtocolClient();
+
+// 第二个实例被拉起（浏览器点链接时）：把 argv 中的深链转交给本实例，然后它自己退出
+app.on('second-instance', (_event, argv) => {
+  const link = findDeepLink(argv);
+  if (link) {
+    handleDeepLink(link, win);
+    return;
+  }
+  // 没有深链时只做窗口聚焦
+  if (win.mainWindow && !win.mainWindow.isDestroyed()) {
+    if (win.mainWindow.isMinimized()) win.mainWindow.restore();
+    win.mainWindow.show();
+    win.mainWindow.focus();
+  }
+});
+
+// macOS 通过 open-url 事件投递深链（Windows/Linux 走 argv）
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url, win);
+});
 
 // 首次启动标记（由 runStartupChecks 决定）；窗口每次加载/刷新时随 config:preload 一起推送
 let isFirstLaunchFlag = false;
@@ -171,9 +232,6 @@ function createSplashWindow(): electron.BrowserWindow {
 
 function createMainWindow(): electron.BrowserWindow {
   const iconPath = getWindowIconPath();
-  // Mica 材质需要透明窗口 —— 透明与否只能在窗口创建时决定，
-  // 因此启动时读一次配置（运行中切换由 handlers/background 提示重启生效）。
-  const useMica = getConfig().background.bgType === 'mica';
 
   const main = new electron.BrowserWindow({
     width: 1100,
@@ -181,8 +239,7 @@ function createMainWindow(): electron.BrowserWindow {
     minWidth: 800,
     minHeight: 600,
     frame: false,
-    transparent: useMica,
-    backgroundColor: useMica ? '#00000000' : undefined,
+    transparent: false,
     resizable: true,
     show: false,
     icon: iconPath,
@@ -193,17 +250,6 @@ function createMainWindow(): electron.BrowserWindow {
       sandbox: false,
     },
   });
-
-  // 记录创建时的透明状态（供背景模式切换判断是否需要重启）
-  (main as unknown as { __bgTransparent?: boolean }).__bgTransparent = useMica;
-  if (useMica) {
-    try {
-      main.setBackgroundMaterial('mica');
-      main.setBackgroundColor('#00000000');
-    } catch {
-      // 非 Windows 11 / 平台不支持：静默降级为普通窗口
-    }
-  }
 
   if (isDev) {
     main.loadURL('http://localhost:1420');
@@ -244,7 +290,7 @@ function registerAllHandlers() {
   registerLaunchHandlers(win);
   registerModsHandlers();
   registerInstanceHandlers(win);
-  registerBackgroundHandlers(win);
+  registerBackgroundHandlers();
   registerInstanceModsHandlers();
   registerInstanceAssetsHandlers();
   registerCrashAnalysisHandlers();
@@ -258,6 +304,7 @@ function registerAllHandlers() {
   registerNewsHandlers();
   registerUpdateHandlers();
   registerForcedUpdateHandlers();
+  registerTerracottaHandlers(win);
 }
 
 app.whenReady().then(() => {
@@ -295,6 +342,12 @@ app.whenReady().then(() => {
   // （保持 last_seen_at/report_count 新鲜；结果会广播给渲染端同步设备状态）
   startDeviceHeartbeat();
 
+  // 陶瓦联机：启动器默认检查联机组件（缺失则自动安装）并拉起本地服务
+  // （失败只记日志，不影响启动器启动）
+  void terracottaService.ensureReady().catch((e) => {
+    log.warn(`[terracotta] 启动检查失败：${e instanceof Error ? e.message : String(e)}`);
+  });
+
   // 1. Show splash immediately
   win.splashWindow = createSplashWindow();
   log.info('Splash 窗口已创建');
@@ -304,6 +357,12 @@ app.whenReady().then(() => {
   //     每次加载/刷新都推送 getConfig() 的最新内存配置）
   win.mainWindow = createMainWindow();
   log.info('主窗口已创建（后台加载）');
+
+  // 深链：注册 IPC 消费通道 + 加载完成后补投递排队中的链接
+  registerDeepLinkHandlers(win);
+  if (startupDeepLink) {
+    handleDeepLink(startupDeepLink, win);
+  }
 
   // 3. When main window finishes loading, wait a minimum time then transition
   let mainReady = false;
@@ -347,8 +406,25 @@ app.whenReady().then(() => {
   }, 12000);
 });
 
-app.on('before-quit', () => {
+// 陶瓦联机服务在退出前优雅关闭（/panic?peaceful=true），否则后台 worker 会残留
+let terracottaQuitHandled = false;
+
+app.on('before-quit', (event) => {
   stopDeviceHeartbeat();
+
+  if (terracottaQuitHandled) return;
+
+  terracottaQuitHandled = true;
+  event.preventDefault();
+  void terracottaService
+    .stop()
+    .catch((e) => {
+      log.warn(`[terracotta] 退出前停止服务失败：${e instanceof Error ? e.message : String(e)}`);
+    })
+    .finally(() => {
+      flushConfig();
+      app.quit();
+    });
 });
 
 app.on('window-all-closed', () => {

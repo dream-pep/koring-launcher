@@ -174,7 +174,7 @@ export function AddAccountDialog({ open, onClose }: AddAccountDialogProps) {
           {step === 1 && (
             <button
               onClick={handleBack}
-              className="p-1 rounded-md hover:bg-foreground/[0.06] transition-colors shrink-0"
+              className="p-1 rounded-md hover:bg-foreground/[0.06] transition-[color,background-color,scale] shrink-0"
               disabled={loading}
             >
               <ChevronLeft className="w-4 h-4 text-muted-foreground" />
@@ -186,7 +186,7 @@ export function AddAccountDialog({ open, onClose }: AddAccountDialogProps) {
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-md hover:bg-foreground/[0.06] transition-colors shrink-0"
+          className="p-1 rounded-md hover:bg-foreground/[0.06] transition-[color,background-color,scale] shrink-0"
           disabled={loading}
         >
           <X className="w-4 h-4 text-muted-foreground" />
@@ -205,7 +205,7 @@ export function AddAccountDialog({ open, onClose }: AddAccountDialogProps) {
                   key={opt.key}
                   disabled={opt.disabled}
                   onClick={() => !opt.disabled && handlePickType(opt.key)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-[scale,background-color,border-color] ease-spring-soft ${
                     opt.disabled
                       ? "border-border/30 dark:border-white/[0.05] opacity-60 cursor-not-allowed"
                       : "border-border/40 dark:border-white/[0.06] hover:border-primary/40 hover:bg-primary/[0.03] active:scale-[0.99]"
@@ -243,7 +243,7 @@ export function AddAccountDialog({ open, onClose }: AddAccountDialogProps) {
                 maxLength={16}
                 autoFocus
                 disabled={loading}
-                className="mt-1.5 w-full rounded-lg border border-border/50 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 transition-colors"
+                className="mt-1.5 w-full rounded-lg border border-border/50 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 transition-[color,background-color,scale]"
               />
             </label>
             <p className="text-[11.5px] text-muted-foreground/60">
@@ -261,7 +261,7 @@ export function AddAccountDialog({ open, onClose }: AddAccountDialogProps) {
                 placeholder="邮箱或用户名"
                 autoFocus
                 disabled={loading}
-                className="mt-1.5 w-full rounded-lg border border-border/50 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 transition-colors"
+                className="mt-1.5 w-full rounded-lg border border-border/50 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 transition-[color,background-color,scale]"
               />
             </label>
             <label className="block">
@@ -273,7 +273,7 @@ export function AddAccountDialog({ open, onClose }: AddAccountDialogProps) {
                 onKeyDown={(e) => e.key === "Enter" && canSubmit && handleSubmit()}
                 placeholder="输入 LittleSkin 密码"
                 disabled={loading}
-                className="mt-1.5 w-full rounded-lg border border-border/50 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 transition-colors"
+                className="mt-1.5 w-full rounded-lg border border-border/50 dark:border-white/[0.08] bg-white/60 dark:bg-black/30 px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40 transition-[color,background-color,scale]"
               />
             </label>
             <p className="text-[11.5px] text-muted-foreground/60">

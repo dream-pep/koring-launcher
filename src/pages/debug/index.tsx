@@ -193,7 +193,7 @@ function ToolCard({ page, onOpen }: { page: DebugEntry; onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-transform duration-200 ease-spring-soft cursor-pointer group"
+      className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-[scale,transform] duration-200 ease-spring-soft cursor-pointer group"
     >
       <div className="flex items-center gap-4">
         <div className={`p-2.5 rounded-xl ${page.bg}`}>
@@ -203,7 +203,7 @@ function ToolCard({ page, onOpen }: { page: DebugEntry; onOpen: () => void }) {
           <p className="text-sm font-medium text-foreground">{page.title}</p>
           <p className="text-[13px] text-muted-foreground mt-0.5">{page.desc}</p>
         </div>
-        <ChevronRight className="w-4 h-4 text-foreground/20 group-hover:text-foreground/40 transition-colors shrink-0" />
+        <ChevronRight className="w-4 h-4 text-foreground/20 group-hover:text-foreground/40 transition-[color,background-color,scale] shrink-0" />
       </div>
     </button>
   );
@@ -227,7 +227,7 @@ export function Debug() {
       {/* 打开浏览器调试工具（DevTools） */}
       <button
         onClick={() => window.electronAPI?.openDevTools()}
-        className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-transform duration-200 ease-spring-soft cursor-pointer group mb-6"
+        className="glass-card w-full px-5 py-4 text-left hover:scale-[1.01] active:scale-[0.99] transition-[scale,transform] duration-200 ease-spring-soft cursor-pointer group mb-6"
       >
         <div className="flex items-center gap-4">
           <div className="p-2.5 rounded-xl bg-foreground/[0.08]">
@@ -239,7 +239,7 @@ export function Debug() {
               打开浏览器调试工具（Chromium DevTools），查看控制台与网络请求
             </p>
           </div>
-          <ChevronRight className="w-4 h-4 text-foreground/20 group-hover:text-foreground/40 transition-colors shrink-0" />
+          <ChevronRight className="w-4 h-4 text-foreground/20 group-hover:text-foreground/40 transition-[color,background-color,scale] shrink-0" />
         </div>
       </button>
 
