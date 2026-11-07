@@ -34,12 +34,6 @@ const EXT_MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.gif': 'image/gif',
   '.bmp': 'image/bmp',
-  '.mp4': 'video/mp4',
-  '.m4v': 'video/mp4',
-  '.webm': 'video/webm',
-  '.mov': 'video/quicktime',
-  '.mkv': 'video/x-matroska',
-  '.ogv': 'video/ogg',
 };
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -124,11 +118,7 @@ export function clearStaleBackgroundFiles(userDataDir: string, keep: string[]): 
  *   同时清理旧的其它格式 opt 文件；
  * - 动画 GIF 或无法解析：原样返回原始路径（不破坏动画/内容）。
  */
-export function optimizeBackgroundFile(
-  rawFilePath: string,
-  maxEdge = 4096,
-  keepPaths: string[] = [],
-): OptimizedBackground {
+export function optimizeBackgroundFile(rawFilePath: string, maxEdge = 4096): OptimizedBackground {
   const fail = (filePath: string): OptimizedBackground => {
     let width = 0;
     let height = 0;
@@ -164,8 +154,8 @@ export function optimizeBackgroundFile(
     const size = image.getSize();
     const longEdge = Math.max(size.width, size.height);
     if (longEdge <= maxEdge || size.width <= 0 || size.height <= 0) {
-      // 无需优化：只清理未被任何配置引用的旧缓存（keepPaths 保护多图轮换列表）
-      clearStaleBackgroundFiles(outDir, [rawFilePath, ...keepPaths]);
+      // 无需优化：清掉历史遗留的旧 opt/其它扩展名缓存后原样返回
+      clearStaleBackgroundFiles(outDir, [rawFilePath]);
       return {
         filePath: rawFilePath,
         bytes: statSize(rawFilePath),
@@ -194,8 +184,8 @@ export function optimizeBackgroundFile(
     }
     if (!buffer || buffer.length === 0) return fail(rawFilePath);
 
-    // 先清理未被引用的旧文件，再原子写入新文件（文件名带唯一后缀，保证每次导入路径都不同）
-    clearStaleBackgroundFiles(outDir, [rawFilePath, ...keepPaths]);
+    // 先清理旧文件，再原子写入新文件（文件名带唯一后缀，保证每次导入路径都不同）
+    clearStaleBackgroundFiles(outDir, [rawFilePath]);
     const optPath = path.join(outDir, `background-custom-opt-${uniqueSuffix()}${outExt}`);
     const tmpPath = `${optPath}.${process.pid}.tmp`;
     fs.writeFileSync(tmpPath, buffer);
@@ -223,11 +213,7 @@ export function optimizeBackgroundFile(
  * 清理旧缓存，然后返回优化结果。每次导入文件名都不同 → 配置里的路径必然变化，
  * 渲染端据此实时刷新并触发切换渐入动效。
  */
-export function importUserBackground(
-  srcPath: string,
-  maxEdge = 4096,
-  keepPaths: string[] = [],
-): OptimizedBackground | null {
+export function importUserBackground(srcPath: string, maxEdge = 4096): OptimizedBackground | null {
   try {
     if (!fs.existsSync(srcPath) || !fs.statSync(srcPath).isFile()) return null;
     const userDataDir = electron.app.getPath('userData');
@@ -235,47 +221,16 @@ export function importUserBackground(
 
     const ext = path.extname(srcPath).toLowerCase() || '.png';
     const rawPath = path.join(userDataDir, `background-custom-${uniqueSuffix()}${ext}`);
-    // 复制新文件后只清理未被引用的旧缓存（保护多图轮换列表里的其它图片）
+    // 删除旧的原始缓存
+    clearStaleBackgroundFiles(userDataDir, []);
     fs.copyFileSync(srcPath, rawPath);
-    clearStaleBackgroundFiles(userDataDir, [rawPath, ...keepPaths]);
-    const result = optimizeBackgroundFile(rawPath, maxEdge, [rawPath, ...keepPaths]);
+    const result = optimizeBackgroundFile(rawPath, maxEdge);
     if (result) {
       log.info(`导入壁纸完成 → ${path.basename(result.filePath)} (${result.width}x${result.height}, ${result.bytes}B, optimized=${result.optimized})`);
     }
     return result;
   } catch (e) {
     log.error('导入壁纸失败:', e);
-    return null;
-  }
-}
-
-/**
- * 复制「非图片处理」的媒体文件（视频 / GIF）到 userData 受管目录。
- * - 视频：不做降采样/重编码（保留原画质与音轨；渲染端强制静音播放）；
- * - GIF：保留动画，不做 nativeImage 重编码（会丢帧）；
- * - 每次导入文件名唯一 → 配置路径变化，渲染端可感知并刷新。
- */
-export function importMediaFile(
-  srcPath: string,
-  kind: 'video' | 'gif',
-  keepPaths: string[] = [],
-): { filePath: string; bytes: number } | null {
-  try {
-    if (!fs.existsSync(srcPath) || !fs.statSync(srcPath).isFile()) return null;
-    const userDataDir = electron.app.getPath('userData');
-    if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
-
-    const ext = path.extname(srcPath).toLowerCase() || (kind === 'video' ? '.mp4' : '.gif');
-    const destPath = path.join(userDataDir, `background-custom-${kind}-${uniqueSuffix()}${ext}`);
-    fs.copyFileSync(srcPath, destPath);
-    // 复制后再清理未被引用的旧缓存
-    clearStaleBackgroundFiles(userDataDir, [destPath, ...keepPaths]);
-    fs.copyFileSync(srcPath, destPath);
-    const bytes = statSize(destPath);
-    log.info(`导入${kind === 'video' ? '视频' : 'GIF'}背景完成 → ${path.basename(destPath)} (${bytes}B)`);
-    return { filePath: destPath, bytes };
-  } catch (e) {
-    log.error(`导入${kind === 'video' ? '视频' : 'GIF'}背景失败:`, e);
     return null;
   }
 }
