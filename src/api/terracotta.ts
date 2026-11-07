@@ -242,7 +242,10 @@ export function onTerracottaInstallProgress(callback: (progress: TcInstallState)
 export const TERRACOTTA_URL = "https://burningtnt.github.io/Terracotta/";
 
 /**
- * 预置公共节点（与主进程 `electron/config.ts` 的 `TERRACOTTA_DEFAULT_PUBLIC_NODES` 保持一致）。
+ * 内置公共节点（与主进程 `electron/config.ts` 的 `TERRACOTTA_DEFAULT_PUBLIC_NODES` 保持一致）。
+ *
+ * **启动联机服务时始终启用**，排在上游内置节点的最前面，不写进用户配置、也没有「填入」入口；
+ * 设置页只把它们作为只读信息展示，用户可以额外追加自己的节点。
  *
  * 上游内置的 `public.easytier.top` / `public2.easytier.cn` 已失效，zkitfly 两个节点又会按
  * 地区 / HTTP 版本返回不同内容，所以额外预置自建共享节点（只做打洞撮合，不转发流量）。

@@ -21,7 +21,7 @@ import http from 'node:http';
 import https from 'node:https';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { getConfig, updateConfig } from '../config';
+import { getConfig, updateConfig, TERRACOTTA_DEFAULT_PUBLIC_NODES } from '../config';
 import { readAuthStore } from '../auth';
 import { readKoringAuth } from './koring-auth';
 import { reportRoomClose, reportRoomOpen } from './launcher-api';
@@ -1199,13 +1199,28 @@ export class TerracottaService {
     }
   }
 
-  /** 公共节点缺省取配置值；入参为空数组时视为显式不附加 */
+  /**
+   * 公共节点：内置预置节点永远排在最前（开箱即用，不依赖用户配置），
+   * 再追加配置里的自定义节点（去重、保持顺序）。
+   *
+   * 传 `input` 时视为「本次调用额外要用的节点」，仍会带上内置节点。
+   */
   private resolvePublicNodes(input?: string[]): string[] {
-    const source = Array.isArray(input) ? input : getConfig().network.terracotta?.publicNodes ?? [];
-    return source.map((node) => node.trim()).filter((node) => node.length > 0);
+    const configured = Array.isArray(input)
+      ? input
+      : getConfig().network.terracotta?.publicNodes ?? [];
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    for (const node of [...TERRACOTTA_DEFAULT_PUBLIC_NODES, ...configured]) {
+      const trimmed = String(node ?? '').trim();
+      if (!trimmed || seen.has(trimmed)) continue;
+      seen.add(trimmed);
+      merged.push(trimmed);
+    }
+    return merged;
   }
 
-  /** 当前配置里的公共节点（供设置页做连通性检测） */
+  /** 当前实际会传给 EasyTier 的公共节点（内置预置 + 用户配置，供设置页展示/检测） */
   getPublicNodes(): string[] {
     return this.resolvePublicNodes();
   }

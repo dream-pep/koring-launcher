@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { AlertCircle, Loader2, RotateCcw, X } from "lucide-react";
 import {
@@ -42,45 +42,83 @@ const TRANSITION_TEXT: Record<string, string> = {
 /**
  * 双卡视图之外的最小状态提示：
  * 只在「组件准备 / 服务启动 / 服务停止 / 异常 / 过渡状态」时出现，不另设整套状态卡。
+ *
+ * 兜底原则：**任何会「卡住」的状态都必须能退出**——
+ * 过渡态（扫描 / 建房 / 加入 / 连接）给「取消」，超时后再补「重启服务」；
+ * 异常态给「返回」；崩溃/停止给「重新启动」。
  */
+const STUCK_HINT_MS = 30_000;
+
 function StatusNotice() {
   const status = useTerracottaStore((s) => s.status);
   const pending = useTerracottaStore((s) => s.pending);
   const start = useTerracottaStore((s) => s.start);
+  const stop = useTerracottaStore((s) => s.stop);
   const reset = useTerracottaStore((s) => s.reset);
 
   const { phase, binary, snapshot } = status;
 
-  let title = TRANSITION_TEXT[snapshot.state] ?? "正在同步联机状态…";
+  const transitionLabel = TRANSITION_TEXT[snapshot.state] ?? "";
+  const isTransition =
+    phase === "running" &&
+    (snapshot.state === "host-scanning" ||
+      snapshot.state === "host-starting" ||
+      snapshot.state === "guest-connecting" ||
+      snapshot.state === "guest-starting");
+
+  // 状态/cd 变化时重置计时，用于「卡住太久」的兜底提示
+  const stateKey = `${phase}:${snapshot.state}:${snapshot.index}`;
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    setElapsed(0);
+    if (!isTransition && phase !== "starting") return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => setElapsed(Date.now() - startedAt), 1000);
+    return () => clearInterval(timer);
+  }, [stateKey, isTransition, phase, binary.installed]);
+
+  let title = transitionLabel || "正在同步联机状态…";
   let description = "";
-  let action: { label: string; onPress: () => void } | null = null;
+  let primaryAction: { label: string; onPress: () => void } | null = null;
+  let secondaryAction: { label: string; onPress: () => void } | null = null;
 
   if (!binary.installed) {
     title = "正在准备陶瓦联机组件";
     description = "首次使用时需要自动准备联机组件，通常十几秒内完成。";
+    // 安装由主进程串行执行，这里不提供重复触发的入口，只显示进度
   } else if (phase === "starting") {
     title = "正在启动联机服务";
     description = "马上就好，请稍等…";
+    secondaryAction = { label: "重启服务", onPress: () => void stop().then(() => start()) };
   } else if (phase === "crashed") {
     title = "联机服务已停止";
     description = "服务意外退出，可以重新启动后再试。";
-    action = { label: "重新启动", onPress: () => void start() };
+    primaryAction = { label: "重新启动", onPress: () => void start() };
   } else if (phase === "stopped") {
     title = "联机服务未运行";
     description = "启动后即可创建或加入房间。";
-    action = { label: "启动联机服务", onPress: () => void start() };
+    primaryAction = { label: "启动联机服务", onPress: () => void start() };
   } else if (snapshot.state === "exception") {
     title = "联机出现异常";
     description = EXCEPTION_TEXT[snapshot.exceptionType] ?? "房间连接中出现问题，请重试。";
-    action = { label: "返回", onPress: () => void reset() };
+    primaryAction = { label: "返回", onPress: () => void reset() };
+  } else if (isTransition) {
+    description =
+      snapshot.state === "host-scanning"
+        ? "请在游戏里点「对局域网开放」，我们会自动识别并创建房间。"
+        : "正在与房主建立 P2P 连接，通常几秒到几十秒。";
+    // 过渡态一律可取消：reset 会把上游状态机拉回 waiting
+    primaryAction = { label: "取消", onPress: () => void reset() };
+    secondaryAction = { label: "重启服务", onPress: () => void stop().then(() => start()) };
   }
 
-  const busy = pending.start || pending.reset;
+  const busy = pending.start || pending.stop || pending.reset;
+  const stuck = elapsed >= STUCK_HINT_MS / 1000;
 
   return (
     <div className={cn("w-full max-w-md p-6", SURFACE_CLS)}>
       <div className="flex items-start gap-3">
-        {action ? (
+        {primaryAction ? (
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
         ) : (
           <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
@@ -90,20 +128,32 @@ function StatusNotice() {
           {description ? (
             <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{description}</p>
           ) : null}
+          {stuck && (isTransition || phase === "starting") ? (
+            <p className="mt-2 text-[12px] leading-relaxed text-amber-600 dark:text-amber-400">
+              已经等了 {elapsed} 秒，看起来没反应。可以点「取消」退出，或者「重启服务」再试。
+            </p>
+          ) : null}
         </div>
       </div>
-      {action ? (
-        <div className="mt-4 flex justify-end">
-          <Button
-            size="sm"
-            variant="outline"
-            onPress={action.onPress}
-            isDisabled={busy}
-            className="gap-1.5"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            {action.label}
-          </Button>
+      {primaryAction || secondaryAction ? (
+        <div className="mt-4 flex justify-end gap-2">
+          {secondaryAction ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={secondaryAction.onPress}
+              isDisabled={busy}
+              className="gap-1.5"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              {secondaryAction.label}
+            </Button>
+          ) : null}
+          {primaryAction ? (
+            <Button size="sm" variant="outline" onPress={primaryAction.onPress} isDisabled={busy}>
+              {primaryAction.label}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>
