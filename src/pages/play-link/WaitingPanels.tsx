@@ -47,8 +47,10 @@ function formatJoinedAt(timestamp: number): string {
  */
 export function WaitingPanels() {
   const navigate = useRouteStore((s) => s.navigate);
+  const setSettingsSection = useRouteStore((s) => s.setSettingsSection);
   const openDialog = useConfirmDialogStore((s) => s.openDialog);
   const savedName = useKoringAuthStore((s) => s.user?.username ?? "");
+  const validateLogin = useKoringAuthStore((s) => s.validate);
   const publicNodes = useConfigStore((s) => s.config.network.terracotta?.publicNodes ?? []);
 
   const snapshot = useTerracottaStore((s) => s.status.snapshot);
@@ -62,6 +64,8 @@ export function WaitingPanels() {
 
   const [room, setRoom] = useState("");
   const [joinExpanded, setJoinExpanded] = useState(false);
+  /** 创建房间前的登录校验进行中（防止重复点击） */
+  const [checkingLogin, setCheckingLogin] = useState(false);
 
   const hosting = snapshot.state === "host-ok";
   const joined = snapshot.state === "guest-ok";
@@ -78,7 +82,8 @@ export function WaitingPanels() {
       snapshot.profiles.map((profile) => ({
         id: profile.machineId,
         name: profile.name || "未知玩家",
-        role: profile.kind === "HOST" ? "host" : "guest",
+        // 上游给的是 HOST / LOCAL（本机玩家，即自己）/ GUEST
+        role: profile.kind === "HOST" ? "host" : profile.kind === "LOCAL" ? "self" : "guest",
       })),
     [snapshot.profiles],
   );
@@ -103,13 +108,52 @@ export function WaitingPanels() {
     });
   }, [hosting, openDialog, reset]);
 
-  const handleHost = useCallback(() => {
+  /**
+   * 创建房间前先校验 Koring 登录是否仍然有效：
+   * 有效才进入「检查实例」子页；过期弹窗引导重新登录；网络异常只提示稍后重试。
+   */
+  const handleHost = useCallback(async () => {
     if (inRoom) {
       handleCloseRoom();
       return;
     }
-    navigate("play-link/create");
-  }, [handleCloseRoom, inRoom, navigate]);
+    if (checkingLogin) return;
+    setCheckingLogin(true);
+    try {
+      const result = await validateLogin();
+      if (result.status === "ok") {
+        navigate("play-link/create");
+        return;
+      }
+      if (result.status === "expired") {
+        openDialog({
+          title: "登录已过期",
+          description: "您的登录已过期，请重新登录。",
+          confirmLabel: "重新登录",
+          secondaryLabel: "仍然创建",
+          confirmVariant: "default",
+          onConfirm: () => {
+            setSettingsSection("account");
+            navigate("setting");
+          },
+          // 仍然创建：跳过校验直接进「检查实例」页（房间上报可能失败，仅本机可用）
+          onSecondary: () => navigate("play-link/create"),
+        });
+        return;
+      }
+      openDialog({
+        title: "无法验证登录状态",
+        description: "网络异常，暂时无法验证登录状态，请稍后重试。",
+        confirmLabel: "知道了",
+        secondaryLabel: "仍然创建",
+        confirmVariant: "default",
+        onConfirm: () => {},
+        onSecondary: () => navigate("play-link/create"),
+      });
+    } finally {
+      setCheckingLogin(false);
+    }
+  }, [checkingLogin, handleCloseRoom, inRoom, navigate, openDialog, setSettingsSection, validateLogin]);
 
   const handleJoin = useCallback(() => {
     if (!canJoin) return;
@@ -151,8 +195,8 @@ export function WaitingPanels() {
         {/* 左：创建房间（整卡点击）；房间内为状态卡（点击关闭/退出） */}
         <button
           type="button"
-          onClick={handleHost}
-          disabled={pendingReset}
+          onClick={() => void handleHost()}
+          disabled={pendingReset || checkingLogin}
           aria-label={inRoom ? (hosting ? "关闭联机房间" : "退出房间") : "创建房间"}
           className={cn(
             SURFACE_CLS,

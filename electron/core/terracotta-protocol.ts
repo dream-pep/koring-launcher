@@ -90,6 +90,19 @@ export interface TerracottaStatus {
   meta: { version: string; easytierVersion: string; targetTuple: string } | null;
   snapshot: TcSnapshot;
   install: TcInstallState;
+  /** 加入房间时正在尝试的公共节点方案（1 起）；不在重试流程中为 null */
+  joinAttempt: { current: number; total: number } | null;
+  /**
+   * 数据面（真实隧道）状态：guest-ok 只代表控制面握手成功，
+   * 这里再对本地直连地址做一次 MC 握手，确认游戏流量真的能到达房主。
+   */
+  tunnel: TcTunnelStatus;
+}
+
+/** 数据面探测状态 */
+export interface TcTunnelStatus {
+  state: 'unknown' | 'checking' | 'ok' | 'failed';
+  detail: string;
 }
 
 // ==================== 房间码校验 ====================

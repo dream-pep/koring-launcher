@@ -1,7 +1,7 @@
 {
   "name": "koring-launcher",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Koring Launcher - Minecraft launcher built with Electron + React",
   "author": "Shenzhen Lingke Network Technology Co., Ltd.",
   "license": "LL-1.0",

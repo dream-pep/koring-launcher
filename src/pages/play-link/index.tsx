@@ -15,6 +15,7 @@ import { useKoringAuthStore } from "@/stores/koringAuthStore";
 import { useTerracottaStore } from "@/stores/terracottaStore";
 import { cn } from "@/lib/utils";
 import { LoginRequiredBanner } from "./LoginRequiredBanner";
+import { useRoomChime } from "./useRoomChime";
 import { WaitingPanels } from "./WaitingPanels";
 
 /** 与联机页/设置页一致的卡片外观 */
@@ -29,6 +30,15 @@ const EXCEPTION_TEXT: Record<number, string> = {
   3: "房主 EasyTier 崩溃。",
   4: "房主的游戏服务器已失联。",
   5: "脚手架协议错误。",
+};
+
+/** 上游 NAT 打洞难度 → 中文（guest-starting 时展示） */
+const DIFFICULTY_TEXT: Record<string, string> = {
+  UNKNOWN: "未知",
+  EASIEST: "极低",
+  SIMPLE: "较低",
+  MEDIUM: "中等",
+  TOUGH: "较高",
 };
 
 /** 过渡状态文案（上游状态机里不属于「双卡视图」的那些） */
@@ -73,7 +83,7 @@ function StatusNotice() {
     setElapsed(0);
     if (!isTransition && phase !== "starting") return;
     const startedAt = Date.now();
-    const timer = setInterval(() => setElapsed(Date.now() - startedAt), 1000);
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
     return () => clearInterval(timer);
   }, [stateKey, isTransition, phase, binary.installed]);
 
@@ -107,6 +117,16 @@ function StatusNotice() {
       snapshot.state === "host-scanning"
         ? "请在游戏里点「对局域网开放」，我们会自动识别并创建房间。"
         : "正在与房主建立 P2P 连接，通常几秒到几十秒。";
+    // 加入方：上游会给出 NAT 打洞难度，难度越高越慢，提前告知避免用户以为卡死
+    const difficultyText = DIFFICULTY_TEXT[snapshot.difficulty?.toUpperCase?.() ?? ""];
+    if (snapshot.state === "guest-starting" && difficultyText) {
+      description += `当前网络打洞难度：${difficultyText}。`;
+    }
+    // 加入失败后会自动切换公共节点重试，进度告诉用户，避免误以为卡住
+    const attempt = status.joinAttempt;
+    if (attempt && attempt.total > 1) {
+      description += `正在尝试第 ${attempt.current}/${attempt.total} 组公共节点…`;
+    }
     // 过渡态一律可取消：reset 会把上游状态机拉回 waiting
     primaryAction = { label: "取消", onPress: () => void reset() };
     secondaryAction = { label: "重启服务", onPress: () => void stop().then(() => start()) };
@@ -198,6 +218,12 @@ export function PlayLink() {
     const hostName = snapshot.profiles?.find((profile) => profile.kind === "HOST")?.name ?? "";
     recordJoinHistory({ code, hostName });
   }, [snapshot.state, snapshot.room, snapshot.profiles, recordJoinHistory]);
+
+  // 房间成员进出提示音（加入 do-空 0.5s-re-mi，退出 mi-re-do）
+  useRoomChime(
+    snapshot.profiles,
+    snapshot.state === "host-ok" || snapshot.state === "guest-ok",
+  );
 
   // 深链自动加入：等账号/组件/服务就绪后，用房间码直接加入
   // - 已在房间中（房主/访客/连接中）：不重复加入，同房间静默提示、其它房间提示忽略

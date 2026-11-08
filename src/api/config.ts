@@ -99,6 +99,8 @@ export interface AppInfoConfig {
 export interface UiConfig {
   /** 首页实例标题显示 */
   showInstanceTitle: boolean;
+  /** 首页左上角 Minecraft 账户卡显示 */
+  showHomeAccount: boolean;
   /** 标题栏任务队列按钮显示 */
   showTaskButton: boolean;
   /** 首页实例标题下的副信息：version（版本）/ loader（加载器）/ playtime（游玩时长）/ none */

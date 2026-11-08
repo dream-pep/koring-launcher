@@ -7,6 +7,7 @@ import { StartCard } from "./StartCard";
 
 export function Home() {
   const gamePath = useConfigStore((state) => state.config.game.gameDir);
+  const showHomeAccount = useConfigStore((state) => state.config.ui?.showHomeAccount ?? true);
   const setCurrent = useInstanceStore((state) => state.setCurrent);
 
   // 启动时按配置恢复「当前选中的版本」：首页标题与启动按钮都跟随它
@@ -37,9 +38,11 @@ export function Home() {
   return (
     <div className="relative h-full overflow-hidden">
       {/* 左上角：Minecraft 游戏账户卡（与设置侧栏顶部账户卡同排版，点击进入游戏账户设置） */}
-      <div className="absolute left-6 top-6 z-20">
-        <MinecraftAccountCard />
-      </div>
+      {showHomeAccount && (
+        <div className="absolute left-6 top-6 z-20">
+          <MinecraftAccountCard />
+        </div>
+      )}
 
       {/*
         底部感应区：

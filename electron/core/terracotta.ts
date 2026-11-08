@@ -26,10 +26,12 @@ import { readAuthStore } from '../auth';
 import { readKoringAuth } from './koring-auth';
 import { reportRoomClose, reportRoomOpen } from './launcher-api';
 import { createLogger } from './logger';
+import { parseDirectAddress, probeMcServer } from './mc-probe';
 import {
   createTcHttpClient,
   describeTcException,
   isValidRoomCode,
+  TcHttpError,
   type ParsedTcState,
   type TcBinaryInfo,
   type TcInstallState,
@@ -422,6 +424,8 @@ export interface TcStartPayload {
 export interface TcHostPayload {
   player?: string;
   publicNodes?: string[];
+  /** 重开房时沿用原邀请码（上游 /state/scanning 的 room 参数） */
+  room?: string;
 }
 
 export interface TcGuestPayload {
@@ -465,6 +469,31 @@ export class TerracottaService {
 
   /** 房间上报串行队列（open 一定先于 close 发出） */
   private roomReportQueue: Promise<void> = Promise.resolve();
+
+  /**
+   * 加入房间的「节点冗余」计划：首次用全量节点，失败（exception type 0/1）后
+   * 依次切换到备选节点方案重新加入，全部失败才停在异常态。
+   */
+  private guestPlan: {
+    room: string;
+    player: string;
+    strategies: string[][];
+    index: number;
+    /** 已经针对哪个 /state index 做过切换，避免同一异常反复触发 */
+    lastHandledIndex: number;
+  } | null = null;
+  private guestRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * 数据面探测（guest-ok 后验证真实隧道）。
+   * 控制面成功 ≠ 数据面可用：上游会出现 guest-ok 但影子端口 TCP 立刻被 RST 的情况，
+   * 所以这里用 MC 握手确认「游戏流量真的能到房主」。
+   */
+  private tunnelState: 'unknown' | 'checking' | 'ok' | 'failed' = 'unknown';
+  private tunnelDetail = '';
+  private tunnelTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 已经验证过（或正在验证）的直连地址，避免重复探测 */
+  private tunnelTarget = '';
 
   private child: TerracottaChildProcess | null = null;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -516,6 +545,10 @@ export class TerracottaService {
         latencyMs: this.latencyMs,
       },
       install: { ...this.installState },
+      joinAttempt: this.guestPlan
+        ? { current: this.guestPlan.index + 1, total: this.guestPlan.strategies.length }
+        : null,
+      tunnel: { state: this.tunnelState, detail: this.tunnelDetail },
     };
   }
 
@@ -884,6 +917,8 @@ export class TerracottaService {
     this.port = 0;
     this.meta = null;
     this.error = '';
+    this.clearGuestPlan();
+    this.resetTunnel();
     this.resetStateFields();
     // 房间关闭上报（best-effort，最多等 1.5s，避免卡住退出）
     await this.flushRoomReport(1500);
@@ -897,19 +932,28 @@ export class TerracottaService {
   /** 开房（未运行会先启动；调用后立即刷新一次状态，其余交给轮询） */
   async host(payload: TcHostPayload): Promise<TerracottaStatus> {
     return this.withRunning(async () => {
+      // 上游约定：非 waiting 状态下 `/state/scanning` 会被静默忽略（仍返回 200），
+      // 所以在本地先拦一次，避免「点了创建房间却毫无反应」。
+      if (this.phase === 'running' && this.state !== 'waiting' && this.state !== 'unknown') {
+        throw new Error('当前正在进行其它联机流程，请先取消或返回后再试');
+      }
       const client = createTcHttpClient(this.port);
       const publicNodes = this.resolvePublicNodes();
-      log.info('[terracotta] host relay nodes', publicNodes);
+      const room = (payload.room ?? '').trim();
+      this.clearGuestPlan();
+      this.resetTunnel();
+      log.info('[terracotta] host relay nodes', publicNodes, room ? `reopen=${room}` : '');
       await client.scanning({
         player: this.resolvePlayer(payload.player),
         publicNodes,
+        ...(room ? { room } : {}),
       });
       await this.refreshState();
       return this.getStatus();
     });
   }
 
-  /** 加入房间（本地预校验 + 上游 400 都转成可读错误） */
+  /** 加入房间（本地预校验 + 上游 400 都转成可读错误；失败自动切换节点重试） */
   async guest(payload: TcGuestPayload): Promise<TerracottaStatus> {
     const room = (payload.room ?? '').trim();
     if (!isValidRoomCode(room)) {
@@ -917,13 +961,29 @@ export class TerracottaService {
     }
     return this.withRunning(async () => {
       const client = createTcHttpClient(this.port);
-      const publicNodes = this.resolvePublicNodes();
-      log.info('[terracotta] guest relay nodes', publicNodes);
-      await client.guesting({
-        room,
-        player: this.resolvePlayer(payload.player),
-        publicNodes,
-      });
+      const strategies = this.buildGuestNodeStrategies();
+      const player = this.resolvePlayer(payload.player);
+      this.clearGuestPlan();
+      this.guestPlan = { room, player, strategies, index: 0, lastHandledIndex: -1 };
+      log.info(
+        '[terracotta] guest relay nodes',
+        strategies[0],
+        `attempt 1/${strategies.length}`,
+      );
+      try {
+        await client.guesting({
+          room,
+          player,
+          publicNodes: strategies[0],
+        });
+      } catch (error) {
+        this.clearGuestPlan();
+        // 上游约定：房间码格式错误或当前不在 waiting → 400
+        if (error instanceof TcHttpError && error.statusCode === 400) {
+          throw new Error('房间码无效，或当前正在其它联机流程中，请稍后重试');
+        }
+        throw error;
+      }
       await this.refreshState();
       return this.getStatus();
     });
@@ -938,6 +998,9 @@ export class TerracottaService {
     if (this.phase !== 'running' || this.port <= 0) {
       throw new Error('陶瓦联机服务未运行');
     }
+    // 用户主动取消：终止正在进行的「加入失败切换节点」重试
+    this.clearGuestPlan();
+    this.resetTunnel();
     const client = createTcHttpClient(this.port);
     try {
       await client.resetState();
@@ -1061,6 +1124,91 @@ export class TerracottaService {
     this.exceptionType = snapshot.state === 'exception' ? snapshot.exceptionType : -1;
     this.error = snapshot.state === 'exception' ? describeTcException(snapshot.exceptionType) : '';
     this.syncRoomReport();
+    this.handleGuestPlan(snapshot);
+    this.syncTunnelCheck(snapshot);
+  }
+
+  /** 进入 guest-ok 时触发一次数据面验证；离开时清空 */
+  private syncTunnelCheck(snapshot: ParsedTcState): void {
+    if (snapshot.state !== 'guest-ok') {
+      if (this.tunnelState !== 'unknown' || this.tunnelDetail) {
+        this.resetTunnel();
+        this.emitStatus(true);
+      }
+      return;
+    }
+    if (!snapshot.url) return;
+    if (this.tunnelTarget === snapshot.url && this.tunnelState !== 'unknown') return;
+    this.tunnelTarget = snapshot.url;
+    this.tunnelState = 'checking';
+    this.tunnelDetail = '正在验证与房主的游戏数据通道…';
+    this.emitStatus(true);
+    if (this.tunnelTimer) clearTimeout(this.tunnelTimer);
+    this.tunnelTimer = setTimeout(() => {
+      this.tunnelTimer = null;
+      void this.verifyTunnel();
+    }, 600);
+  }
+
+  private resetTunnel(): void {
+    if (this.tunnelTimer) {
+      clearTimeout(this.tunnelTimer);
+      this.tunnelTimer = null;
+    }
+    this.tunnelState = 'unknown';
+    this.tunnelDetail = '';
+    this.tunnelTarget = '';
+  }
+
+  /**
+   * 数据面验证：对 `snapshot.url`（陶瓦给的本地直连地址）做一次 MC 握手。
+   * 成功 → 数据面 OK，加入流程彻底完成；
+   * 失败 → 说明控制面成功但隧道没通，按节点冗余再换一组节点重试。
+   */
+  private async verifyTunnel(): Promise<void> {
+    if (this.phase !== 'running' || this.state !== 'guest-ok') return;
+    const target = parseDirectAddress(this.url);
+    if (!target) {
+      this.tunnelState = 'failed';
+      this.tunnelDetail = `直连地址无法解析：${this.url || '(空)'}`;
+      this.emitStatus(true);
+      return;
+    }
+    const result = await probeMcServer(target.host, target.port);
+    if (this.phase !== 'running' || this.state !== 'guest-ok') return;
+    if (result.ok) {
+      this.tunnelState = 'ok';
+      this.tunnelDetail = result.detail;
+      this.clearGuestPlan();
+      log.info(`[terracotta] 数据面验证通过：${target.host}:${target.port} — ${result.detail}`);
+      this.emitStatus(true);
+      return;
+    }
+    this.tunnelState = 'failed';
+    this.tunnelDetail = result.detail;
+    log.warn(
+      `[terracotta] 数据面验证失败（控制面已 guest-ok 但隧道不通）：${target.host}:${target.port} — ${result.detail}`,
+    );
+    this.emitStatus(true);
+    this.retryOnTunnelFailure();
+  }
+
+  /** 数据面失败：还有备选节点就换一组重来（控制面会重新握手） */
+  private retryOnTunnelFailure(): void {
+    const plan = this.guestPlan;
+    if (!plan) return;
+    if (plan.index + 1 >= plan.strategies.length) {
+      log.warn(
+        `[terracotta] 已尝试全部 ${plan.strategies.length} 组公共节点，数据通道仍不可用`,
+      );
+      this.clearGuestPlan();
+      this.emitStatus(true);
+      return;
+    }
+    log.info(
+      `[terracotta] 数据通道不可用，切换节点重试（${plan.index + 2}/${plan.strategies.length}）`,
+    );
+    this.scheduleGuestRetry();
   }
 
   private resetStateFields(): void {
@@ -1227,6 +1375,148 @@ export class TerracottaService {
   /** 当前实际会传给 EasyTier 的公共节点（内置预置 + 用户配置，供设置页展示/检测） */
   getPublicNodes(): string[] {
     return this.resolvePublicNodes();
+  }
+
+  // ---------- 加入失败的节点冗余 ----------
+
+  /**
+   * 加入房间时的节点方案列表（按优先级）：
+   * 1. 全量节点（内置预置 + 用户配置）—— 正常情况用这个；
+   * 2. 只用内置预置节点 —— 跳过用户配置里可能失效的节点；
+   * 3. 空列表 —— 交给陶瓦内部的默认节点。
+   *
+   * 某些公共节点会出现「TCP 连得上但撮合不到房主」的情况，换一组节点重试往往就能成功，
+   * 所以加入失败（exception type 0/1）时按这个顺序自动切换。
+   */
+  private buildGuestNodeStrategies(): string[][] {
+    const builtin = TERRACOTTA_DEFAULT_PUBLIC_NODES.map((node) => String(node ?? '').trim()).filter(
+      Boolean,
+    );
+    const merged = this.resolvePublicNodes();
+    const candidates: string[][] = [
+      merged,
+      merged.filter((node) => builtin.includes(node)),
+      [],
+    ];
+    const result: string[][] = [];
+    const seen = new Set<string>();
+    for (const list of candidates) {
+      const key = list.join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(list);
+    }
+    return result;
+  }
+
+  /** /state 变化后推进加入重试流程 */
+  private handleGuestPlan(snapshot: ParsedTcState): void {
+    const plan = this.guestPlan;
+    if (!plan) return;
+    if (snapshot.state === 'guest-ok') {
+      // 控制面成功：保留计划，等数据面验证结果决定是否需要换节点重试
+      return;
+    }
+    if (snapshot.state !== 'exception') return;
+    if (plan.lastHandledIndex === snapshot.index) return;
+    plan.lastHandledIndex = snapshot.index;
+    // 只有「连不上房主 / 连接中断」这类网络原因才值得换节点；其它异常重试无意义
+    const type = snapshot.exceptionType;
+    if (type !== 0 && type !== 1) {
+      this.clearGuestPlan();
+      return;
+    }
+    if (plan.index + 1 >= plan.strategies.length) {
+      log.warn(
+        `[terracotta] 已尝试全部 ${plan.strategies.length} 组公共节点，仍无法加入房间 ${fullRoomCode(
+          plan.room,
+        )}`,
+      );
+      this.clearGuestPlan();
+      this.emitStatus(true);
+      return;
+    }
+    log.info(
+      `[terracotta] 加入失败（exception type ${type}），准备切换节点重试（${
+        plan.index + 2
+      }/${plan.strategies.length}）`,
+    );
+    this.scheduleGuestRetry();
+  }
+
+  private scheduleGuestRetry(): void {
+    if (!this.guestPlan || this.guestRetryTimer) return;
+    this.guestRetryTimer = setTimeout(() => {
+      this.guestRetryTimer = null;
+      void this.retryGuestPlan();
+    }, 400);
+  }
+
+  /** 用下一组节点重新发起加入（先 /state/ide 回到 waiting，否则上游会 400） */
+  private async retryGuestPlan(): Promise<void> {
+    const plan = this.guestPlan;
+    if (!plan || this.phase !== 'running' || this.port <= 0) return;
+    const next = plan.index + 1;
+    if (next >= plan.strategies.length) {
+      this.clearGuestPlan();
+      return;
+    }
+    plan.index = next;
+    this.resetTunnel();
+    let client = createTcHttpClient(this.port);
+    log.info(
+      `[terracotta] guest relay nodes（重试）`,
+      plan.strategies[next],
+      `attempt ${next + 1}/${plan.strategies.length}`,
+    );
+    try {
+      await client.resetState();
+    } catch {
+      // 上游可能在异常态自行退出，重置失败不阻塞重试
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    // 已知缺陷：异常态调 /state/ide 可能让上游进程直接消失 → 重启服务后继续。
+    try {
+      await client.getState();
+    } catch {
+      if (!this.guestPlan) return;
+      log.warn('[terracotta] 重置状态时上游进程已退出，重启联机服务后再重试加入');
+      try {
+        await this.start();
+      } catch (e) {
+        log.warn(
+          `[terracotta] 重试前重启联机服务失败：${e instanceof Error ? e.message : String(e)}`,
+        );
+        this.clearGuestPlan();
+        this.emitStatus(true);
+        return;
+      }
+      if (!this.guestPlan || this.phase !== 'running' || this.port <= 0) return;
+      client = createTcHttpClient(this.port);
+    }
+    if (!this.guestPlan || this.phase !== 'running') return;
+    try {
+      await client.guesting({
+        room: plan.room,
+        player: plan.player,
+        publicNodes: plan.strategies[next],
+      });
+      await this.refreshState();
+    } catch (e) {
+      log.warn(
+        `[terracotta] 切换节点后重新加入失败：${e instanceof Error ? e.message : String(e)}`,
+      );
+      this.clearGuestPlan();
+      this.emitStatus(true);
+    }
+  }
+
+  private clearGuestPlan(): void {
+    if (this.guestRetryTimer) {
+      clearTimeout(this.guestRetryTimer);
+      this.guestRetryTimer = null;
+    }
+    this.guestPlan = null;
   }
 
   // ---------- 广播 ----------

@@ -82,6 +82,16 @@ export interface TerracottaStatus {
   meta: { version: string; easytierVersion: string; targetTuple: string } | null;
   snapshot: TcSnapshot;
   install: TcInstallState;
+  /** 加入房间时正在尝试的公共节点方案（1 起）；不在重试流程中为 null */
+  joinAttempt: { current: number; total: number } | null;
+  /** 数据面（真实隧道）状态：guest-ok 后对本地直连地址做 MC 握手验证 */
+  tunnel: TcTunnelStatus;
+}
+
+/** 数据面探测状态 */
+export interface TcTunnelStatus {
+  state: "unknown" | "checking" | "ok" | "failed";
+  detail: string;
 }
 
 /** 公共节点连通性检测结果（主进程 DNS / TCP / HTTPS 探测） */
@@ -113,6 +123,8 @@ export const EMPTY_TERRACOTTA_STATUS: TerracottaStatus = {
     latencyMs: 0,
   },
   install: { active: false, stage: "idle", percent: 0, transferred: 0, total: 0, message: "" },
+  joinAttempt: null,
+  tunnel: { state: "unknown", detail: "" },
 };
 
 // ---------- 7.2 通道调用 ----------
@@ -162,10 +174,12 @@ export async function stopTerracotta(): Promise<TerracottaStatus> {
 export async function hostTerracotta(
   player?: string,
   publicNodes?: string[],
+  room?: string,
 ): Promise<TerracottaStatus> {
-  const payload: { player?: string; publicNodes?: string[] } = {};
+  const payload: { player?: string; publicNodes?: string[]; room?: string } = {};
   if (player) payload.player = player;
   if (publicNodes && publicNodes.length > 0) payload.publicNodes = publicNodes;
+  if (room) payload.room = room;
   return call<TerracottaStatus>("terracottaHost", "terracotta:host", [payload]);
 }
 

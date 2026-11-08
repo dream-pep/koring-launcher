@@ -77,7 +77,7 @@ const DEFAULT_CONFIG: AppConfig = {
     securityId: { enabled: false, authUrl: "" },
     terracotta: { publicNodes: [], binaryPath: "" },
   },
-  ui: { showInstanceTitle: true, showTaskButton: true, homeTitleDetail: "version", showQuickActions: true },
+  ui: { showInstanceTitle: true, showHomeAccount: true, showTaskButton: true, homeTitleDetail: "version", showQuickActions: true },
   activation: { versionOk: false, deviceOk: false, checkedAt: 0, version: "", reason: "", upgradeTarget: "" },
   update: { state: "idle", version: "", percent: 0, transferred: 0, total: 0, source: "github", channel: "woker", error: "" },
   instances: [],

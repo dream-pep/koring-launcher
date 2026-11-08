@@ -207,3 +207,38 @@ export function readKoringAuth(): StoredKoringAuth | null {
 export function deleteKoringAuth(): void {
   writeAuth({ username: '', uuid: '', accessToken: '', refreshToken: '', xboxProfile: '' });
 }
+
+/** 登录有效性校验结果 */
+export interface KoringAuthValidation {
+  /** ok=登录仍有效（顺带刷新了令牌）；expired=需要重新登录；error=网络等临时问题，不能判定为过期 */
+  status: 'ok' | 'expired' | 'error';
+  message?: string;
+  user?: KoringUser;
+}
+
+/**
+ * 校验 Koring Account 登录是否仍然有效。
+ *
+ * 判定方式：本地有 refresh_token 就向 OIDC 换一次新的 access_token。
+ * - 换成功 → 会话有效（同时把新令牌写回，等于顺手续期）；
+ * - 上游明确拒绝（invalid_grant / invalid_request 等）→ 登录已过期；
+ * - 网络不可达等其它错误 → error（不能因为断网就把用户踢下线）。
+ */
+export async function validateKoringAuth(): Promise<KoringAuthValidation> {
+  const stored = readKoringAuth();
+  if (!stored?.refresh_token) {
+    return { status: 'expired', message: '尚未登录 Koring Account' };
+  }
+  try {
+    const tokenRes = await refreshAccessToken(stored.refresh_token);
+    const user = saveKoringAuth(tokenRes);
+    return { status: 'ok', user };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // OAuth 语义错误才算「登录过期」；其余按临时错误处理
+    if (/invalid_grant|invalid_request|unauthorized|invalid_token|expired/i.test(message)) {
+      return { status: 'expired', message };
+    }
+    return { status: 'error', message };
+  }
+}

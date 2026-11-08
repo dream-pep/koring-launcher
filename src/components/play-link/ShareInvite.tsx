@@ -17,8 +17,8 @@ export interface SharePlayer {
   id: string;
   /** 显示名，如 "Steve" */
   name: string;
-  /** 房主 / 访客 */
-  role: "host" | "guest";
+  /** 房主 / 自己（加入方视角的本地玩家）/ 访客 */
+  role: "host" | "self" | "guest";
   /** 可选头像底色，缺省按名字 hash 生成柔和色 */
   color?: string;
 }
@@ -84,6 +84,8 @@ interface ShareInviteLabels {
   share: string;
   heading: string;
   host: string;
+  /** 加入方视角下「自己」的角色标签 */
+  self: string;
   guest: string;
   kick: string;
   copyLink: string;
@@ -108,6 +110,7 @@ const LABELS: Record<Locale, ShareInviteLabels> = {
     share: "分享",
     heading: "拥有访问权限的成员",
     host: "房主",
+    self: "我",
     guest: "访客",
     kick: "踢出",
     copyLink: "复制链接",
@@ -130,6 +133,7 @@ const LABELS: Record<Locale, ShareInviteLabels> = {
     share: "Share",
     heading: "People with access",
     host: "Host",
+    self: "You",
     guest: "Guest",
     kick: "Kick",
     copyLink: "Copy link",
@@ -947,7 +951,7 @@ function PlayerRow({ player, index, labels, palette, dark, onKick }: PlayerRowPr
           </button>
         ) : (
           <span style={{ flex: "0 0 auto", fontSize: 13, color: palette.subText }}>
-            {player.role === "host" ? labels.host : labels.guest}
+            {player.role === "host" ? labels.host : player.role === "self" ? labels.self : labels.guest}
           </span>
         )}
       </div>

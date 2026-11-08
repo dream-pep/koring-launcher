@@ -40,15 +40,26 @@ export function CreateRoom() {
   const installed = status.binary.installed;
   const phase = status.phase;
   const state = status.snapshot.state;
+  const roomCode = status.snapshot.room;
   const exceptionType = status.snapshot.exceptionType;
   const errorText = status.snapshot.error;
 
   /** 只在本次进入页面内触发一次「启动服务 / 开始匹配」 */
   const startRequestedRef = useRef(false);
   const hostRequestedRef = useRef(false);
+  /**
+   * 记住已经分配过的邀请码：重试时通过 /state/scanning 的 room 参数沿用同一个码，
+   * 这样之前分享出去的链接不会失效（上游支持「指定房间码重新开房」）。
+   */
+  const lastRoomRef = useRef("");
 
   // 订阅主进程状态事件（离开联机主页后订阅会被卸载，这里重新挂上）
   useEffect(() => init(), [init]);
+
+  // 记录本次分配到的邀请码，供重试复用
+  useEffect(() => {
+    if ((state === "host-starting" || state === "host-ok") && roomCode) lastRoomRef.current = roomCode;
+  }, [state, roomCode]);
 
   // 匹配成功：回到联机主页（主页卡片会变成「房间已开启」）
   useEffect(() => {
@@ -70,7 +81,7 @@ export function CreateRoom() {
     if (state !== "waiting") return;
     if (hostRequestedRef.current) return;
     hostRequestedRef.current = true;
-    void host(savedName.trim() || undefined, publicNodes);
+    void host(savedName.trim() || undefined, publicNodes, lastRoomRef.current || undefined);
   }, [installed, phase, state, start, host, savedName, publicNodes]);
 
   const handleCancel = () => {

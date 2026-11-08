@@ -42,6 +42,15 @@ export function UiSetting() {
           <div className="space-y-3">
             <SettingCard>
               <SettingSwitch
+                label="首页账户组件"
+                desc="在首页左上角显示 Minecraft 游戏账户卡（点击可切换或管理账户）"
+                checked={ui?.showHomeAccount ?? true}
+                onChange={(v) => setUi({ showHomeAccount: v })}
+              />
+            </SettingCard>
+
+            <SettingCard>
+              <SettingSwitch
                 label="首页实例标题"
                 desc="在首页左下角显示当前实例的大标题（点击可进入实例管理）"
                 checked={ui?.showInstanceTitle ?? true}

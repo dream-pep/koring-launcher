@@ -7,6 +7,7 @@ import {
   saveKoringAuth,
   readKoringAuth,
   deleteKoringAuth,
+  validateKoringAuth,
 } from '../core/koring-auth';
 import { getConfig, updateConfig, deleteConfigKey } from '../config';
 import { createLogger } from '../core/logger';
@@ -96,6 +97,38 @@ export function registerKoringAuthHandlers() {
       return { success: true, data: stored, error: null };
     } catch (e: unknown) {
       return { success: false, data: null, error: String(e) };
+    }
+  });
+
+  /**
+   * 校验登录是否仍然有效（创建房间前调用）。
+   * 会用 refresh_token 换新令牌：成功即视为有效，并顺带把新令牌写回 auth/config。
+   */
+  ipcMain.handle('koring-auth:validate', async () => {
+    try {
+      const result = await validateKoringAuth();
+      if (result.status === 'ok' && result.user) {
+        const user = result.user;
+        try {
+          const stored = readKoringAuth();
+          updateConfig({
+            koringUser: {
+              sub: user.sub,
+              name: user.name,
+              username: user.username,
+              email: user.email,
+              picture: user.picture,
+              accessToken: stored?.access_token ?? '',
+              refreshToken: stored?.refresh_token ?? '',
+            },
+          });
+        } catch (e) {
+          log.error('[koring-auth] failed to sync validated user to config:', e);
+        }
+      }
+      return { success: true, data: result, error: null };
+    } catch (e: unknown) {
+      return { success: false, data: null, error: e instanceof Error ? e.message : String(e) };
     }
   });
 

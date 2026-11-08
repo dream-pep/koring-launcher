@@ -106,7 +106,7 @@ interface TerracottaState {
   install: (force?: boolean) => Promise<void>;
   start: (player?: string) => Promise<void>;
   stop: () => Promise<void>;
-  host: (player?: string, publicNodes?: string[]) => Promise<void>;
+  host: (player?: string, publicNodes?: string[], room?: string) => Promise<void>;
   guest: (room: string, player?: string, publicNodes?: string[]) => Promise<void>;
   reset: () => Promise<void>;
   /** 返回选中的路径；取消/失败返回 null（错误同时写入 error） */
@@ -182,7 +182,8 @@ export const useTerracottaStore = create<TerracottaState>((set, get) => {
 
     stop: async () => run("stop", () => stopTerracotta()),
 
-    host: async (player, publicNodes) => run("host", () => hostTerracotta(player, publicNodes)),
+    host: async (player, publicNodes, room) =>
+      run("host", () => hostTerracotta(player, publicNodes, room)),
 
     guest: async (room, player, publicNodes) =>
       run("guest", () => guestTerracotta(room, player, publicNodes)),

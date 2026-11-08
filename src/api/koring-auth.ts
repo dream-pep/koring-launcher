@@ -45,3 +45,15 @@ export async function getKoringUser(): Promise<KoringAuthData | null> {
 export async function logoutKoring(): Promise<void> {
   return ipcInvoke<void>('koring-auth:logout');
 }
+
+export interface KoringAuthValidation {
+  /** ok=登录仍有效（已顺带刷新令牌）；expired=需要重新登录；error=网络等临时问题 */
+  status: 'ok' | 'expired' | 'error';
+  message?: string;
+  user?: KoringUser;
+}
+
+/** 校验登录是否仍然有效（创建房间前调用） */
+export async function validateKoringAuth(): Promise<KoringAuthValidation> {
+  return ipcInvoke<KoringAuthValidation>('koring-auth:validate');
+}

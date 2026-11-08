@@ -55,6 +55,14 @@ function tierFromLatency(latency: number): TierKey {
   return "poor";
 }
 
+/** 数据面探测状态 → 文案 */
+const TUNNEL_TEXT: Record<string, string> = {
+  unknown: "待验证",
+  checking: "验证中…",
+  ok: "正常",
+  failed: "不通",
+};
+
 /**
  * 房间内的「连接质量」面板：折线图直接铺满整张卡（作为卡片背景，从卡片边缘起画），
  * 质量档位优先取陶瓦返回的打洞难度（difficulty），房主态回退用链路往返耗时估算。
@@ -62,6 +70,8 @@ function tierFromLatency(latency: number): TierKey {
 export function NetworkStatus({ snapshot }: { snapshot: TcSnapshot }) {
   const gradientId = useId().replace(/:/g, "");
   const latency = useTerracottaStore((s) => s.status.snapshot.latencyMs);
+  const tunnel = useTerracottaStore((s) => s.status.tunnel);
+  const isGuest = snapshot.state === "guest-ok" || snapshot.state === "guest-starting";
 
   const tierKey = DIFFICULTY_TIER[snapshot.difficulty?.toUpperCase?.() ?? ""] ?? tierFromLatency(latency);
   const quality = QUALITY[tierKey];
@@ -134,6 +144,47 @@ export function NetworkStatus({ snapshot }: { snapshot: TcSnapshot }) {
           {STATE_TEXT[snapshot.state] ?? snapshot.state}
         </span>
       </div>
+
+      {/* 加入方：控制面 guest-ok 之后的数据面探测结果（隧道是否真的能通到房主 MC） */}
+      {isGuest ? (
+        <p className="relative z-10 mt-2 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-muted-foreground">
+          <span
+            className={cn(
+              "mt-1 size-1.5 shrink-0 rounded-full",
+              tunnel.state === "ok"
+                ? "bg-emerald-500"
+                : tunnel.state === "failed"
+                  ? "bg-red-500"
+                  : "animate-pulse bg-amber-500",
+            )}
+          />
+          <span>
+            数据通道
+            <span
+              className={cn(
+                "ml-1 font-medium",
+                tunnel.state === "ok"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : tunnel.state === "failed"
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-foreground",
+              )}
+            >
+              {TUNNEL_TEXT[tunnel.state]}
+            </span>
+            {tunnel.detail && tunnel.state !== "checking" ? `　${tunnel.detail}` : null}
+          </span>
+        </p>
+      ) : null}
+
+      {/* 加入方：上游 guest-ok 给出的直连地址，可在「多人游戏 → 直接连接」里使用 */}
+      {snapshot.url ? (
+        <p className="relative z-10 mt-auto text-[11.5px] leading-relaxed text-muted-foreground">
+          备用直连地址{" "}
+          <span className="font-mono text-foreground">{snapshot.url}</span>
+          <span className="ml-1">（可在「多人游戏 → 直接连接」里使用）</span>
+        </p>
+      ) : null}
     </>
   );
 }

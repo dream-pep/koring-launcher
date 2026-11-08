@@ -29,6 +29,28 @@ const SOURCE_LABEL: Record<string, string> = {
   none: "未知",
 };
 
+/** 安装阶段 → 文案（进度条上方提示） */
+const STAGE_LABEL: Record<string, string> = {
+  idle: "正在准备",
+  download: "正在下载联机组件",
+  extract: "正在解压",
+  verify: "正在校验文件",
+  done: "安装完成",
+  error: "安装失败",
+};
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 100 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
+
 function openUpstream() {
   if (window.electronAPI?.openExternal) {
     void window.electronAPI.openExternal(TERRACOTTA_URL);
@@ -55,6 +77,9 @@ export function TawaOnlineSetting() {
   const pending = useTerracottaStore((s) => s.pending);
 
   const savedBinaryPath = tcConfig?.binaryPath ?? "";
+  const installState = status.install;
+  const installing = installState.active || pending.install;
+  const installPercent = Math.max(0, Math.min(100, Math.round(installState.percent || 0)));
 
   // 进入设置页时同步一次真实状态（含安装/版本信息）
   useEffect(() => init(), [init]);
@@ -141,7 +166,9 @@ export function TawaOnlineSetting() {
                   </span>
                 </SettingRow>
                 <SettingRow label="安装状态" desc="陶瓦联机可执行文件的当前状态">
-                  {binary.installed ? (
+                  {installing ? (
+                    <SettingBadge variant="warning">安装中 {installPercent}%</SettingBadge>
+                  ) : binary.installed ? (
                     <SettingBadge variant="success">已安装</SettingBadge>
                   ) : (
                     <SettingBadge variant="warning">未安装</SettingBadge>
@@ -219,6 +246,34 @@ export function TawaOnlineSetting() {
               {savedBinaryPath ? (
                 <p className="mt-2 break-all font-mono text-[11px] text-muted-foreground">
                   自定义路径：{savedBinaryPath}
+                </p>
+              ) : null}
+
+              {/* 下载/安装进度：主进程通过 terracotta:install-progress 推送 */}
+              {installing ? (
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center justify-between gap-3 text-[11.5px] text-muted-foreground">
+                    <span className="min-w-0 truncate">
+                      {STAGE_LABEL[installState.stage] ?? "正在安装"}
+                      {installState.message ? ` · ${installState.message}` : ""}
+                    </span>
+                    <span className="shrink-0 tabular-nums">{installPercent}%</span>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/10">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width] duration-300 ease-spring-soft"
+                      style={{ width: `${installPercent}%` }}
+                    />
+                  </div>
+                  {installState.total > 0 ? (
+                    <p className="text-[11px] tabular-nums text-muted-foreground">
+                      {formatBytes(installState.transferred)} / {formatBytes(installState.total)}
+                    </p>
+                  ) : null}
+                </div>
+              ) : installState.stage === "error" ? (
+                <p className="mt-2 text-[11.5px] text-danger">
+                  上次安装失败{installState.message ? `：${installState.message}` : ""}，可点「重新安装」重试。
                 </p>
               ) : null}
             </SettingCard>

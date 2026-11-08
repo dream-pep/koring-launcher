@@ -24,9 +24,12 @@ export function ConfirmDialog() {
     title,
     description,
     confirmLabel,
+    secondaryLabel,
     countdown: initCountdown,
     showCountdown,
+    confirmVariant,
     onConfirm,
+    onSecondary,
     closeDialog,
   } = useConfirmDialogStore();
 
@@ -64,8 +67,20 @@ export function ConfirmDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter className="-mx-6 -mb-6 flex-row justify-end gap-2 rounded-b-xl border-t-0 bg-transparent px-6 py-4">
           <AlertDialogCancel onClick={closeDialog}>取消</AlertDialogCancel>
+          {secondaryLabel ? (
+            <AlertDialogAction
+              variant="outline"
+              disabled={!canConfirm}
+              onClick={() => {
+                closeDialog();
+                onSecondary();
+              }}
+            >
+              {secondaryLabel}
+            </AlertDialogAction>
+          ) : null}
           <AlertDialogAction
-            variant="destructive"
+            variant={confirmVariant}
             disabled={!canConfirm}
             onClick={() => {
               // 先关闭（让弹层开始退场），再执行真正的操作
