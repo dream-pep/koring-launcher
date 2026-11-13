@@ -3,14 +3,12 @@ import { useRouteStore } from "@/stores/routeStore";
 import { useKoringAuthStore } from "@/stores/koringAuthStore";
 import { OobeLayout } from "./layout";
 import { KoringLogin } from "@/components/KoringLogin";
-import { SettingCard, SettingRow } from "@/components/setting";
-import { Button } from "@heroui/react";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { UserRound } from "lucide-react";
 
 /**
  * 详细配置：是否登录 Koring Account。
  * 先询问（不登录也能继续），选择登录后才渲染扫码/授权组件。
- * 已登录时「继续使用」直接进入快速上手，不会再次弹出二维码。
+ * 已登录时「继续使用 xxx」直接进入快速上手。
  */
 export function OobeLogin() {
   const navigate = useRouteStore((s) => s.navigate);
@@ -21,47 +19,35 @@ export function OobeLogin() {
   const finish = () => navigate("oobe/quickstart");
 
   if (stage === "ask") {
-    const displayName = user?.name || user?.username || "当前账户";
-    const options = user
-      ? [
-          { key: "use", label: `继续使用 ${displayName}`, desc: "直接进入快速上手", onClick: finish },
-          { key: "switch", label: "切换账户", desc: "登录其他 Koring Account", onClick: () => setStage("login") },
-        ]
-      : [
-          {
-            key: "login",
-            label: "登录 Koring Account",
-            desc: "使用 Koring Link 联机服务与云端配置同步",
-            onClick: () => setStage("login"),
-          },
-          { key: "skip", label: "暂不登录", desc: "之后也可以在设置中登录", onClick: finish },
-        ];
-
     return (
       <OobeLayout>
-        <div className="w-full max-w-md flex flex-col items-center gap-3 px-6">
-          <div className="text-center space-y-1 mb-1">
-            <h2 className="text-lg font-bold text-foreground">登录 Koring Account</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              登录后可以使用 Koring Link 联机服务还有更多其他功能，不登录也可以照常使用。
-            </p>
+        <div className="w-full max-w-md flex flex-col items-center gap-7 px-6">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+              <UserRound className="w-6 h-6" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-bold text-foreground">登录 Koring Account</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                登录后可以使用 Koring Link 联机服务还有更多其他功能，不登录也可以照常使用。
+              </p>
+            </div>
           </div>
 
-          {options.map((opt, i) => (
+          <div className="w-full flex flex-col gap-2.5">
             <button
-              key={opt.key}
-              type="button"
-              onClick={opt.onClick}
-              className="animate-list-item-in w-full text-left"
-              style={{ animationDelay: `${i * 55}ms` }}
+              onClick={() => (user ? finish() : setStage("login"))}
+              className="h-11 w-full rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 active:scale-[0.99] transition-[opacity,scale] cursor-pointer"
             >
-              <SettingCard className="w-full">
-                <SettingRow label={opt.label} desc={opt.desc}>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
-                </SettingRow>
-              </SettingCard>
+              {user ? `继续使用 ${user.name || user.username || "当前账户"}` : "登录 Koring Account"}
             </button>
-          ))}
+            <button
+              onClick={finish}
+              className="h-11 w-full rounded-xl bg-foreground/[0.06] hover:bg-foreground/[0.12] text-sm font-medium text-foreground/70 hover:text-foreground transition-colors cursor-pointer"
+            >
+              不登录，继续
+            </button>
+          </div>
         </div>
       </OobeLayout>
     );
@@ -77,27 +63,25 @@ export function OobeLogin() {
           </p>
         </div>
 
-        <SettingCard className="w-full animate-list-item-in">
-          <KoringLogin
-            onLoginSuccess={() => {
-              setJustLoggedIn(true);
-              setTimeout(finish, 800);
-            }}
-          />
-        </SettingCard>
+        <KoringLogin
+          onLoginSuccess={() => {
+            setJustLoggedIn(true);
+            setTimeout(finish, 800);
+          }}
+        />
 
         {justLoggedIn && (
-          <p className="animate-list-item-in flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            登录成功，正在进入下一步...
-          </p>
+          <p className="text-xs text-green-600 dark:text-green-400">登录成功，正在进入下一步...</p>
         )}
       </div>
 
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
-        <Button variant="ghost" size="sm" onPress={finish}>
+        <button
+          onClick={finish}
+          className="text-[12px] text-foreground/40 hover:text-foreground/70 transition-colors cursor-pointer"
+        >
           不登录，继续
-        </Button>
+        </button>
       </div>
     </OobeLayout>
   );

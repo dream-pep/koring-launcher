@@ -167,10 +167,8 @@ function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
   if (key === "device-blocked") return "blocked";
   // 强制升级页：复用 OOBE 顶栏（品牌 + 信息胶囊 + 窗口控制，无返回）
   if (key === "forced-update") return "oobe";
-  // 协议子页面：使用常规顶栏，不显示返回按钮（返回由页内按钮完成）
-  if (key === "oobe/agreement-user" || key === "oobe/agreement-beta" || key === "oobe/legal") {
-    return "default";
-  }
+  // OOBE/UPVP 流程页统一 OOBE 顶栏；协议子页（agreement-user/beta/legal）backable=false，
+  // 因此不显示返回箭头，返回由页内「返回协议列表」按钮完成。
   if (key === "oobe" || key.startsWith("oobe/") || key === "upvp" || key.startsWith("upvp/")) return "oobe";
   return topLevelKeys.has(key) ? "default" : "sub";
 }
