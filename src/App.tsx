@@ -41,8 +41,12 @@ import { TextlessDebug } from "./pages/debug/textless-debug";
 import { ListToolDebug } from "./pages/debug/list-tool-debug";
 import { Oobe } from "./pages/oobe";
 import { OobeLanguage } from "./pages/oobe/step-language";
+import { OobeSetupMode } from "./pages/oobe/setup-mode";
 import { OobeDevice } from "./pages/oobe/step-device";
 import { OobeAgreement } from "./pages/oobe/step-agreement";
+import { OobeAgreementUser, OobeAgreementBeta } from "./pages/oobe/agreement-detail";
+import { OobeCheck } from "./pages/oobe/step-check";
+import { OobeTheme } from "./pages/oobe/step-theme";
 import { OobeLogin } from "./pages/oobe/step-login";
 import { OobeWelcome } from "./pages/oobe/step-welcome";
 import { OobeVersion } from "./pages/oobe/step-version";
@@ -83,8 +87,13 @@ const pageMap = {
   "device-blocked": DeviceBlocked,
   oobe: Oobe,
   "oobe/language": OobeLanguage,
+  "oobe/setup-mode": OobeSetupMode,
   "oobe/device": OobeDevice,
   "oobe/agreement": OobeAgreement,
+  "oobe/agreement-user": OobeAgreementUser,
+  "oobe/agreement-beta": OobeAgreementBeta,
+  "oobe/check": OobeCheck,
+  "oobe/theme": OobeTheme,
   "oobe/login": OobeLogin,
   "oobe/welcome": OobeWelcome,
   "oobe/version": OobeVersion,

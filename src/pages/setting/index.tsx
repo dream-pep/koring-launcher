@@ -20,6 +20,7 @@ import {
   Heart,
   Code,
   UserCircle,
+  HardDrive,
 } from "lucide-react";
 import { useRouteStore } from "@/stores/routeStore";
 import { useDeveloperModeStore, refreshDeveloperMode } from "@/stores/developerModeStore";
@@ -30,6 +31,7 @@ import { HomeSetting } from "./general/home";
 import { AccountSetting } from "./general/account";
 import { AboutSetting } from "./general/about";
 import { CopyrightSetting } from "./general/copyright";
+import { StorageSetting } from "./general/storage";
 import { GameSetting } from "./game/game";
 import { GameAccountSetting } from "./game/game-account";
 import { JavaMemSetting } from "./game/java-mem";
@@ -67,6 +69,7 @@ function buildMenuData(
         { key: "home", label: "主页", icon: <Home className={iconCls} />, content: <HomeSetting onNavigate={switchPage} sharedTransition={selected === "home"} /> },
         { key: "about", label: "关于", icon: <Info className={iconCls} />, content: <AboutSetting sharedTransition={selected === "about"} /> },
         { key: "copyright", label: "版权", icon: <Copyright className={iconCls} />, content: <CopyrightSetting /> },
+        { key: "storage", label: "存储", icon: <HardDrive className={iconCls} />, content: <StorageSetting />, scrollShadow: "end" },
       ],
     },
     {

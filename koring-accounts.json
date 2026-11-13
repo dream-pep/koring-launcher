@@ -9,6 +9,14 @@
       "uuid": "cb8357c5-2e4a-246c-306b-bbdda63ad46f",
       "addedAt": 1794048981080,
       "lastLoginAt": 1794048981080
+    },
+    {
+      "id": "cdc9e251-b5f3-469e-9b5e-98cfe5053dd6",
+      "type": "offline",
+      "username": "dream_2",
+      "uuid": "894c0339-c55a-45cc-bea5-c1ba68476584",
+      "addedAt": 1794586366365,
+      "lastLoginAt": 1794586366365
     }
   ]
 }

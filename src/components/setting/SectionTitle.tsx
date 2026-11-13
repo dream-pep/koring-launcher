@@ -13,7 +13,19 @@ export function PageHeader({ title, desc }: { title: string; desc: string }) {
   );
 }
 
-export function SectionTitle({ children }: { children: React.ReactNode }) {
+export function SectionTitle({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  if (icon) {
+    return (
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex size-6 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          {icon}
+        </span>
+        <Typography.Heading level={3} className="text-lg font-bold text-foreground">
+          {children}
+        </Typography.Heading>
+      </div>
+    );
+  }
   return (
     <Typography.Heading level={3} className="text-lg font-bold text-foreground mb-3">
       {children}

@@ -23,6 +23,7 @@ import { registerNewsHandlers } from './handlers/news';
 import { registerUpdateHandlers } from './handlers/update';
 import { registerForcedUpdateHandlers } from './handlers/forced-update';
 import { registerTerracottaHandlers } from './handlers/terracotta';
+import { registerStorageHandlers } from './handlers/storage';
 import { terracottaService } from './core/terracotta';
 import { updateService } from './updater';
 import { saveConfig, configExists, getConfig, flushConfig, configPath } from './config';
@@ -305,6 +306,7 @@ function registerAllHandlers() {
   registerUpdateHandlers();
   registerForcedUpdateHandlers();
   registerTerracottaHandlers(win);
+  registerStorageHandlers(win);
 }
 
 app.whenReady().then(() => {

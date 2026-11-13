@@ -19,8 +19,13 @@ export type RouteKey =
   | "device-blocked"
   | "oobe"
   | "oobe/language"
-  | "oobe/device"
+  | "oobe/setup-mode"
   | "oobe/agreement"
+  | "oobe/agreement-user"
+  | "oobe/agreement-beta"
+  | "oobe/check"
+  | "oobe/theme"
+  | "oobe/device"
   | "oobe/version"
   | "oobe/about-version"
   | "oobe/beta-test"
@@ -102,8 +107,13 @@ export const allRoutes: RouteItem[] = [
   { key: "device-blocked", label: "设备异常", path: "/device-blocked", hidden: true },
   { key: "oobe", label: "OOBE", path: "/oobe", hidden: true },
   { key: "oobe/language", label: "语言设置", path: "/oobe/language", hidden: true },
-  { key: "oobe/device", label: "设备校验", path: "/oobe/device", hidden: true },
+  { key: "oobe/setup-mode", label: "开始方式", path: "/oobe/setup-mode", hidden: true },
   { key: "oobe/agreement", label: "同意协议", path: "/oobe/agreement", hidden: true },
+  { key: "oobe/agreement-user", label: "用户协议与免责声明", path: "/oobe/agreement/user", hidden: true },
+  { key: "oobe/agreement-beta", label: "Beta 测试协议", path: "/oobe/agreement/beta", hidden: true },
+  { key: "oobe/check", label: "激活校验", path: "/oobe/check", hidden: true },
+  { key: "oobe/theme", label: "外观模式", path: "/oobe/theme", hidden: true },
+  { key: "oobe/device", label: "设备校验", path: "/oobe/device", hidden: true },
   { key: "oobe/version", label: "当前版本", path: "/oobe/version", hidden: true },
   { key: "oobe/about-version", label: "关于此版本", path: "/oobe/about-version", hidden: true },
   { key: "oobe/beta-test", label: "测试协议", path: "/oobe/beta-test", hidden: true },
@@ -157,6 +167,10 @@ function getRouteTitleBarMode(key: RouteKey): TitleBarMode {
   if (key === "device-blocked") return "blocked";
   // 强制升级页：复用 OOBE 顶栏（品牌 + 信息胶囊 + 窗口控制，无返回）
   if (key === "forced-update") return "oobe";
+  // 协议子页面：使用常规顶栏，不显示返回按钮（返回由页内按钮完成）
+  if (key === "oobe/agreement-user" || key === "oobe/agreement-beta" || key === "oobe/legal") {
+    return "default";
+  }
   if (key === "oobe" || key.startsWith("oobe/") || key === "upvp" || key.startsWith("upvp/")) return "oobe";
   return topLevelKeys.has(key) ? "default" : "sub";
 }
@@ -181,27 +195,34 @@ function getRouteDepth(key: RouteKey): number {
 
 /** 同一向导流程内的步骤顺序：步骤前进/后退必须带方向，而不是同级交叉淡化 */
 const FLOW_STEPS: Partial<Record<RouteKey, number>> = {
-  // 实际流程：language → device → agreement → about-version → (beta-test) → activation
-  //           → quickstart → quickstart-list → quickstart-game → quickstart-craekote → quickstart-end → finish
-  // 不在流程内（页面保留、仅可手动导航）：login / version / welcome / legal
+  // 实际流程：language → setup-mode → agreement（协议全部折叠，可跳子页查看）
+  //           → check（版本 + 设备同时校验）
+  //           → 直接使用：quickstart；详细配置：theme → login → quickstart
+  //           → quickstart-list → quickstart-game → quickstart-craekote → quickstart-end → finish
+  // 不在流程内（页面保留、仅可手动导航）：device / version / about-version / beta-test / activation / welcome
   oobe: 0,
   "oobe/language": 1,
-  "oobe/device": 2,
+  "oobe/setup-mode": 2,
   "oobe/agreement": 3,
-  "oobe/about-version": 4,
-  "oobe/beta-test": 5,
-  "oobe/activation": 6,
-  "oobe/quickstart": 7,
-  "oobe/quickstart-list": 8,
-  "oobe/quickstart-game": 9,
-  "oobe/quickstart-craekote": 10,
-  "oobe/quickstart-end": 11,
-  "oobe/finish": 12,
-  "oobe/about-info": 13,
-  "oobe/login": 14,
-  "oobe/version": 15,
-  "oobe/welcome": 16,
-  "oobe/legal": 17,
+  "oobe/agreement-user": 4,
+  "oobe/agreement-beta": 5,
+  "oobe/legal": 6,
+  "oobe/check": 7,
+  "oobe/theme": 8,
+  "oobe/login": 9,
+  "oobe/quickstart": 10,
+  "oobe/quickstart-list": 11,
+  "oobe/quickstart-game": 12,
+  "oobe/quickstart-craekote": 13,
+  "oobe/quickstart-end": 14,
+  "oobe/finish": 15,
+  "oobe/about-info": 16,
+  "oobe/device": 17,
+  "oobe/version": 18,
+  "oobe/about-version": 19,
+  "oobe/beta-test": 20,
+  "oobe/activation": 21,
+  "oobe/welcome": 22,
   upvp: 0,
   "upvp/complete": 1,
   "upvp/device": 2,

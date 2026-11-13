@@ -10,7 +10,8 @@
 
 import { useRouteStore } from "@/stores/routeStore";
 import { OobeLayout } from "./layout";
-import { NextButton } from "./next-button";
+import { SettingCard } from "@/components/setting";
+import { Button } from "@heroui/react";
 
 const LEGAL_ITEMS = [
   {
@@ -36,30 +37,36 @@ export function OobeLegal() {
 
   return (
     <OobeLayout>
-      <div className="w-full max-w-lg flex flex-col items-center gap-5 px-6">
+      <div className="w-full max-w-lg flex flex-col items-center gap-3 px-6">
         {/* 标题 */}
-        <div className="text-center space-y-1">
+        <div className="text-center space-y-1 mb-1">
           <h2 className="text-lg font-bold text-foreground">法律信息</h2>
           <p className="text-xs text-muted-foreground">请阅读以下法律声明</p>
         </div>
 
         {/* 法律信息列表 */}
-        <div className="w-full space-y-2">
-          {LEGAL_ITEMS.map((item) => (
-            <div
-              key={item.label}
-              className="w-full px-4 py-3 rounded-xl bg-foreground/[0.03] border border-border/40 dark:border-white/[0.06]"
-            >
+        {LEGAL_ITEMS.map((item, i) => (
+          <div
+            key={item.label}
+            className="w-full animate-list-item-in"
+            style={{ animationDelay: `${i * 45}ms` }}
+          >
+            <SettingCard className="w-full">
               <p className="text-[13.5px] font-medium text-foreground">{item.label}</p>
-              <p className="text-[11.5px] text-muted-foreground/70 mt-1 leading-relaxed whitespace-pre-line">
+              <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed whitespace-pre-line">
                 {item.desc}
               </p>
-            </div>
-          ))}
-        </div>
+            </SettingCard>
+          </div>
+        ))}
       </div>
 
-      <NextButton onClick={() => navigate("oobe/welcome")} />
+      {/* 返回协议列表 */}
+      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
+        <Button variant="outline" size="sm" onPress={() => navigate("oobe/agreement")}>
+          返回协议列表
+        </Button>
+      </div>
     </OobeLayout>
   );
 }

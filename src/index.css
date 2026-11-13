@@ -234,6 +234,70 @@
 }
 
 /* ============================================
+   ScrollShadow — 滚动阴影（内容边缘渐隐提示）
+   颜色跟随模式：浅色模式用浅色（白）、深色模式用深色（黑），
+   相当于让内容在边缘「淡入页面底色」，比压暗/提亮的色带更自然，
+   也避免浅色主题在壁纸上压出一条灰带。
+   渐变用 4 段而不是 2 段，接近真实阴影的衰减曲线，不会出现「一条硬边色带」。
+   尺寸由组件内联 height/width 控制，显隐由组件内联 opacity + transition 控制。
+   ============================================ */
+.scroll-shadow-y,
+.scroll-shadow-x {
+  --scroll-shadow-rgb: 255 255 255;
+  --scroll-shadow-alpha: 0.5;
+}
+.dark .scroll-shadow-y,
+.dark .scroll-shadow-x {
+  --scroll-shadow-rgb: 0 0 0;
+  --scroll-shadow-alpha: 0.42;
+}
+.high-contrast .scroll-shadow-y,
+.high-contrast .scroll-shadow-x {
+  --scroll-shadow-alpha: 0.7;
+}
+.dark.high-contrast .scroll-shadow-y,
+.dark.high-contrast .scroll-shadow-x {
+  --scroll-shadow-alpha: 0.6;
+}
+
+.scroll-shadow-y.scroll-shadow-start {
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--scroll-shadow-rgb) / var(--scroll-shadow-alpha)) 0%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.55)) 30%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.2)) 65%,
+    rgb(var(--scroll-shadow-rgb) / 0) 100%
+  );
+}
+.scroll-shadow-y.scroll-shadow-end {
+  background: linear-gradient(
+    to top,
+    rgb(var(--scroll-shadow-rgb) / var(--scroll-shadow-alpha)) 0%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.55)) 30%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.2)) 65%,
+    rgb(var(--scroll-shadow-rgb) / 0) 100%
+  );
+}
+.scroll-shadow-x.scroll-shadow-start {
+  background: linear-gradient(
+    to right,
+    rgb(var(--scroll-shadow-rgb) / var(--scroll-shadow-alpha)) 0%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.55)) 30%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.2)) 65%,
+    rgb(var(--scroll-shadow-rgb) / 0) 100%
+  );
+}
+.scroll-shadow-x.scroll-shadow-end {
+  background: linear-gradient(
+    to left,
+    rgb(var(--scroll-shadow-rgb) / var(--scroll-shadow-alpha)) 0%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.55)) 30%,
+    rgb(var(--scroll-shadow-rgb) / calc(var(--scroll-shadow-alpha) * 0.2)) 65%,
+    rgb(var(--scroll-shadow-rgb) / 0) 100%
+  );
+}
+
+/* ============================================
    View Transitions — 页面切换动效（方向化）
    前进：旧页向左退场，新页从右进入；后退完全镜像
    ============================================ */
@@ -387,6 +451,12 @@
 }
 .animate-task-button-pop {
   animation: task-button-pop 520ms var(--ease-spring) both;
+}
+
+/* 存储页占用分布长条：首次统计完成后自左向右展开 */
+@keyframes storage-bar-in {
+  from { opacity: 0; transform: scaleX(0.06); }
+  to   { opacity: 1; transform: scaleX(1); }
 }
 @keyframes sheet-in {
   from { opacity: 0; }

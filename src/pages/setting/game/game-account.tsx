@@ -10,11 +10,12 @@
 
 import { useState } from "react";
 import { Button } from "@heroui/react";
-import { Gamepad2, Plus, Check, UserRound } from "lucide-react";
+import { Gamepad2, Plus, Check } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/stores/authStore";
 import { useConfirmDialogStore } from "@/stores/confirmDialogStore";
 import { SettingCard, SettingRow, type SettingBadgeVariant } from "@/components/setting";
+import { AccountAvatar } from "@/components/account/AccountAvatar";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -22,7 +23,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import type { AccountType, AuthAccount } from "@/api/auth-registry";
-import { ACCOUNT_TYPE_LABELS, minecraftAccountAvatar } from "@/lib/minecraft-account";
+import { ACCOUNT_TYPE_LABELS, minecraftAccountAvatar, minecraftAccountSkin } from "@/lib/minecraft-account";
 import { AddAccountDialog } from "./AddAccountDialog";
 
 // 账号类型 → 徽标文案与样式
@@ -44,10 +45,7 @@ function AccountRow({
   onActivate: () => void;
   onDelete: () => void;
 }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const src = minecraftAccountAvatar(account);
   const meta = TYPE_META[account.type];
-  const initial = account.username.slice(0, 1).toUpperCase();
 
   return (
     <ContextMenu>
@@ -67,20 +65,14 @@ function AccountRow({
             <SettingCard>
               <div className="flex items-center gap-3.5">
                 {/* 头像 */}
-                <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-foreground/[0.06] flex items-center justify-center">
-                  {src && !imgFailed ? (
-                    <img
-                      src={src}
-                      alt={account.username}
-                      className="w-10 h-10 object-cover"
-                      onError={() => setImgFailed(true)}
-                    />
-                  ) : initial ? (
-                    <span className="text-[15px] font-bold text-foreground/50">{initial}</span>
-                  ) : (
-                    <UserRound className="w-5 h-5 text-foreground/40" />
-                  )}
-                </div>
+                <AccountAvatar
+                  picture={minecraftAccountAvatar(account)}
+                  skin={minecraftAccountSkin(account)}
+                  name={account.username}
+                  size={40}
+                  alt={account.username}
+                  frameClassName="bg-foreground/[0.06] text-foreground/50"
+                />
 
                 {/* 账号信息 + 操作 */}
                 <div className="flex-1 min-w-0">

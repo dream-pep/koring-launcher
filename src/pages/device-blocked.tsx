@@ -26,7 +26,7 @@ export function DeviceBlocked() {
 
   const goNext = useCallback(() => {
     leavingRef.current = true;
-    navigate(oobePending ? "oobe/device" : "home");
+    navigate(oobePending ? "oobe/check" : "home");
   }, [navigate, oobePending]);
 
   const retry = async () => {

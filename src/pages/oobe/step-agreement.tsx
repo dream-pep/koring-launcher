@@ -1,95 +1,140 @@
-//  __         __     __   __     ______     __  __     ______        __   __     ______     ______
-// /\ \       /\ \   /\ "-.\ \   /\  ___\   /\ \/ /    /\  ___\      /\ "-.\ \   /\  ___\   /\__  _\
-// \ \ \____  \ \ \  \ \ \-.  \  \ \ \__ \  \ \  _"-.  \ \  __\      \ \ \-.  \  \ \  __\   \/_/\ \/
-//  \ \_____\  \ \_\  \ \_\\"\_\  \ \_____\  \ \_\ \_\  \ \_____\     \ \_\\"\_\  \ \_____\    \ \_\
-//   \/_____/   \/_/   \/_/ \/_/   \/_____/   \/_/\/_/   \/_____/      \/_/ \/_/   \/_____/     \/_/
-//
-// 所有权利归Lingke Network (china)所有 | dream_pep拥有其艺术改变权力
-// 未经允许的情况下删除此版权头可能会受到民事指控
-// 请勿在未经Lingke Network (china)允许的范围内修改代码并分发
-
 import { useState } from "react";
-import { ExternalLink } from "lucide-react";
 import { useRouteStore } from "@/stores/routeStore";
 import { OobeLayout } from "./layout";
 import { NextButton } from "./next-button";
+import { SettingCard } from "@/components/setting";
+import { Button } from "@heroui/react";
+import { Check, ChevronDown, ExternalLink } from "lucide-react";
 
-const openLink = (url: string) => {
-  window.electronAPI?.openExternal(url);
-};
+const LICENSE_URL = "https://support.lingke.ink/Koring/系列产品分发有限许可";
+const USER_AGREEMENT_URL = "https://support.lingke.ink/Koring/系列产品用户协议与免责声明";
 
-const AGREEMENT_LINKS = [
-  {
-    label: "用户协议与免责声明",
-    desc: "Copyright © Shenzhen Prism Horizon Technology Co., Ltd.",
-    url: "https://support.lingke.ink/Koring/系列产品用户协议与免责声明",
-  },
-  {
-    label: "产品分发有限许可",
-    desc: "除本许可明确授予的权利外，许可方保留软件及其相关知识产权中的全部权利。",
-    url: "https://support.lingke.ink/Koring/系列产品分发有限许可",
-  },
-];
+interface AgreementItem {
+  key: string;
+  title: string;
+  summary: string;
+  /** 跳转子页面（站内文本） */
+  view?: () => void;
+  /** 在浏览器中打开 */
+  external?: string;
+}
 
+/** 测试协议签署：统一折叠的卡片列表，沿用设置页卡片样式。 */
 export function OobeAgreement() {
   const navigate = useRouteStore((s) => s.navigate);
-  const [checked, setChecked] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
+
+  const items: AgreementItem[] = [
+    {
+      key: "user",
+      title: "用户协议与免责声明",
+      summary: "使用 Koring 启动器前请阅读并充分理解服务内容、用户义务与免责条款。",
+      view: () => navigate("oobe/agreement-user"),
+      external: USER_AGREEMENT_URL,
+    },
+    {
+      key: "license",
+      title: "产品分发有限许可",
+      summary: "本产品仅限个人使用，未经许可不得进行二次分发、修改或商业使用。",
+      external: LICENSE_URL,
+    },
+    {
+      key: "beta",
+      title: "Koring APP Beta 测试协议",
+      summary: "测试版本可能存在不稳定或数据异常，请知悉并自愿参与测试计划。",
+      view: () => navigate("oobe/agreement-beta"),
+    },
+    {
+      key: "legal",
+      title: "法律信息与隐私声明",
+      summary: "了解我们的数据收集范围、存储方式与使用目的。",
+      view: () => navigate("oobe/legal"),
+    },
+  ];
 
   return (
     <OobeLayout>
-      <div className="w-full max-w-lg flex flex-col items-center gap-5 px-6">
-        {/* 标题 */}
-        <div className="text-center space-y-1">
-          <h2 className="text-lg font-bold text-foreground">确认产品协议</h2>
-          <p className="text-xs text-muted-foreground">您需要同意以下协议才可以继续</p>
+      <div className="w-full max-w-md flex flex-col items-center gap-2.5 px-6">
+        <div className="text-center space-y-1 mb-1">
+          <h2 className="text-lg font-bold text-foreground">协议与隐私</h2>
+          <p className="text-xs text-muted-foreground">请阅读并同意以下内容以继续使用</p>
         </div>
 
-        {/* 协议链接列表 */}
-        <div className="w-full space-y-2">
-          {AGREEMENT_LINKS.map((item) => (
+        {items.map((item, i) => {
+          const expanded = open === item.key;
+          return (
             <div
-              key={item.label}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-foreground/[0.03] border border-border/40 dark:border-white/[0.06]"
+              key={item.key}
+              className="w-full animate-list-item-in"
+              style={{ animationDelay: `${i * 45}ms` }}
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-[13.5px] font-medium text-foreground">{item.label}</p>
-                <p className="text-[11.5px] text-muted-foreground/70 mt-0.5 leading-relaxed">{item.desc}</p>
-              </div>
-              <button
-                onClick={() => openLink(item.url)}
-                className="flex items-center gap-1 px-3 h-7 rounded-lg text-[12px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0 cursor-pointer"
-              >
-                查看
-                <ExternalLink className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-        </div>
+              <SettingCard className="w-full">
+                <button
+                  onClick={() => setOpen(expanded ? null : item.key)}
+                  className="w-full flex items-center justify-between gap-4 text-left"
+                >
+                  <span className="text-sm font-medium text-foreground">{item.title}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-muted-foreground/60 shrink-0 transition-transform duration-200 ${
+                      expanded ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
 
-        {/* 勾选框 */}
-        <label className="flex items-start gap-2.5 cursor-pointer select-none group">
-          <div className="relative mt-0.5">
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={(e) => setChecked(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-4 h-4 rounded border border-border/60 bg-foreground/[0.03] peer-checked:bg-primary peer-checked:border-primary transition-colors flex items-center justify-center">
-              {checked && (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="2 6 5 9 10 3" />
-                </svg>
-              )}
+                {expanded && (
+                  <div className="animate-list-item-in mt-3 pt-3 space-y-2.5 border-t border-black/[0.05] dark:border-white/[0.06]">
+                    <p className="text-[12.5px] leading-relaxed text-muted-foreground">{item.summary}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {item.view && (
+                        <Button variant="outline" size="sm" onPress={item.view}>
+                          查看完整协议
+                        </Button>
+                      )}
+                      {item.external && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onPress={() => window.electronAPI?.openExternal(item.external as string)}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          在浏览器中打开
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </SettingCard>
             </div>
-          </div>
-          <span className="text-xs text-muted-foreground leading-relaxed group-hover:text-foreground/70 transition-colors">
-            我已详细阅读以上协议，且同意其内容并签署此协议。
+          );
+        })}
+
+        <label
+          className="animate-list-item-in w-full flex items-start gap-3 cursor-pointer select-none mt-1 px-1"
+          style={{ animationDelay: `${items.length * 45}ms` }}
+        >
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="sr-only"
+            aria-label="同意协议"
+          />
+          <span
+            className={`mt-0.5 w-4 h-4 rounded-[5px] border shrink-0 flex items-center justify-center transition-colors ${
+              agreed ? "bg-primary border-primary" : "border-border/60 bg-white/60 dark:bg-black/30"
+            }`}
+          >
+            {agreed && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3} />}
+          </span>
+          <span className="text-[12.5px] leading-relaxed text-muted-foreground">
+            我已阅读并同意上述协议，并自愿承担由此产生的相关责任。
           </span>
         </label>
       </div>
 
-      <NextButton onClick={() => navigate("oobe/about-version")} disabled={!checked} />
+      {/* 同意协议后进入设备与版本校验 */}
+      <NextButton disabled={!agreed} onClick={() => navigate("oobe/check")} />
     </OobeLayout>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { ScrollShadow } from "@/components/ui/scroll-shadow";
 
 /** 侧边栏中的一个条目 */
 export interface PageShellItem {
@@ -38,6 +39,11 @@ export interface PageShellItem {
    * 子页内容与切换动画照常工作。
    */
   hidden?: boolean;
+  /**
+   * 子页滚动阴影：不传 = 不加阴影（默认）；"end" = 只在底部渐变；"both" = 上下都有。
+   * 只有确实需要「下面还有内容」提示的长页面才开。
+   */
+  scrollShadow?: "end" | "both";
 }
 
 /** 侧边栏分组（分组之间自动画分隔线） */
@@ -348,13 +354,30 @@ export function PageShell({
               <div
                 key={item.key}
                 className={cn(
-                  "absolute inset-0 scroll-area overflow-y-auto",
-                  pageClassName,
+                  "absolute inset-0",
                   !active && !leaving && "hidden",
                   animClass,
                 )}
               >
-                {item.content}
+                {/* 每个子页独立滚动；只有声明了 scrollShadow 的条目才加边缘阴影 */}
+                {item.scrollShadow ? (
+                  <ScrollShadow
+                    className="h-full"
+                    contentClassName={pageClassName}
+                    start={item.scrollShadow === "both"}
+                  >
+                    {item.content}
+                  </ScrollShadow>
+                ) : (
+                  <div
+                    className={cn(
+                      "scroll-area h-full w-full overflow-x-hidden overflow-y-auto",
+                      pageClassName,
+                    )}
+                  >
+                    {item.content}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -38,11 +38,11 @@ export function OobeFinish() {
       .then((result) => {
         if (cancelled) return;
         if (result.block === "device_blacklisted") {
-          navigate("oobe/device");
+          navigate("device-blocked");
           return;
         }
         if (result.block === "activation_blocked") {
-          navigate("oobe/activation");
+          navigate("oobe/check");
           return;
         }
         if (result.block === "force_upgrade") {
