@@ -24,6 +24,9 @@ import { useConfigStore } from "@/stores/configStore";
 /** 目录显示名：优先用设置页里配置的自定义名称（dirAliases），否则取路径最后一段 */
 function folderDisplayName(folder: string, alias?: string): string {
   if (alias) return alias;
+  // 相对路径（默认 .minecraft）没有可比对的「最后一段」，直接给个明确的名字，
+  // 否则和其它目录（末尾同样是 .minecraft）混在一起分不清谁是谁
+  if (!folder.includes("\\") && !folder.includes("/")) return "默认游戏目录";
   const segments = folder.split(/[\\/]+/).filter(Boolean);
   return segments[segments.length - 1] || folder;
 }
@@ -124,7 +127,9 @@ export function InstancePage() {
       const listed = target === mainDir || (gameDirs || []).includes(target);
       if (!listed) setGame({ gameDirs: [...(gameDirs || []), target] });
 
-      const existing = await listInstances(mainDir);
+      // 导入到「这个目录自己」的 instances/ 下，而不是当前目录：
+      // 否则侧边栏选中 A 时内容里会出现 B 的实例，切到 B 又什么都没有。
+      const existing = await listInstances(target);
       const takenNames = new Set(existing.map((instance) => instance.name));
       const importedVersions = new Set(
         existing
@@ -142,7 +147,7 @@ export function InstancePage() {
           continue;
         }
         try {
-          await importExistingInstance(name, mainDir, version.id, {
+          await importExistingInstance(name, target, version.id, {
             description: `从 ${target} 导入的 ${version.id}`,
             sourceGamePath: target,
             mode: "reference",
@@ -153,6 +158,14 @@ export function InstancePage() {
         } catch {
           failed += 1;
         }
+      }
+
+      // 导入成功就切到这个目录，让用户直接看到刚导入的实例（不成功就保持原选中项）
+      if (ok > 0 && target !== mainDir) {
+        setGame({
+          gameDir: target,
+          gameDirs: (gameDirs || []).concat(target).filter((dir) => dir !== target),
+        });
       }
 
       setReloadKey((value) => value + 1);
